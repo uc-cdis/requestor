@@ -11,6 +11,7 @@ config = Config(".env")
 # Server
 
 DEBUG = config("DEBUG", cast=bool, default=True)
+TESTING = config("TESTING", cast=bool, default=False)
 URL_PREFIX = config("URL_PREFIX", default="/" if DEBUG else "/requestor")
 
 
@@ -21,7 +22,11 @@ DB_HOST = config("DB_HOST", default=None)
 DB_PORT = config("DB_PORT", cast=int, default=None)
 DB_USER = config("DB_USER", default=None)
 DB_PASSWORD = config("DB_PASSWORD", cast=Secret, default=None)
-DB_DATABASE = config("DB_DATABASE", default=None)
+DB_DATABASE = config("DB_DATABASE", default="requestor")
+
+if TESTING:
+    DB_DATABASE = DB_DATABASE + "_test"
+    TEST_KEEP_DB = config("TEST_KEEP_DB", cast=bool, default=False)
 
 DB_URL = config(
     "DB_URL",
