@@ -2,6 +2,6 @@
 
 ```
 poetry install
-PYTHONPATH=. alembic upgrade head
+alembic upgrade head
 uvicorn requestor.asgi:app --reload
 ```

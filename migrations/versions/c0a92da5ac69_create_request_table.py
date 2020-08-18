@@ -2,13 +2,12 @@
 
 Revision ID: c0a92da5ac69
 Revises:
-Create Date: 2020-08-14 16:58:51.718639
+Create Date: 2020-08-18 13:40:12.031174
 
 """
-from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID
-
+from alembic import op
+from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = "c0a92da5ac69"
@@ -19,15 +18,28 @@ depends_on = None
 
 def upgrade():
     op.create_table(
-        "request",
-        sa.Column("request_id", UUID(), nullable=False),
-        sa.Column("username", sa.VARCHAR(), nullable=False),
-        sa.Column("resource_path", sa.VARCHAR(), nullable=False),
-        sa.Column("resource_name", sa.VARCHAR(), nullable=False),
-        sa.Column("status", sa.VARCHAR(), nullable=False),
-        sa.PrimaryKeyConstraint("request_id", name="request_pkey"),
+        "requests",
+        sa.Column("request_id", postgresql.UUID(), nullable=False),
+        sa.Column("username", sa.String(), nullable=True),
+        sa.Column("resource_path", sa.String(), nullable=True),
+        sa.Column("resource_name", sa.String(), nullable=True),
+        sa.Column(
+            "status",
+            sa.Enum(
+                "DRAFT",
+                "SUBMITTED",
+                "APPROVED",
+                "SIGNED",
+                "REJECTED",
+                name="requeststatusenum",
+            ),
+            nullable=True,
+        ),
+        sa.PrimaryKeyConstraint("request_id"),
+        sa.UniqueConstraint("username", "resource_path"),
     )
 
 
 def downgrade():
-    op.drop_table("request")
+    op.drop_table("requests")
+    op.execute("DROP TYPE requeststatusenum;")

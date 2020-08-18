@@ -1,34 +1,44 @@
 import asyncio
-from fastapi import FastAPI, APIRouter
-from fastapi_sqlalchemy import DBSessionMiddleware
-import httpx
 import logging
 
-from requestor import config
-from requestor.routes.system import router as system_router
-from requestor.routes.request import router as request_router
+import httpx
+from fastapi import FastAPI
 
+try:
+    from importlib.metadata import entry_points, version
+except ImportError:
+    from importlib_metadata import entry_points, version
+
+from . import config
+from .models import db
 
 logger = logging.getLogger("requestor")
 if config.DEBUG:
     logger.setLevel(logging.DEBUG)
 
 
+def load_modules(app=None):
+    for ep in entry_points()["requestor.modules"]:
+        logger.info("Loading module: %s", ep.name)
+        mod = ep.load()
+        if app:
+            init_app = getattr(mod, "init_app", None)
+            if init_app:
+                init_app(app)
+
+
 def app_init():
     logger.info("Initializing app")
     app = FastAPI(
         title="Requestor",
-        # version=pkg_resources.get_distribution("mds").version,
+        version=version("requestor"),
         debug=config.DEBUG,
         root_path=config.URL_PREFIX,
     )
     app.add_middleware(ClientDisconnectMiddleware)
-    app.add_middleware(DBSessionMiddleware, db_url=config.DB_URL)
     app.async_client = httpx.AsyncClient()
-
-    # add routes
-    app.include_router(system_router, tags=["System"])
-    app.include_router(request_router, tags=["Request"])
+    db.init_app(app)
+    load_modules(app)
 
     @app.on_event("shutdown")
     async def shutdown_event():
