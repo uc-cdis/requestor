@@ -30,10 +30,10 @@ class Request(db.Model):
     __tablename__ = "requests"
 
     request_id = Column(UUID, primary_key=True)
-    username = Column(String)
-    resource_path = Column(String)
-    resource_name = Column(String)
-    status = Column(Enum(RequestStatusEnum))
+    username = Column(String, nullable=False)
+    resource_path = Column(String, nullable=False)
+    resource_name = Column(String, nullable=False)
+    status = Column(Enum(RequestStatusEnum), nullable=False)
 
     # users can only request access to a resource once
     _uniq = UniqueConstraint("username", "resource_path")

@@ -20,9 +20,9 @@ def upgrade():
     op.create_table(
         "requests",
         sa.Column("request_id", postgresql.UUID(), nullable=False),
-        sa.Column("username", sa.String(), nullable=True),
-        sa.Column("resource_path", sa.String(), nullable=True),
-        sa.Column("resource_name", sa.String(), nullable=True),
+        sa.Column("username", sa.String(), nullable=False),
+        sa.Column("resource_path", sa.String(), nullable=False),
+        sa.Column("resource_name", sa.String(), nullable=False),
         sa.Column(
             "status",
             sa.Enum(
@@ -33,7 +33,7 @@ def upgrade():
                 "REJECTED",
                 name="requeststatusenum",
             ),
-            nullable=True,
+            nullable=False,
         ),
         sa.PrimaryKeyConstraint("request_id"),
         sa.UniqueConstraint("username", "resource_path"),

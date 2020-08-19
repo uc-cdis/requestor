@@ -37,6 +37,7 @@ async def create_request(body: CreateRequestInput):
     """
     TODO
     """
+    # TODO users can only request access to a resource once
     try:
         request = await RequestModel.create(
             request_id=str(uuid.uuid4()), status=RequestStatusEnum.DRAFT, **body.dict()
