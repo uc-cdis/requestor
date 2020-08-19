@@ -38,15 +38,22 @@ async def create_request(body: CreateRequestInput):
     """
     TODO
     """
-    # TODO users can only request access to a resource once
+    request_id = str(uuid.uuid4())
     try:
         request = await RequestModel.create(
-            request_id=str(uuid.uuid4()), status=RequestStatusEnum.DRAFT, **body.dict()
+            request_id=request_id, status=RequestStatusEnum.DRAFT, **body.dict()
         )
     except UniqueViolationError:
-        logger.error("Unable to create request", exc_info=True)
-        raise HTTPException(HTTP_409_CONFLICT, "Please try again")
-        # TODO should retry generating unique request_id automatically
+        # assume the error is because a request with this (username,
+        # resource_path) already exists, not about a duplicate request_id
+        logger.error(
+            f"Unable to create request. request_id: {request_id}. body: {body}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            HTTP_409_CONFLICT,
+            "An access request for these username and resource_path already exists. Users can only request access to a resource once.",
+        )
     else:
         return request.to_dict()
 
