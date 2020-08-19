@@ -9,6 +9,7 @@ from starlette.status import (
     HTTP_409_CONFLICT,
 )
 
+from .. import logger
 from ..models import RequestStatusEnum, Request as RequestModel
 
 router = APIRouter()
@@ -43,6 +44,7 @@ async def create_request(body: CreateRequestInput):
             request_id=str(uuid.uuid4()), status=RequestStatusEnum.DRAFT, **body.dict()
         )
     except UniqueViolationError:
+        logger.error("Unable to create request", exc_info=True)
         raise HTTPException(HTTP_409_CONFLICT, "Please try again")
         # TODO should retry generating unique request_id automatically
     else:
@@ -64,6 +66,22 @@ async def update_request(
         .gino.first_or_404()
     )
     return request.to_dict()
+
+
+@router.delete("/request/{request_id}", status_code=HTTP_204_NO_CONTENT)
+async def delete_request(request_id: uuid.UUID):
+    """
+    TODO
+    """
+    request = (
+        await RequestModel.delete.where(RequestModel.request_id == request_id)
+        .returning(*RequestModel)
+        .gino.first()
+    )
+    if request:
+        return {}
+    else:
+        raise HTTPException(HTTP_404_NOT_FOUND, f"Not found: {request_id}")
 
 
 def init_app(app: FastAPI):

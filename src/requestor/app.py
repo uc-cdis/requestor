@@ -9,12 +9,8 @@ try:
 except ImportError:
     from importlib_metadata import entry_points, version
 
-from . import config
+from . import config, logger
 from .models import db
-
-logger = logging.getLogger("requestor")
-if config.DEBUG:
-    logger.setLevel(logging.DEBUG)
 
 
 def load_modules(app=None):

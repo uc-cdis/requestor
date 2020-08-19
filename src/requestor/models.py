@@ -32,7 +32,7 @@ class Request(db.Model):
     request_id = Column(UUID, primary_key=True)
     username = Column(String, nullable=False)
     resource_path = Column(String, nullable=False)
-    resource_name = Column(String, nullable=False)
+    resource_name = Column(String)
     status = Column(Enum(RequestStatusEnum), nullable=False)
 
     # users can only request access to a resource once

@@ -22,7 +22,7 @@ def upgrade():
         sa.Column("request_id", postgresql.UUID(), nullable=False),
         sa.Column("username", sa.String(), nullable=False),
         sa.Column("resource_path", sa.String(), nullable=False),
-        sa.Column("resource_name", sa.String(), nullable=False),
+        sa.Column("resource_name", sa.String()),
         sa.Column(
             "status",
             sa.Enum(
