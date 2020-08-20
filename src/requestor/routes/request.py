@@ -3,13 +3,16 @@ import uuid
 from asyncpg.exceptions import UniqueViolationError
 from fastapi import APIRouter, FastAPI, HTTPException, Body
 from pydantic import BaseModel
+from starlette.requests import Request
 from starlette.status import (
+    HTTP_200_OK,
     HTTP_201_CREATED,
     HTTP_204_NO_CONTENT,
     HTTP_409_CONFLICT,
+    HTTP_500_INTERNAL_SERVER_ERROR,
 )
 
-from .. import logger
+from .. import logger, arborist
 from ..models import RequestStatusEnum, Request as RequestModel
 
 router = APIRouter()
@@ -17,10 +20,7 @@ router = APIRouter()
 
 class CreateRequestInput(BaseModel):
     """
-    Create a request.
-    username (str)
-    resource_path (str)
-    resource_name (str, optional)
+    Create an access request.
     """
 
     username: str
@@ -58,14 +58,45 @@ async def create_request(body: CreateRequestInput):
         return request.to_dict()
 
 
+@router.get("/request/{request_id}", status_code=HTTP_200_OK)
+async def get_request(request_id: uuid.UUID):
+    request = await RequestModel.query.where(
+        RequestModel.request_id == request_id
+    ).gino.first_or_404()
+    return request.to_dict()
+
+
 @router.put("/request/{request_id}", status_code=HTTP_204_NO_CONTENT)
 async def update_request(
-    request_id: uuid.UUID, status: RequestStatusEnum = Body(..., embed=True),
+    request_id: uuid.UUID,
+    api_request: Request,
+    status: RequestStatusEnum = Body(..., embed=True),
 ):
     """
     TODO
     """
-    # TODO update arborist if status is "approved"
+    # the access request is approved: grant access
+    if status == RequestStatusEnum.APPROVED:
+        request = await RequestModel.query.where(
+            RequestModel.request_id == request_id
+        ).gino.first_or_404()
+
+        # assume we are always granting a user access to a resource.
+        # in the future we may want to handle more use cases
+        success = await arborist.grant_user_access_to_resource(
+            api_request.app.arborist_client,
+            request.username,
+            request.resource_path,
+            request.resource_name,
+        )
+
+        if not success:
+            logger.error(f"Unable to grant access. Check previous logs for errors")
+            raise HTTPException(
+                HTTP_500_INTERNAL_SERVER_ERROR,
+                "Something went wrong, unable to grant access",
+            )
+
     request = await (
         RequestModel.update.where(RequestModel.request_id == request_id)
         .values(status=status)
@@ -83,12 +114,8 @@ async def delete_request(request_id: uuid.UUID):
     request = (
         await RequestModel.delete.where(RequestModel.request_id == request_id)
         .returning(*RequestModel)
-        .gino.first()
+        .gino.first_or_404()
     )
-    if request:
-        return {}
-    else:
-        raise HTTPException(HTTP_404_NOT_FOUND, f"Not found: {request_id}")
 
 
 def init_app(app: FastAPI):

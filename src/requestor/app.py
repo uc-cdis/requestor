@@ -1,13 +1,14 @@
 import asyncio
-import logging
-
 import httpx
+import logging
 from fastapi import FastAPI
 
 try:
     from importlib.metadata import entry_points, version
 except ImportError:
     from importlib_metadata import entry_points, version
+
+from gen3authz.client.arborist.client import ArboristClient
 
 from . import config, logger
 from .models import db
@@ -35,6 +36,13 @@ def app_init():
     app.async_client = httpx.AsyncClient()
     db.init_app(app)
     load_modules(app)
+
+    if config.ARBORIST_URL:
+        app.arborist_client = ArboristClient(
+            arborist_base_url=config.ARBORIST_URL, logger=logger
+        )
+    else:
+        app.arborist_client = ArboristClient(logger=logger)
 
     @app.on_event("shutdown")
     async def shutdown_event():
