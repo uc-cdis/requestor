@@ -40,29 +40,38 @@ def client():
         yield client
 
 
-@pytest.fixture(scope="function")
-def mock_arborist_requests(request):
-    def do_patch():
-        def make_mock_response(*args, **kwargs):
-            mocked_response = MagicMock(requests.Response)
-            mocked_response.status_code = 200
-            mocked_response.json.return_value = {}
-            return mocked_response
+# unused for now
+# @pytest.fixture(scope="function")
+# def mock_arborist_requests(request):
+#     def do_patch(urls_to_responses=None):
+#         urls_to_responses = urls_to_responses or {}
 
-        mocked_method = MagicMock(side_effect=make_mock_response)
-        patch_method = patch(
-            "gen3authz.client.arborist.client.httpx.Client.request", mocked_method
-        )
+#         def make_mock_response(method, url, *args, **kwargs):
+#             method = method.upper()
+#             mocked_response = MagicMock(requests.Response)
 
-        patch_method.start()
-        request.addfinalizer(patch_method.stop)
+#             if url not in urls_to_responses:
+#                 mocked_response.status_code = 404
+#                 mocked_response.text = "NOT FOUND"
+#             elif method not in urls_to_responses[url]:
+#                 mocked_response.status_code = 405
+#                 mocked_response.text = "METHOD NOT ALLOWED"
+#             else:
+#                 content, code = urls_to_responses[url][method]
+#                 mocked_response.status_code = code
+#                 if isinstance(content, dict):
+#                     mocked_response.json.return_value = content
+#                 else:
+#                     mocked_response.text = content
 
-    return do_patch
+#             return mocked_response
 
+#         mocked_method = MagicMock(side_effect=make_mock_response)
+#         patch_method = patch(
+#             "gen3authz.client.arborist.client.httpx.Client.request", mocked_method
+#         )
 
-@pytest.fixture(autouse=True)
-def arborist_authorized(mock_arborist_requests):
-    """
-    By default, mock all arborist calls.
-    """
-    mock_arborist_requests()
+#         patch_method.start()
+#         request.addfinalizer(patch_method.stop)
+
+#     return do_patch

@@ -13,9 +13,11 @@ async def grant_user_access_to_resource(
     TODO: cache things that already exist
     """
     # create the user
+    logger.debug(f"Attempting to create user {username} in Arborist")
     await arborist_client.create_user_if_not_exist(username)
 
     # create the resource
+    logger.debug(f"Attempting to create resource {resource_path} in Arborist")
     resources = resource_path.split("/")
     resource_name = resources[-1]
     parent_path = "/".join(resources[:-1])
@@ -27,16 +29,19 @@ async def grant_user_access_to_resource(
 
     # create the policy
     policy_id = ".".join(resources[1:]) + "_reader"
+    logger.debug(f"Attempting to create policy {policy_id} in Arborist")
     # assume "reader" and "storage_reader" roles already exist,
     # what could go wrong :-) (TODO)
     policy = {
         "id": policy_id,
+        "description": "policy created by requestor",
         "role_ids": ["reader", "storage_reader"],
         "resource_paths": [resource_path],
     }
     await arborist_client.create_policy(policy, skip_if_exists=True)
 
     # grant the user access to the resource
+    logger.debug(f"Attempting to grant {username} access to {policy_id}")
     status_code = await arborist_client.grant_user_policy(username, policy_id)
     if status_code != 204:
         logger.error(f"Unable to grant access, got status code: {status_code}")

@@ -30,6 +30,7 @@ class CreateRequestInput(BaseModel):
 
 @router.get("/request")
 async def list_requests():
+    logger.debug("Listing all requests")
     return [r.to_dict() for r in (await RequestModel.query.gino.all())]
 
 
@@ -40,6 +41,7 @@ async def create_request(body: CreateRequestInput):
     """
     request_id = str(uuid.uuid4())
     try:
+        logger.debug(f"Creating request. request_id: {request_id}. Body: {body.dict()}")
         request = await RequestModel.create(
             request_id=request_id, status=RequestStatusEnum.DRAFT, **body.dict()
         )
@@ -60,6 +62,7 @@ async def create_request(body: CreateRequestInput):
 
 @router.get("/request/{request_id}", status_code=HTTP_200_OK)
 async def get_request(request_id: uuid.UUID):
+    logger.debug(f"Getting request '{request_id}'")
     request = await RequestModel.query.where(
         RequestModel.request_id == request_id
     ).gino.first_or_404()
@@ -75,14 +78,18 @@ async def update_request(
     """
     TODO
     """
+    logger.debug(f"Updating request '{request_id}' with status '{status}'")
+
     # the access request is approved: grant access
     if status == RequestStatusEnum.APPROVED:
+        logger.debug(f"Status is 'approved', attempting to grant access in Arborist")
         request = await RequestModel.query.where(
             RequestModel.request_id == request_id
         ).gino.first_or_404()
 
         # assume we are always granting a user access to a resource.
         # in the future we may want to handle more use cases
+        logger.debug(f"username: {request.username}, resource: {request.resource_path}")
         success = await arborist.grant_user_access_to_resource(
             api_request.app.arborist_client,
             request.username,
@@ -111,6 +118,7 @@ async def delete_request(request_id: uuid.UUID):
     """
     TODO
     """
+    logger.debug(f"Deleting request '{request_id}'")
     request = (
         await RequestModel.delete.where(RequestModel.request_id == request_id)
         .returning(*RequestModel)

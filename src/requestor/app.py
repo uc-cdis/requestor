@@ -1,6 +1,5 @@
 import asyncio
 import httpx
-import logging
 from fastapi import FastAPI
 
 try:
@@ -34,15 +33,19 @@ def app_init():
     )
     app.add_middleware(ClientDisconnectMiddleware)
     app.async_client = httpx.AsyncClient()
-    db.init_app(app)
-    load_modules(app)
 
+    logger.info("Initializing Arborist client")
     if config.ARBORIST_URL:
         app.arborist_client = ArboristClient(
-            arborist_base_url=config.ARBORIST_URL, logger=logger
+            arborist_base_url=config.ARBORIST_URL,
+            authz_provider="requestor",
+            logger=logger,
         )
     else:
-        app.arborist_client = ArboristClient(logger=logger)
+        app.arborist_client = ArboristClient(authz_provider="requestor", logger=logger)
+
+    db.init_app(app)
+    load_modules(app)
 
     @app.on_event("shutdown")
     async def shutdown_event():

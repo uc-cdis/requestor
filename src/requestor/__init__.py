@@ -1,11 +1,7 @@
-import logging
+from cdislogging import get_logger
+
 from . import config
 
 
-logger = logging.getLogger("requestor")
-logging.basicConfig(level=logging.WARNING)
-
-
-if config.DEBUG:
-    logger.setLevel(logging.DEBUG)
-    logging.basicConfig(level=logging.DEBUG)
+log_level = "debug" if config.DEBUG else "info"
+logger = get_logger("requestor", log_level=log_level)

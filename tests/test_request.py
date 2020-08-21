@@ -1,8 +1,9 @@
 import pytest
+from unittest.mock import patch
 
 
 @pytest.fixture(autouse=True)
-def run_around_tests(client):
+def clean_db(client):
     # before each test, delete all existing requests from the DB
     res = client.get("/request")
     assert res.status_code == 200
@@ -93,7 +94,9 @@ def test_update_request(client):
 
     # update the request status and grant access
     status = "approved"  # TODO make that configurable
-    res = client.put(f"/request/{request_id}", json={"status": status})
+    with patch("gen3authz.client.arborist.client.httpx.Client.request") as mock_request:
+        mock_request.return_value.status_code = 204
+        res = client.put(f"/request/{request_id}", json={"status": status})
     assert res.status_code == 204, res.text
     request_data = res.json()
     assert request_data["status"] == status
