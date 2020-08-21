@@ -8,12 +8,13 @@ from starlette.status import (
     HTTP_200_OK,
     HTTP_201_CREATED,
     HTTP_204_NO_CONTENT,
+    HTTP_400_BAD_REQUEST,
     HTTP_409_CONFLICT,
     HTTP_500_INTERNAL_SERVER_ERROR,
 )
 
-from .. import logger, arborist
-from ..models import RequestStatusEnum, Request as RequestModel
+from .. import config, logger, arborist
+from ..models import Request as RequestModel
 
 router = APIRouter()
 
@@ -42,9 +43,7 @@ async def create_request(body: CreateRequestInput):
     request_id = str(uuid.uuid4())
     try:
         logger.debug(f"Creating request. request_id: {request_id}. Body: {body.dict()}")
-        request = await RequestModel.create(
-            request_id=request_id, status=RequestStatusEnum.DRAFT, **body.dict()
-        )
+        request = await RequestModel.create(request_id=request_id, **body.dict())
     except UniqueViolationError:
         # assume the error is because a request with this (username,
         # resource_path) already exists, not about a duplicate request_id
@@ -71,18 +70,26 @@ async def get_request(request_id: uuid.UUID):
 
 @router.put("/request/{request_id}", status_code=HTTP_204_NO_CONTENT)
 async def update_request(
-    request_id: uuid.UUID,
-    api_request: Request,
-    status: RequestStatusEnum = Body(..., embed=True),
+    request_id: uuid.UUID, api_request: Request, status: str = Body(..., embed=True),
 ):
     """
     TODO
     """
     logger.debug(f"Updating request '{request_id}' with status '{status}'")
 
+    allowed_statuses = config["ALLOWED_REQUEST_STATUSES"]
+    if status not in allowed_statuses:
+        raise HTTPException(
+            HTTP_400_BAD_REQUEST,
+            f"Status '{status}' is not an allowed request status ({allowed_statuses})",
+        )
+
     # the access request is approved: grant access
-    if status == RequestStatusEnum.APPROVED:
-        logger.debug(f"Status is 'approved', attempting to grant access in Arborist")
+    approved_status = config["GRANT_ACCESS_STATUS"]
+    if status == approved_status:
+        logger.debug(
+            f"Status is '{approved_status}', attempting to grant access in Arborist"
+        )
         request = await RequestModel.query.where(
             RequestModel.request_id == request_id
         ).gino.first_or_404()

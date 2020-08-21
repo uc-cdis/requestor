@@ -18,14 +18,6 @@ db = Gino(
 )
 
 
-class RequestStatusEnum(enum.Enum):
-    DRAFT = "draft"
-    SUBMITTED = "submitted"
-    APPROVED = "approved"
-    SIGNED = "signed"
-    REJECTED = "rejected"
-
-
 class Request(db.Model):
     __tablename__ = "requests"
 
@@ -33,7 +25,7 @@ class Request(db.Model):
     username = Column(String, nullable=False)
     resource_path = Column(String, nullable=False)
     resource_name = Column(String)
-    status = Column(Enum(RequestStatusEnum), nullable=False)
+    status = Column(String)
 
     # users can only request access to a resource once
     _uniq = UniqueConstraint("username", "resource_path")

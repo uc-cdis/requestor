@@ -1,6 +1,8 @@
 import pytest
 from unittest.mock import patch
 
+from requestor import config
+
 
 @pytest.fixture(autouse=True)
 def clean_db(client):
@@ -35,7 +37,7 @@ def test_create_and_list_request(client):
         "username": data["username"],
         "resource_path": data["resource_path"],
         "resource_name": data["resource_name"],
-        "status": "draft",
+        "status": None,
     }
 
     # list requests
@@ -61,7 +63,7 @@ def test_create_duplicate_request(client):
         "username": data["username"],
         "resource_path": data["resource_path"],
         "resource_name": data["resource_name"],
-        "status": "draft",
+        "status": None,
     }
 
     # create a request with the same username and resource_path
@@ -83,24 +85,29 @@ def test_update_request(client):
     request_data = res.json()
     request_id = request_data["request_id"]
     assert request_id, "POST /request did not return a request_id"
-    assert request_data["status"] == "draft"
+    assert request_data["status"] == None
+
+    # try to update the request with a status that's not allowed
+    status = "this is not allowed"
+    res = client.put(f"/request/{request_id}", json={"status": status})
+    assert res.status_code == 400, res.text
 
     # update the request status
-    status = "submitted"
+    status = "SUBMITTED"
     res = client.put(f"/request/{request_id}", json={"status": status})
     assert res.status_code == 204, res.text
     request_data = res.json()
     assert request_data["status"] == status
 
     # update the request status and grant access
-    status = "approved"  # TODO make that configurable
+    status = config["GRANT_ACCESS_STATUS"]
     with patch("gen3authz.client.arborist.client.httpx.Client.request") as mock_request:
         mock_request.return_value.status_code = 204
         res = client.put(f"/request/{request_id}", json={"status": status})
+        assert mock_request.called
     assert res.status_code == 204, res.text
     request_data = res.json()
     assert request_data["status"] == status
-    # TODO check arborist called
 
 
 def test_delete_request(client):
@@ -120,7 +127,7 @@ def test_delete_request(client):
         "username": data["username"],
         "resource_path": data["resource_path"],
         "resource_name": data["resource_name"],
-        "status": "draft",
+        "status": None,
     }
 
     # list requests

@@ -23,18 +23,7 @@ def upgrade():
         sa.Column("username", sa.String(), nullable=False),
         sa.Column("resource_path", sa.String(), nullable=False),
         sa.Column("resource_name", sa.String()),
-        sa.Column(
-            "status",
-            sa.Enum(
-                "DRAFT",
-                "SUBMITTED",
-                "APPROVED",
-                "SIGNED",
-                "REJECTED",
-                name="requeststatusenum",
-            ),
-            nullable=False,
-        ),
+        sa.Column("status", sa.String()),
         sa.PrimaryKeyConstraint("request_id"),
         sa.UniqueConstraint("username", "resource_path"),
     )
@@ -42,4 +31,3 @@ def upgrade():
 
 def downgrade():
     op.drop_table("requests")
-    op.execute("DROP TYPE requeststatusenum;")
