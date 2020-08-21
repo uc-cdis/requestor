@@ -28,16 +28,16 @@ def app_init():
     app = FastAPI(
         title="Requestor",
         version=version("requestor"),
-        debug=config.DEBUG,
-        root_path=config.URL_PREFIX,
+        debug=config["DEBUG"],
+        root_path=config["DOCS_URL_PREFIX"],
     )
     app.add_middleware(ClientDisconnectMiddleware)
     app.async_client = httpx.AsyncClient()
 
     logger.info("Initializing Arborist client")
-    if config.ARBORIST_URL:
+    if config["ARBORIST_URL"]:
         app.arborist_client = ArboristClient(
-            arborist_base_url=config.ARBORIST_URL,
+            arborist_base_url=config["ARBORIST_URL"],
             authz_provider="requestor",
             logger=logger,
         )

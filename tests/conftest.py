@@ -1,12 +1,17 @@
 from alembic.config import main as alembic_main
 import importlib
+import os
 import pytest
 import requests
 from starlette.config import environ
 from starlette.testclient import TestClient
 from unittest.mock import MagicMock, patch
 
-environ["TESTING"] = "TRUE"
+
+CURRENT_DIR = os.path.dirname(os.path.realpath(__file__))
+environ["REQUESTOR_CONFIG_PATH"] = os.path.join(
+    CURRENT_DIR, "test-requestor-config.yaml"
+)
 from requestor import config
 from requestor.app import app_init
 
@@ -19,23 +24,16 @@ def app():
 
 @pytest.fixture(autouse=True, scope="session")
 def setup_test_database():
-    from requestor import config
-
     alembic_main(["--raiseerr", "upgrade", "head"])
 
     yield
 
-    importlib.reload(config)
-    if not config.TEST_KEEP_DB:
+    if not config["TEST_KEEP_DB"]:
         alembic_main(["--raiseerr", "downgrade", "base"])
 
 
 @pytest.fixture()
 def client():
-    from requestor import config
-
-    importlib.reload(config)
-
     with TestClient(app_init()) as client:
         yield client
 

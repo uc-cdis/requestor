@@ -2,15 +2,15 @@ from alembic import context
 from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 
-from requestor.config import DB_URL
+from requestor import config
 from requestor.app import db, load_modules
 
 
-config = context.config
-fileConfig(config.config_file_name)
+conf = context.config
+fileConfig(conf.config_file_name)
 load_modules()
 target_metadata = db
-config.set_main_option("sqlalchemy.url", str(DB_URL))
+conf.set_main_option("sqlalchemy.url", str(config["DB_URL"]))
 
 
 def run_migrations_offline():
@@ -25,7 +25,7 @@ def run_migrations_offline():
     script output.
 
     """
-    url = config.get_main_option("sqlalchemy.url")
+    url = conf.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -45,7 +45,7 @@ def run_migrations_online():
 
     """
     connectable = engine_from_config(
-        config.get_section(config.config_ini_section),
+        conf.get_section(conf.config_ini_section),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )

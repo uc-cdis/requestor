@@ -1,0 +1,10 @@
+# Server
+
+DEBUG: true
+TESTING: true
+TEST_KEEP_DB: false
+DOCS_URL_PREFIX: /
+
+# Database
+
+DB_DATABASE: requestor_test

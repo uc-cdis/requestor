@@ -1,0 +1,60 @@
+# Server
+
+DEBUG: true
+TESTING: false
+TEST_KEEP_DB: false
+DOCS_URL_PREFIX: /requestor
+ARBORIST_URL:
+
+# Database
+
+DB_DRIVER: postgresql
+DB_HOST:
+DB_PORT:
+DB_USER:
+DB_PASSWORD:
+DB_DATABASE: requestor
+
+DB_POOL_MIN_SIZE: 1
+DB_POOL_MAX_SIZE: 16
+DB_ECHO: False
+DB_SSL:
+DB_USE_CONNECTION_FOR_REQUEST: true
+DB_RETRY_LIMIT: 1
+DB_RETRY_INTERVAL: 1
+
+
+ALLOWED_REQUEST_STATUSES:
+  - DRAFT
+  - SUBMITTED
+  - APPROVED
+  - SIGNED
+  - REJECTED
+GRANT_ACCESS_STATUS: SUBMITTED
+
+REDIRECT_CONFIGS:
+  to_niaid_dua:
+    redirect_url: ""
+    params:
+      - request_id
+      - resource_name
+
+EXTERNAL_CALL_CONFIGS:
+  let_someone_know:
+    method: ""
+    url: ""
+    params:
+      - request_id
+      - resource_name
+    body:
+      - request_id
+      - resource_name
+
+EMAIL_CONFIGS:
+  email_from_niaid: "TBD"
+
+ACTION_ON_UPDATE:
+  /:
+    DRAFT:
+      redirect_configs:
+        - to_niaid_dua
