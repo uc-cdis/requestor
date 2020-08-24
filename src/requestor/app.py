@@ -19,7 +19,7 @@ if os.environ.get("REQUESTOR_CONFIG_PATH"):
     config.load(config_path=os.environ["REQUESTOR_CONFIG_PATH"])
 else:
     CONFIG_SEARCH_FOLDERS = [
-        "/var/www/fence",
+        "/src",
         "{}/.gen3/requestor".format(os.path.expanduser("~")),
     ]
     config.load(search_folders=CONFIG_SEARCH_FOLDERS)
