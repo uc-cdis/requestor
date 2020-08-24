@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import patch
 
-from requestor import config
+from requestor.config import config
 
 
 @pytest.fixture(autouse=True)

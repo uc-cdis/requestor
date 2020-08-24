@@ -1,5 +1,6 @@
 import asyncio
 import httpx
+import os
 from fastapi import FastAPI
 
 try:
@@ -7,9 +8,22 @@ try:
 except ImportError:
     from importlib_metadata import entry_points, version
 
+from cdislogging import get_logger
 from gen3authz.client.arborist.client import ArboristClient
 
-from . import config, logger
+from . import logger
+from .config import config
+
+# Load the configuration *before* importing models
+if os.environ.get("REQUESTOR_CONFIG_PATH"):
+    config.load(config_path=os.environ["REQUESTOR_CONFIG_PATH"])
+else:
+    CONFIG_SEARCH_FOLDERS = [
+        "/var/www/fence",
+        "{}/.gen3/requestor".format(os.path.expanduser("~")),
+    ]
+    config.load(search_folders=CONFIG_SEARCH_FOLDERS)
+
 from .models import db
 
 
@@ -25,14 +39,18 @@ def load_modules(app=None):
 
 def app_init():
     logger.info("Initializing app")
+    debug = config["DEBUG"]
     app = FastAPI(
         title="Requestor",
         version=version("requestor"),
-        debug=config["DEBUG"],
+        debug=debug,
         root_path=config["DOCS_URL_PREFIX"],
     )
     app.add_middleware(ClientDisconnectMiddleware)
     app.async_client = httpx.AsyncClient()
+
+    # Following will update logger level, propagate, and handlers
+    get_logger("requestor", log_level="debug" if debug == True else "info")
 
     logger.info("Initializing Arborist client")
     if config["ARBORIST_URL"]:

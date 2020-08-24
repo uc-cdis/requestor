@@ -13,7 +13,8 @@ from starlette.status import (
     HTTP_500_INTERNAL_SERVER_ERROR,
 )
 
-from .. import config, logger, arborist
+from .. import logger, arborist
+from ..config import config
 from ..models import Request as RequestModel
 
 router = APIRouter()
@@ -41,6 +42,7 @@ async def create_request(body: CreateRequestInput):
     TODO
     """
     request_id = str(uuid.uuid4())
+    # TODO optional status
     try:
         logger.debug(f"Creating request. request_id: {request_id}. Body: {body.dict()}")
         request = await RequestModel.create(request_id=request_id, **body.dict())

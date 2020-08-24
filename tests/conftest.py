@@ -1,4 +1,5 @@
 from alembic.config import main as alembic_main
+import copy
 import importlib
 import os
 import pytest
@@ -8,11 +9,12 @@ from starlette.testclient import TestClient
 from unittest.mock import MagicMock, patch
 
 
+# Set REQUESTOR_CONFIG_PATH *before* loading the configuration
 CURRENT_DIR = os.path.dirname(os.path.realpath(__file__))
 environ["REQUESTOR_CONFIG_PATH"] = os.path.join(
     CURRENT_DIR, "test-requestor-config.yaml"
 )
-from requestor import config
+from requestor.config import config
 from requestor.app import app_init
 
 
@@ -24,9 +26,17 @@ def app():
 
 @pytest.fixture(autouse=True, scope="session")
 def setup_test_database():
+    """
+    At teardown, restore original config and reset test DB.
+    """
+    saved_config = copy.deepcopy(config._configs)
+
     alembic_main(["--raiseerr", "upgrade", "head"])
 
     yield
+
+    # restore old configs
+    config.update(saved_config)
 
     if not config["TEST_KEEP_DB"]:
         alembic_main(["--raiseerr", "downgrade", "base"])

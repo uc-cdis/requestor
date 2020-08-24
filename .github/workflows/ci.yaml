@@ -10,8 +10,8 @@ jobs:
       postgres:
         image: postgres:9.6
         env:
-          POSTGRES_USER: requestor
-          POSTGRES_PASSWORD: requestor
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
           POSTGRES_DB: requestor_test
         ports:
         - 5432:5432
@@ -33,11 +33,6 @@ jobs:
         curl -sSL https://raw.githubusercontent.com/sdispater/poetry/master/get-poetry.py | python
         $HOME/.poetry/bin/poetry install
     - name: Test with pytest
-      env:
-        DB_HOST: localhost
-        DB_PORT: ${{ job.services.postgres.ports[5432] }}
-        DB_USER: requestor
-        DB_PASSWORD: requestor
       run: |
         $HOME/.poetry/bin/poetry run pytest --cov=src --cov=migrations/versions --cov-report xml
     # - name: Submit coverage report

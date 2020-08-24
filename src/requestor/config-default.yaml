@@ -1,7 +1,6 @@
 # Server
 
 DEBUG: true
-TESTING: false
 TEST_KEEP_DB: false
 DOCS_URL_PREFIX: /requestor
 ARBORIST_URL:
