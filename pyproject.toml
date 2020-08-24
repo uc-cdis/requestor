@@ -1,0 +1,38 @@
+[tool.poetry]
+name = "requestor"
+version = "0.0.0"
+description = "Gen3 Access Request Service"
+authors = ["CTDS UChicago <cdis@uchicago.edu>"]
+license = "Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/uc-cdis/requestor"
+include = [
+  "NOTICE",
+]
+
+[tool.poetry.dependencies]
+python = "^3.7"
+alembic = "^1.4.2"
+cdislogging = "^=1.0.0"
+fastapi = "^0.61.0"
+gen3authz = "^1.0.0"
+gen3config = {git = "https://github.com/uc-cdis/gen3config", rev = "chore/cdiserrors"}
+httpx = "^0.12.1"
+psycopg2-binary = "^2.8.5"
+uvicorn = "^0.11.8"
+gino = {version = "^1.0.1", extras = ["starlette"]}
+importlib-metadata = {version = "^1.7.0", python = "<3.8"}
+gunicorn = "^20.0.4"
+
+[tool.poetry.dev-dependencies]
+pytest = "^6.0.1"
+pytest-cov = "^2.8"
+requests = "^2.24.0"
+
+[tool.poetry.plugins."requestor.modules"]
+"request" = "requestor.routes.request"
+"system" = "requestor.routes.system"
+
+[build-system]
+requires = ["poetry>=1.0.0"]
+build-backend = "poetry.masonry.api"

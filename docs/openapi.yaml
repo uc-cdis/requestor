@@ -1,0 +1,209 @@
+components:
+  schemas:
+    Body_update_request_request__request_id__put:
+      properties:
+        status:
+          title: Status
+          type: string
+      required:
+      - status
+      title: Body_update_request_request__request_id__put
+      type: object
+    CreateRequestInput:
+      description: Create an access request.
+      properties:
+        resource_name:
+          title: Resource Name
+          type: string
+        resource_path:
+          title: Resource Path
+          type: string
+        status:
+          title: Status
+          type: string
+        username:
+          title: Username
+          type: string
+      required:
+      - username
+      - resource_path
+      title: CreateRequestInput
+      type: object
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          title: Detail
+          type: array
+      title: HTTPValidationError
+      type: object
+    ValidationError:
+      properties:
+        loc:
+          items:
+            type: string
+          title: Location
+          type: array
+        msg:
+          title: Message
+          type: string
+        type:
+          title: Error Type
+          type: string
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
+      type: object
+info:
+  title: Requestor
+  version: 0.0.0
+openapi: 3.0.2
+paths:
+  /_status:
+    get:
+      operationId: get_status__status_get
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+      summary: Get Status
+      tags:
+      - System
+  /_version:
+    get:
+      operationId: get_version__version_get
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+      summary: Get Version
+      tags:
+      - System
+  /request:
+    get:
+      operationId: list_requests_request_get
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+      summary: List Requests
+      tags:
+      - Request
+    post:
+      description: 'Create a new access request. If no "status" is specified in the
+        request
+
+        body, will use the configured DEFAULT_INITIAL_STATUS. Because users can
+
+        only request access to a resource once, (username, resource_path) must
+
+        be unique.'
+      operationId: create_request_request_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRequestInput'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Create Request
+      tags:
+      - Request
+  /request/{request_id}:
+    delete:
+      description: Delete an access request.
+      operationId: delete_request_request__request_id__delete
+      parameters:
+      - in: path
+        name: request_id
+        required: true
+        schema:
+          format: uuid
+          title: Request Id
+          type: string
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Delete Request
+      tags:
+      - Request
+    get:
+      operationId: get_request_request__request_id__get
+      parameters:
+      - in: path
+        name: request_id
+        required: true
+        schema:
+          format: uuid
+          title: Request Id
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Get Request
+      tags:
+      - Request
+    put:
+      description: Update an access request with a new "status".
+      operationId: update_request_request__request_id__put
+      parameters:
+      - in: path
+        name: request_id
+        required: true
+        schema:
+          format: uuid
+          title: Request Id
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Body_update_request_request__request_id__put'
+        required: true
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Update Request
+      tags:
+      - Request
