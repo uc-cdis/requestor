@@ -40,7 +40,10 @@ async def list_requests():
 @router.post("/request", status_code=HTTP_201_CREATED)
 async def create_request(body: CreateRequestInput):
     """
-    TODO
+    Create a new access request. If no "status" is specified in the request
+    body, will use the configured DEFAULT_INITIAL_STATUS. Because users can
+    only request access to a resource once, (username, resource_path) must
+    be unique.
     """
     request_id = str(uuid.uuid4())
     try:
@@ -78,7 +81,7 @@ async def update_request(
     request_id: uuid.UUID, api_request: Request, status: str = Body(..., embed=True),
 ):
     """
-    TODO
+    Update an access request with a new "status".
     """
     logger.debug(f"Updating request '{request_id}' with status '{status}'")
 
@@ -128,7 +131,7 @@ async def update_request(
 @router.delete("/request/{request_id}", status_code=HTTP_204_NO_CONTENT)
 async def delete_request(request_id: uuid.UUID):
     """
-    TODO
+    Delete an access request.
     """
     logger.debug(f"Deleting request '{request_id}'")
     request = (

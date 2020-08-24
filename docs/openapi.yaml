@@ -3,25 +3,23 @@ components:
     Body_update_request_request__request_id__put:
       properties:
         status:
-          $ref: '#/components/schemas/RequestStatusEnum'
+          title: Status
+          type: string
       required:
       - status
       title: Body_update_request_request__request_id__put
       type: object
     CreateRequestInput:
-      description: 'Create a request.
-
-        username (str)
-
-        resource_path (str)
-
-        resource_name (str, optional)'
+      description: Create an access request.
       properties:
         resource_name:
           title: Resource Name
           type: string
         resource_path:
           title: Resource Path
+          type: string
+        status:
+          title: Status
           type: string
         username:
           title: Username
@@ -40,15 +38,6 @@ components:
           type: array
       title: HTTPValidationError
       type: object
-    RequestStatusEnum:
-      description: An enumeration.
-      enum:
-      - draft
-      - submitted
-      - approved
-      - signed
-      - rejected
-      title: RequestStatusEnum
     ValidationError:
       properties:
         loc:
@@ -110,7 +99,14 @@ paths:
       tags:
       - Request
     post:
-      description: TODO
+      description: 'Create a new access request. If no "status" is specified in the
+        request
+
+        body, will use the configured DEFAULT_INITIAL_STATUS. Because users can
+
+        only request access to a resource once, (username, resource_path) must
+
+        be unique.'
       operationId: create_request_request_post
       requestBody:
         content:
@@ -135,7 +131,7 @@ paths:
       - Request
   /request/{request_id}:
     delete:
-      description: TODO
+      description: Delete an access request.
       operationId: delete_request_request__request_id__delete
       parameters:
       - in: path
@@ -157,8 +153,33 @@ paths:
       summary: Delete Request
       tags:
       - Request
+    get:
+      operationId: get_request_request__request_id__get
+      parameters:
+      - in: path
+        name: request_id
+        required: true
+        schema:
+          format: uuid
+          title: Request Id
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Get Request
+      tags:
+      - Request
     put:
-      description: TODO
+      description: Update an access request with a new "status".
       operationId: update_request_request__request_id__put
       parameters:
       - in: path
