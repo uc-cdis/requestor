@@ -28,6 +28,7 @@ class CreateRequestInput(BaseModel):
     username: str
     resource_path: str
     resource_name: str = None
+    status: str = None
 
 
 @router.get("/request")
@@ -42,10 +43,12 @@ async def create_request(body: CreateRequestInput):
     TODO
     """
     request_id = str(uuid.uuid4())
-    # TODO optional status
     try:
         logger.debug(f"Creating request. request_id: {request_id}. Body: {body.dict()}")
-        request = await RequestModel.create(request_id=request_id, **body.dict())
+        data = body.dict()
+        if not data.get("status"):
+            data["status"] = config["DEFAULT_INITIAL_STATUS"]
+        request = await RequestModel.create(request_id=request_id, **data)
     except UniqueViolationError:
         # assume the error is because a request with this (username,
         # resource_path) already exists, not about a duplicate request_id

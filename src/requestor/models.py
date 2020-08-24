@@ -25,7 +25,7 @@ class Request(db.Model):
     username = Column(String, nullable=False)
     resource_path = Column(String, nullable=False)
     resource_name = Column(String)
-    status = Column(String)
+    status = Column(String, nullable=False)
 
     # users can only request access to a resource once
     _uniq = UniqueConstraint("username", "resource_path")

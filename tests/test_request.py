@@ -37,7 +37,7 @@ def test_create_and_list_request(client):
         "username": data["username"],
         "resource_path": data["resource_path"],
         "resource_name": data["resource_name"],
-        "status": None,
+        "status": config["DEFAULT_INITIAL_STATUS"],
     }
 
     # list requests
@@ -63,7 +63,7 @@ def test_create_duplicate_request(client):
         "username": data["username"],
         "resource_path": data["resource_path"],
         "resource_name": data["resource_name"],
-        "status": None,
+        "status": config["DEFAULT_INITIAL_STATUS"],
     }
 
     # create a request with the same username and resource_path
@@ -85,7 +85,7 @@ def test_update_request(client):
     request_data = res.json()
     request_id = request_data["request_id"]
     assert request_id, "POST /request did not return a request_id"
-    assert request_data["status"] == None
+    assert request_data["status"] == config["DEFAULT_INITIAL_STATUS"]
 
     # try to update the request with a status that's not allowed
     status = "this is not allowed"
@@ -93,7 +93,7 @@ def test_update_request(client):
     assert res.status_code == 400, res.text
 
     # update the request status
-    status = "SUBMITTED"
+    status = config["ALLOWED_REQUEST_STATUSES"][1]
     res = client.put(f"/request/{request_id}", json={"status": status})
     assert res.status_code == 204, res.text
     request_data = res.json()
@@ -127,7 +127,7 @@ def test_delete_request(client):
         "username": data["username"],
         "resource_path": data["resource_path"],
         "resource_name": data["resource_name"],
-        "status": None,
+        "status": config["DEFAULT_INITIAL_STATUS"],
     }
 
     # list requests
