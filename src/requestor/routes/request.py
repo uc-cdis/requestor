@@ -128,7 +128,10 @@ async def update_request(
         .returning(*RequestModel)
         .gino.first_or_404()
     )
-    return request.to_dict()
+
+    res = request.to_dict()
+    redirect_response = post_status_update(status, res)
+    return redirect_response if redirect_response else res
 
 
 @router.delete("/request/{request_id}", status_code=HTTP_204_NO_CONTENT)

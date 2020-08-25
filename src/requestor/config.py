@@ -26,6 +26,9 @@ class RequestorConfig(Config):
         )
 
     def validate(self):
+        """
+        Perform a series of sanity checks on a loaded config.
+        """
         msg = "'{}' is not one of {}"
 
         allowed_statuses = self["ALLOWED_REQUEST_STATUSES"]
