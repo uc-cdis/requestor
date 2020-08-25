@@ -23,8 +23,8 @@ def post_status_update(status: str, data: dict):
 
     # redirect *after* doing other actions
     if redirects:
-        # TODO move this check to config validation:
-        assert len(redirects) == 1, "Can only do one redirect!"
+        # assume there is only one redirect config.
+        # this is checked using config.validate()
         (redirect_action, data) = redirects[0]
         return do_redirect_action(redirect_action, data)
 
