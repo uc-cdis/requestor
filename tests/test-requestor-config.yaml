@@ -22,3 +22,32 @@ ALLOWED_REQUEST_STATUSES:
   - STATUS_20
 DEFAULT_INITIAL_STATUS: STATUS_0
 GRANT_ACCESS_STATUS: STATUS_20
+
+# Configure actions on request status update
+
+REDIRECT_CONFIGS:
+  to_niaid_dua:
+    redirect_url: ""
+    params:
+      - request_id
+      - resource_name
+
+EXTERNAL_CALL_CONFIGS:
+  let_someone_know:
+    method: ""
+    url: ""
+    params:
+      - request_id
+      - resource_name
+    body:
+      - request_id
+      - resource_name
+
+EMAIL_CONFIGS:
+  email_from_niaid: "TBD"
+
+ACTION_ON_UPDATE:
+  /:
+    STATUS_0:
+      redirect_configs:
+        - to_niaid_dua

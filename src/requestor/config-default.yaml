@@ -35,29 +35,10 @@ GRANT_ACCESS_STATUS: APPROVED
 
 # Configure actions on request status update
 
-REDIRECT_CONFIGS:
-  to_niaid_dua:
-    redirect_url: ""
-    params:
-      - request_id
-      - resource_name
+REDIRECT_CONFIGS: {}
 
-EXTERNAL_CALL_CONFIGS:
-  let_someone_know:
-    method: ""
-    url: ""
-    params:
-      - request_id
-      - resource_name
-    body:
-      - request_id
-      - resource_name
+EXTERNAL_CALL_CONFIGS: {}
 
-EMAIL_CONFIGS:
-  email_from_niaid: "TBD"
+EMAIL_CONFIGS: {}
 
-ACTION_ON_UPDATE:
-  /:
-    DRAFT:
-      redirect_configs:
-        - to_niaid_dua
+ACTION_ON_UPDATE: {}

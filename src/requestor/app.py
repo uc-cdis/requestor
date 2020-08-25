@@ -39,6 +39,8 @@ def load_modules(app=None):
 
 def app_init():
     logger.info("Initializing app")
+    config.validate()
+
     debug = config["DEBUG"]
     app = FastAPI(
         title="Requestor",
