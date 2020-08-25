@@ -35,6 +35,7 @@ GRANT_ACCESS_STATUS: APPROVED
 
 # Configure actions on request status update
 
+# TODO add examples
 REDIRECT_CONFIGS: {}
 
 EXTERNAL_CALL_CONFIGS: {}

@@ -46,6 +46,35 @@ def test_create_and_list_request(client):
     assert res.json() == [request_data]
 
 
+def test_create_request_with_redirect(client):
+    # create a request
+    data = {
+        "username": "requestor_user",
+        "resource_path": "/resource-with-redirect/resource",
+        "resource_name": "My Resource",
+    }
+    res = client.post("/request", json=data)
+
+    # check that the user is redirected as expected
+    assert res.status_code == 307, res.text
+    request_data = client.get("/request").json()[0]
+    request_id = request_data.get("request_id")
+    assert (
+        res.headers["location"]
+        == f"http://localhost?something=&request_id={request_id}&resource_name=My+Resource"
+    )
+
+    # check that the request has been created properly
+    assert request_id, "POST /request did not return a request_id"
+    assert request_data == {
+        "request_id": request_id,
+        "username": data["username"],
+        "resource_path": data["resource_path"],
+        "resource_name": data["resource_name"],
+        "status": config["DEFAULT_INITIAL_STATUS"],
+    }
+
+
 def test_create_duplicate_request(client):
     # create a request
     data = {

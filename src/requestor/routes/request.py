@@ -16,6 +16,7 @@ from starlette.status import (
 from .. import logger, arborist
 from ..config import config
 from ..models import Request as RequestModel
+from ..util import post_status_update
 
 router = APIRouter()
 
@@ -53,8 +54,8 @@ async def create_request(body: CreateRequestInput):
             data["status"] = config["DEFAULT_INITIAL_STATUS"]
         request = await RequestModel.create(request_id=request_id, **data)
     except UniqueViolationError:
-        # assume the error is because a request with this (username,
-        # resource_path) already exists, not about a duplicate request_id
+        # assume the error is because a request for this (username,
+        # resource_path) already exists, not because of a duplicate request_id
         logger.error(
             f"Unable to create request. request_id: {request_id}. body: {body}",
             exc_info=True,
@@ -64,7 +65,9 @@ async def create_request(body: CreateRequestInput):
             "An access request for these username and resource_path already exists. Users can only request access to a resource once.",
         )
     else:
-        return request.to_dict()
+        res = request.to_dict()
+        redirect_response = post_status_update(data["status"], res)
+        return redirect_response if redirect_response else res
 
 
 @router.get("/request/{request_id}", status_code=HTTP_200_OK)
