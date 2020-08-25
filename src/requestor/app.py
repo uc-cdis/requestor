@@ -12,17 +12,21 @@ from cdislogging import get_logger
 from gen3authz.client.arborist.client import ArboristClient
 
 from . import logger
-from .config import config
+from .config import config, DEFAULT_CFG_PATH
 
 # Load the configuration *before* importing models
-if os.environ.get("REQUESTOR_CONFIG_PATH"):
-    config.load(config_path=os.environ["REQUESTOR_CONFIG_PATH"])
-else:
-    CONFIG_SEARCH_FOLDERS = [
-        "/src",
-        "{}/.gen3/requestor".format(os.path.expanduser("~")),
-    ]
-    config.load(search_folders=CONFIG_SEARCH_FOLDERS)
+try:
+    if os.environ.get("REQUESTOR_CONFIG_PATH"):
+        config.load(config_path=os.environ["REQUESTOR_CONFIG_PATH"])
+    else:
+        CONFIG_SEARCH_FOLDERS = [
+            "/src",
+            "{}/.gen3/requestor".format(os.path.expanduser("~")),
+        ]
+        config.load(search_folders=CONFIG_SEARCH_FOLDERS)
+except:
+    logger.warning("Unable to load config, using default config...", exc_info=True)
+    config.load(config_path=DEFAULT_CFG_PATH)
 
 from .models import db
 
