@@ -137,8 +137,13 @@ async def update_request(
     )
 
     res = request.to_dict()
+
+    # CORS limits redirections, so we redirect on the client side
     redirect_response = post_status_update(status, res)
-    return redirect_response if redirect_response else res
+    if redirect_response:
+        res["redirect_url"] = redirect_response
+
+    return res
 
 
 @router.delete("/request/{request_id}", status_code=HTTP_204_NO_CONTENT)
