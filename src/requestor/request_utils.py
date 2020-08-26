@@ -1,10 +1,14 @@
 from fastapi.responses import RedirectResponse
 from urllib.parse import urlparse, urlencode, parse_qsl
 
+from . import logger
 from .config import config
 
 
 def post_status_update(status: str, data: dict):
+    """
+    Handle actions after a successful status update.
+    """
     resource_path = data["resource_path"]
     redirects = []
     for resource_prefix, status_actions in config["ACTION_ON_UPDATE"].items():
@@ -24,16 +28,17 @@ def post_status_update(status: str, data: dict):
     # redirect *after* doing other actions
     if redirects:
         # assume there is only one redirect config.
-        # this is checked using config.validate()
+        # this is checked during config.validate()
         (redirect_action, data) = redirects[0]
-        return do_redirect_action(redirect_action, data)
+        return get_redirect_url(redirect_action, data)
 
 
-def do_redirect_action(action_id, data):
+def get_redirect_url(action_id, data):
     conf = config["REDIRECT_CONFIGS"][action_id]
     redirect_url = conf["redirect_url"]
     base_query_params = parse_qsl(urlparse(redirect_url).query, keep_blank_values=True)
     redirect_query_params = [(key, str(data[key])) for key in conf["params"]]
     final_query_params = urlencode(base_query_params + redirect_query_params)
     final_redirect_url = redirect_url.split("?")[0] + "?" + final_query_params
-    return RedirectResponse(final_redirect_url)
+    logger.debug(f"End user should be redirected to: {final_redirect_url}")
+    return final_redirect_url

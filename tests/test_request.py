@@ -55,16 +55,9 @@ def test_create_request_with_redirect(client):
     }
     res = client.post("/request", json=data)
 
-    # check that the user is redirected as expected
-    assert res.status_code == 307, res.text
-    request_data = client.get("/request").json()[0]
+    assert res.status_code == 201, res.text
+    request_data = res.json()
     request_id = request_data.get("request_id")
-    assert (
-        res.headers["location"]
-        == f"http://localhost?something=&request_id={request_id}&resource_name=My+Resource"
-    )
-
-    # check that the request has been created properly
     assert request_id, "POST /request did not return a request_id"
     assert request_data == {
         "request_id": request_id,
@@ -72,6 +65,8 @@ def test_create_request_with_redirect(client):
         "resource_path": data["resource_path"],
         "resource_name": data["resource_name"],
         "status": config["DEFAULT_INITIAL_STATUS"],
+        # the redirect URL should be returned to the client:
+        "redirect_url": f"http://localhost?something=&request_id={request_id}&resource_name=My+Resource",
     }
 
 
