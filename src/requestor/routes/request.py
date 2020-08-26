@@ -16,6 +16,7 @@ from starlette.status import (
 from .. import logger, arborist
 from ..config import config
 from ..models import Request as RequestModel
+from ..request_utils import post_status_update
 
 router = APIRouter()
 
@@ -37,6 +38,15 @@ async def list_requests():
     return [r.to_dict() for r in (await RequestModel.query.gino.all())]
 
 
+@router.get("/request/{request_id}", status_code=HTTP_200_OK)
+async def get_request(request_id: uuid.UUID):
+    logger.debug(f"Getting request '{request_id}'")
+    request = await RequestModel.query.where(
+        RequestModel.request_id == request_id
+    ).gino.first_or_404()
+    return request.to_dict()
+
+
 @router.post("/request", status_code=HTTP_201_CREATED)
 async def create_request(body: CreateRequestInput):
     """
@@ -47,14 +57,16 @@ async def create_request(body: CreateRequestInput):
     """
     request_id = str(uuid.uuid4())
     try:
-        logger.debug(f"Creating request. request_id: {request_id}. Body: {body.dict()}")
+        logger.debug(
+            f"Creating request. request_id: {request_id}. Received body: {body.dict()}"
+        )
         data = body.dict()
         if not data.get("status"):
             data["status"] = config["DEFAULT_INITIAL_STATUS"]
         request = await RequestModel.create(request_id=request_id, **data)
     except UniqueViolationError:
-        # assume the error is because a request with this (username,
-        # resource_path) already exists, not about a duplicate request_id
+        # assume the error is because a request for this (username,
+        # resource_path) already exists, not because of a duplicate request_id
         logger.error(
             f"Unable to create request. request_id: {request_id}. body: {body}",
             exc_info=True,
@@ -64,16 +76,14 @@ async def create_request(body: CreateRequestInput):
             "An access request for these username and resource_path already exists. Users can only request access to a resource once.",
         )
     else:
-        return request.to_dict()
+        res = request.to_dict()
 
+        # CORS limits redirections, so we redirect on the client side
+        redirect_response = post_status_update(data["status"], res)
+        if redirect_response:
+            res["redirect_url"] = redirect_response
 
-@router.get("/request/{request_id}", status_code=HTTP_200_OK)
-async def get_request(request_id: uuid.UUID):
-    logger.debug(f"Getting request '{request_id}'")
-    request = await RequestModel.query.where(
-        RequestModel.request_id == request_id
-    ).gino.first_or_404()
-    return request.to_dict()
+        return res
 
 
 @router.put("/request/{request_id}", status_code=HTTP_204_NO_CONTENT)
@@ -125,7 +135,15 @@ async def update_request(
         .returning(*RequestModel)
         .gino.first_or_404()
     )
-    return request.to_dict()
+
+    res = request.to_dict()
+
+    # CORS limits redirections, so we redirect on the client side
+    redirect_response = post_status_update(status, res)
+    if redirect_response:
+        res["redirect_url"] = redirect_response
+
+    return res
 
 
 @router.delete("/request/{request_id}", status_code=HTTP_204_NO_CONTENT)

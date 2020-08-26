@@ -26,8 +26,12 @@ class RequestorConfig(Config):
         )
 
     def validate(self):
+        """
+        Perform a series of sanity checks on a loaded config.
+        """
+        msg = "'{}' is not one of {}"
+
         allowed_statuses = self["ALLOWED_REQUEST_STATUSES"]
-        msg = "Status '{}' is not in allowed statuses {}"
         assert self["DEFAULT_INITIAL_STATUS"] in allowed_statuses, msg.format(
             self["DEFAULT_INITIAL_STATUS"], allowed_statuses
         )
@@ -35,22 +39,32 @@ class RequestorConfig(Config):
             self["GRANT_ACCESS_STATUS"], allowed_statuses
         )
 
+        allowed_actions = [
+            "redirect_configs",
+            "external_call_configs",
+            "email_configs",
+        ]
         for action in self["ACTION_ON_UPDATE"].values():
             for (status, rules) in action.items():
                 assert status in allowed_statuses, msg.format(status, allowed_statuses)
                 for (key, rule_list) in rules.items():
-                    assert key in [
-                        "redirect_configs",
-                        "external_call_configs",
-                        "email_configs",
-                    ]
+                    assert key in allowed_actions, msg.format(key, allowed_actions)
                     for rule in rule_list:
                         if key == "redirect_configs":
-                            assert rule in self["REDIRECT_CONFIGS"]
+                            assert rule in self["REDIRECT_CONFIGS"], msg.format(
+                                rule, self["REDIRECT_CONFIGS"]
+                            )
                         elif key == "external_call_configs":
-                            assert rule in self["EXTERNAL_CALL_CONFIGS"]
+                            assert rule in self["EXTERNAL_CALL_CONFIGS"], msg.format(
+                                rule, self["EXTERNAL_CALL_CONFIGS"]
+                            )
                         elif key == "email_configs":
-                            assert rule in self["EMAIL_CONFIGS"]
+                            assert rule in self["EMAIL_CONFIGS"], msg.format(
+                                rule, self["EMAIL_CONFIGS"]
+                            )
+
+                redirects = rules.get("redirect_configs", [])
+                assert len(redirects) <= 1, f"Can only do one redirect! Got {redirects}"
 
 
 config = RequestorConfig(DEFAULT_CFG_PATH)

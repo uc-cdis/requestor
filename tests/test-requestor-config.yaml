@@ -27,7 +27,7 @@ GRANT_ACCESS_STATUS: STATUS_20
 
 REDIRECT_CONFIGS:
   to_niaid_dua:
-    redirect_url: ""
+    redirect_url: http://localhost?something
     params:
       - request_id
       - resource_name
@@ -47,7 +47,7 @@ EMAIL_CONFIGS:
   email_from_niaid: "TBD"
 
 ACTION_ON_UPDATE:
-  /:
+  /resource-with-redirect:
     STATUS_0:
       redirect_configs:
         - to_niaid_dua
