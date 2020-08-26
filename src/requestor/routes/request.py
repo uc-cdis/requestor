@@ -1,7 +1,8 @@
 import uuid
 
 from asyncpg.exceptions import UniqueViolationError
-from fastapi import APIRouter, FastAPI, HTTPException, Body
+from fastapi import APIRouter, FastAPI, HTTPException, Body, Security
+from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from starlette.requests import Request
 from starlette.status import (
@@ -17,6 +18,7 @@ from .. import logger, arborist
 from ..config import config
 from ..models import Request as RequestModel
 from ..request_utils import post_status_update
+from ..auth import bearer, get_token_claims
 
 router = APIRouter()
 
@@ -26,7 +28,7 @@ class CreateRequestInput(BaseModel):
     Create an access request.
     """
 
-    username: str
+    username: str = None
     resource_path: str
     resource_name: str = None
     status: str = None
@@ -48,21 +50,38 @@ async def get_request(request_id: uuid.UUID):
 
 
 @router.post("/request", status_code=HTTP_201_CREATED)
-async def create_request(body: CreateRequestInput):
+async def create_request(
+    body: CreateRequestInput,
+    bearer_token: HTTPAuthorizationCredentials = Security(bearer),
+):
     """
-    Create a new access request. If no "status" is specified in the request
-    body, will use the configured DEFAULT_INITIAL_STATUS. Because users can
-    only request access to a resource once, (username, resource_path) must
-    be unique.
+    Create a new access request.
+    If no "status" is specified in the request body, will use the configured
+    DEFAULT_INITIAL_STATUS. Because users can only request access to a
+    resource once, (username, resource_path) must be unique.
+    If no "username" is specified in the request body, will create an access
+    request for the user who provided the token.
     """
     request_id = str(uuid.uuid4())
+
+    token_claims = await get_token_claims(bearer_token)
+    token_username = token_claims["context"]["user"]["name"]
+    logger.debug(f"Got username from token: {token_username}")
+
+    # TODO arborist check access
+
     try:
         logger.debug(
             f"Creating request. request_id: {request_id}. Received body: {body.dict()}"
         )
+
         data = body.dict()
         if not data.get("status"):
             data["status"] = config["DEFAULT_INITIAL_STATUS"]
+        if not data.get("username"):
+            logger.debug("No username provided in body, using token username")
+            data["username"] = token_username
+
         request = await RequestModel.create(request_id=request_id, **data)
     except UniqueViolationError:
         # assume the error is because a request for this (username,
@@ -88,7 +107,9 @@ async def create_request(body: CreateRequestInput):
 
 @router.put("/request/{request_id}", status_code=HTTP_204_NO_CONTENT)
 async def update_request(
-    request_id: uuid.UUID, api_request: Request, status: str = Body(..., embed=True),
+    request_id: uuid.UUID,
+    api_request: Request,
+    status: str = Body(..., embed=True),
 ):
     """
     Update an access request with a new "status".

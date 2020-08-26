@@ -16,6 +16,8 @@ def clean_db(client):
 
 
 def test_create_and_list_request(client):
+    fake_jwt = "1.2.3"
+
     # list requests: empty
     res = client.get("/request")
     assert res.status_code == 200
@@ -27,7 +29,9 @@ def test_create_and_list_request(client):
         "resource_path": "/my/resource",
         "resource_name": "My Resource",
     }
-    res = client.post("/request", json=data)
+    res = client.post(
+        "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+    )
     assert res.status_code == 201, res.text
     request_data = res.json()
     request_id = request_data.get("request_id")
@@ -47,13 +51,21 @@ def test_create_and_list_request(client):
 
 
 def test_create_request_with_redirect(client):
+    """
+    When a redirect is configured for the requested resource, a
+    redirect URL should be returned to the client.
+    """
+    fake_jwt = "1.2.3"
+
     # create a request
     data = {
         "username": "requestor_user",
         "resource_path": "/resource-with-redirect/resource",
         "resource_name": "My Resource",
     }
-    res = client.post("/request", json=data)
+    res = client.post(
+        "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+    )
 
     assert res.status_code == 201, res.text
     request_data = res.json()
@@ -65,19 +77,55 @@ def test_create_request_with_redirect(client):
         "resource_path": data["resource_path"],
         "resource_name": data["resource_name"],
         "status": config["DEFAULT_INITIAL_STATUS"],
-        # the redirect URL should be returned to the client:
         "redirect_url": f"http://localhost?something=&request_id={request_id}&resource_name=My+Resource",
     }
 
 
+def test_create_request_without_username(client):
+    """
+    When a username is not provided in the body, the request is created
+    using the username from the provided access token.
+    """
+    fake_jwt = "1.2.3"
+
+    # create a request
+    data = {
+        "resource_path": "/my/resource",
+        "resource_name": "My Resource",
+    }
+    res = client.post(
+        "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+    )
+
+    assert res.status_code == 201, res.text
+    request_data = res.json()
+    request_id = request_data.get("request_id")
+    assert request_id, "POST /request did not return a request_id"
+    assert request_data == {
+        "request_id": request_id,
+        "username": "requestor-user",  # username from access_token_patcher
+        "resource_path": data["resource_path"],
+        "resource_name": data["resource_name"],
+        "status": config["DEFAULT_INITIAL_STATUS"],
+    }
+
+
 def test_create_duplicate_request(client):
+    """
+    Users can only request access to a resource once.
+    (username, resource_path) should be unique.
+    """
+    fake_jwt = "1.2.3"
+
     # create a request
     data = {
         "username": "requestor_user",
         "resource_path": "/my/resource",
         "resource_name": "My Resource",
     }
-    res = client.post("/request", json=data)
+    res = client.post(
+        "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+    )
     assert res.status_code == 201, res.text
     request_data = res.json()
     request_id = request_data.get("request_id")
@@ -91,11 +139,19 @@ def test_create_duplicate_request(client):
     }
 
     # create a request with the same username and resource_path
-    res = client.post("/request", json=data)
+    res = client.post(
+        "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+    )
     assert res.status_code == 409, res.text
 
 
 def test_update_request(client):
+    """
+    When updating the request with the GRANT_ACCESS_STATUS, a call
+    should be made to Arborist to grant the user access.
+    """
+    fake_jwt = "1.2.3"
+
     # create a request
     res = client.post(
         "/request",
@@ -104,6 +160,7 @@ def test_update_request(client):
             "resource_path": "/my/resource",
             "resource_name": "My Resource",
         },
+        headers={"Authorization": f"bearer {fake_jwt}"},
     )
     assert res.status_code == 201, res.text
     request_data = res.json()
@@ -135,13 +192,17 @@ def test_update_request(client):
 
 
 def test_delete_request(client):
+    fake_jwt = "1.2.3"
+
     # create a request
     data = {
         "username": "requestor_user",
         "resource_path": "/my/resource",
         "resource_name": "My Resource",
     }
-    res = client.post("/request", json=data)
+    res = client.post(
+        "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+    )
     assert res.status_code == 201, res.text
     request_data = res.json()
     request_id = request_data.get("request_id")
