@@ -17,7 +17,8 @@ async def get_token_claims(bearer_token):
         err_msg = "Must provide an access token."
         logger.error(err_msg)
         raise HTTPException(
-            HTTP_401_UNAUTHORIZED, err_msg,
+            HTTP_401_UNAUTHORIZED,
+            err_msg,
         )
 
     try:

@@ -128,7 +128,7 @@ async def create_request(
     return res
 
 
-@router.put("/request/{request_id}", status_code=HTTP_204_NO_CONTENT)
+@router.put("/request/{request_id}", status_code=HTTP_200_OK)
 async def update_request(
     request_id: uuid.UUID,
     api_request: Request,
@@ -191,7 +191,7 @@ async def update_request(
     return res
 
 
-@router.delete("/request/{request_id}", status_code=HTTP_204_NO_CONTENT)
+@router.delete("/request/{request_id}", status_code=HTTP_200_OK)
 async def delete_request(request_id: uuid.UUID):
     """
     Delete an access request.
@@ -203,6 +203,7 @@ async def delete_request(request_id: uuid.UUID):
         .returning(*RequestModel)
         .gino.first_or_404()
     )
+    return {"request_id": request_id}
 
 
 def init_app(app: FastAPI):
