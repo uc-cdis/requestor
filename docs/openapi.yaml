@@ -12,8 +12,11 @@ components:
     CreateRequestInput:
       description: Create an access request.
       properties:
-        resource_name:
-          title: Resource Name
+        resource_display_name:
+          title: Resource Display Name
+          type: string
+        resource_id:
+          title: Resource Id
           type: string
         resource_path:
           title: Resource Path
@@ -25,7 +28,6 @@ components:
           title: Username
           type: string
       required:
-      - username
       - resource_path
       title: CreateRequestInput
       type: object
@@ -57,6 +59,10 @@ components:
       - type
       title: ValidationError
       type: object
+  securitySchemes:
+    HTTPBearer:
+      scheme: bearer
+      type: http
 info:
   title: Requestor
   version: 0.0.0
@@ -99,14 +105,19 @@ paths:
       tags:
       - Request
     post:
-      description: 'Create a new access request. If no "status" is specified in the
-        request
+      description: 'Create a new access request.
 
-        body, will use the configured DEFAULT_INITIAL_STATUS. Because users can
+        If no "status" is specified in the request body, will use the configured
 
-        only request access to a resource once, (username, resource_path) must
+        DEFAULT_INITIAL_STATUS. Because users can only request access to a
 
-        be unique.'
+        resource once, (username, resource_path) must be unique unless past
+
+        requests'' statuses are in FINAL_STATUSES.
+
+        If no "username" is specified in the request body, will create an access
+
+        request for the user who provided the token.'
       operationId: create_request_request_post
       requestBody:
         content:
@@ -126,6 +137,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
           description: Validation Error
+      security:
+      - HTTPBearer: []
       summary: Create Request
       tags:
       - Request
