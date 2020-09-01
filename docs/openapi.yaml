@@ -155,7 +155,10 @@ paths:
           title: Request Id
           type: string
       responses:
-        '204':
+        '200':
+          content:
+            application/json:
+              schema: {}
           description: Successful Response
         '422':
           content:
@@ -209,7 +212,10 @@ paths:
               $ref: '#/components/schemas/Body_update_request_request__request_id__put'
         required: true
       responses:
-        '204':
+        '200':
+          content:
+            application/json:
+              schema: {}
           description: Successful Response
         '422':
           content:
