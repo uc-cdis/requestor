@@ -48,6 +48,22 @@ def client():
         yield client
 
 
+@pytest.fixture(autouse=True, scope="function")
+def access_token_patcher(client, request):
+    async def get_access_token(*args, **kwargs):
+        return {"sub": "1", "context": {"user": {"name": "requestor-user"}}}
+
+    access_token_mock = MagicMock()
+    access_token_mock.return_value = get_access_token
+
+    access_token_patch = patch("requestor.auth.access_token", access_token_mock)
+    access_token_patch.start()
+
+    yield access_token_mock
+
+    access_token_patch.stop()
+
+
 # unused for now
 # @pytest.fixture(scope="function")
 # def mock_arborist_requests(request):

@@ -1,7 +1,9 @@
 import uuid
 
 from asyncpg.exceptions import UniqueViolationError
-from fastapi import APIRouter, FastAPI, HTTPException, Body
+from datetime import datetime
+from fastapi import APIRouter, FastAPI, HTTPException, Body, Security
+from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from starlette.requests import Request
 from starlette.status import (
@@ -12,11 +14,13 @@ from starlette.status import (
     HTTP_409_CONFLICT,
     HTTP_500_INTERNAL_SERVER_ERROR,
 )
+from sqlalchemy import and_
 
 from .. import logger, arborist
 from ..config import config
 from ..models import Request as RequestModel
 from ..request_utils import post_status_update
+from ..auth import bearer, get_token_claims
 
 router = APIRouter()
 
@@ -26,9 +30,10 @@ class CreateRequestInput(BaseModel):
     Create an access request.
     """
 
-    username: str
+    username: str = None
     resource_path: str
-    resource_name: str = None
+    resource_id: str = None
+    resource_display_name: str = None
     status: str = None
 
 
@@ -48,51 +53,91 @@ async def get_request(request_id: uuid.UUID):
 
 
 @router.post("/request", status_code=HTTP_201_CREATED)
-async def create_request(body: CreateRequestInput):
+async def create_request(
+    body: CreateRequestInput,
+    bearer_token: HTTPAuthorizationCredentials = Security(bearer),
+):
     """
-    Create a new access request. If no "status" is specified in the request
-    body, will use the configured DEFAULT_INITIAL_STATUS. Because users can
-    only request access to a resource once, (username, resource_path) must
-    be unique.
+    Create a new access request.
+    If no "status" is specified in the request body, will use the configured
+    DEFAULT_INITIAL_STATUS. Because users can only request access to a
+    resource once, (username, resource_path) must be unique unless past
+    requests' statuses are in FINAL_STATUSES.
+    If no "username" is specified in the request body, will create an access
+    request for the user who provided the token.
     """
     request_id = str(uuid.uuid4())
-    try:
-        logger.debug(
-            f"Creating request. request_id: {request_id}. Received body: {body.dict()}"
+
+    token_claims = await get_token_claims(bearer_token)
+    token_username = token_claims["context"]["user"]["name"]
+    logger.debug(f"Got username from token: {token_username}")
+
+    # TODO arborist check access
+
+    data = body.dict()
+    logger.debug(f"Creating request. request_id: {request_id}. Received body: {data}")
+
+    if not data.get("status"):
+        data["status"] = config["DEFAULT_INITIAL_STATUS"]
+    if not data.get("username"):
+        logger.debug("No username provided in body, using token username")
+        data["username"] = token_username
+
+    # get requests for this (username, resource_path) for which the status is
+    # not in FINAL_STATUSES. users can only request access to a resource once.
+    previous_requests = [
+        (str(r.request_id), r.status)
+        for r in (
+            await RequestModel.query.where(
+                and_(
+                    RequestModel.username == data["username"],
+                    RequestModel.resource_path == data["resource_path"],
+                    RequestModel.status.notin_(config["FINAL_STATUSES"]),
+                )
+            ).gino.all()
         )
-        data = body.dict()
-        if not data.get("status"):
-            data["status"] = config["DEFAULT_INITIAL_STATUS"]
-        request = await RequestModel.create(request_id=request_id, **data)
-    except UniqueViolationError:
-        # assume the error is because a request for this (username,
-        # resource_path) already exists, not because of a duplicate request_id
+    ]
+    if previous_requests:
+        # a request for this (username, resource_path) already exists
+        msg = f'An open access request for username \'{data["username"]}\' and resource_path \'{data["resource_path"]}\' already exists. Users can only request access to a resource once.'
         logger.error(
-            f"Unable to create request. request_id: {request_id}. body: {body}",
+            msg + f" body: {body}. existing requests: {previous_requests}",
             exc_info=True,
         )
         raise HTTPException(
             HTTP_409_CONFLICT,
-            "An access request for these username and resource_path already exists. Users can only request access to a resource once.",
+            msg,
         )
-    else:
-        res = request.to_dict()
 
+    # create the request
+    try:
+        request = await RequestModel.create(request_id=request_id, **data)
+    except UniqueViolationError:
+        raise HTTPException(
+            HTTP_409_CONFLICT,
+            "request_id already exists. Please try again",
+        )
+
+    res = request.to_dict()
+    redirect_url = post_status_update(data["status"], res)
+
+    if redirect_url:
         # CORS limits redirections, so we redirect on the client side
-        redirect_response = post_status_update(data["status"], res)
-        if redirect_response:
-            res["redirect_url"] = redirect_response
+        res["redirect_url"] = redirect_url
 
-        return res
+    return res
 
 
-@router.put("/request/{request_id}", status_code=HTTP_204_NO_CONTENT)
+@router.put("/request/{request_id}", status_code=HTTP_200_OK)
 async def update_request(
-    request_id: uuid.UUID, api_request: Request, status: str = Body(..., embed=True),
+    request_id: uuid.UUID,
+    api_request: Request,
+    status: str = Body(..., embed=True),
 ):
     """
     Update an access request with a new "status".
     """
+    # TODO arborist check access
     logger.debug(f"Updating request '{request_id}' with status '{status}'")
 
     allowed_statuses = config["ALLOWED_REQUEST_STATUSES"]
@@ -119,7 +164,7 @@ async def update_request(
             api_request.app.arborist_client,
             request.username,
             request.resource_path,
-            request.resource_name,
+            request.resource_display_name,
         )
 
         if not success:
@@ -131,7 +176,7 @@ async def update_request(
 
     request = await (
         RequestModel.update.where(RequestModel.request_id == request_id)
-        .values(status=status)
+        .values(status=status, updated_time=datetime.utcnow())
         .returning(*RequestModel)
         .gino.first_or_404()
     )
@@ -146,17 +191,19 @@ async def update_request(
     return res
 
 
-@router.delete("/request/{request_id}", status_code=HTTP_204_NO_CONTENT)
+@router.delete("/request/{request_id}", status_code=HTTP_200_OK)
 async def delete_request(request_id: uuid.UUID):
     """
     Delete an access request.
     """
+    # TODO arborist check access
     logger.debug(f"Deleting request '{request_id}'")
     request = (
         await RequestModel.delete.where(RequestModel.request_id == request_id)
         .returning(*RequestModel)
         .gino.first_or_404()
     )
+    return {"request_id": request_id}
 
 
 def init_app(app: FastAPI):

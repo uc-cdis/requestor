@@ -1,11 +1,14 @@
-# Server
+####################
+# SERVER           #
+####################
 
 DEBUG: true
 TEST_KEEP_DB: false
 DOCS_URL_PREFIX: /requestor
-ARBORIST_URL:
 
-# Database
+####################
+# DATABASE         #
+####################
 
 DB_DRIVER: postgresql
 DB_HOST:
@@ -22,7 +25,9 @@ DB_USE_CONNECTION_FOR_REQUEST: true
 DB_RETRY_LIMIT: 1
 DB_RETRY_INTERVAL: 1
 
-# Request statuses
+####################
+# REQUEST STATUSES #
+####################
 
 ALLOWED_REQUEST_STATUSES:
   - DRAFT
@@ -30,10 +35,39 @@ ALLOWED_REQUEST_STATUSES:
   - APPROVED
   - SIGNED
   - REJECTED
+
+# TODO maybe?
+# display_name is optional
+# ALLOWED_REQUEST_STATUSES:
+#   DRAFT:
+#     display_name: Draft
+#   SUBMITTED:
+#     display_name: Submitted
+#   APPROVED:
+#     display_name: Approved
+#   SIGNED:
+#     display_name: Signed
+#   REJECTED:
+#     display_name: Rejected
+
+# status of new requests when no status is specified by
+# the user
 DEFAULT_INITIAL_STATUS: DRAFT
+
+# automatically grant access when a request's status is
+# updated to this status
 GRANT_ACCESS_STATUS: APPROVED
 
-# Configure actions on request status update
+# these requests cannot be updated anymore.
+# (username, resource_path) is unique, unless the statuses
+# of previous requests are in FINAL_STATUSES
+FINAL_STATUSES:
+  - APPROVED
+  - REJECTED
+
+############################
+# ACTIONS ON STATUS UPDATE #
+############################
 
 # TODO add examples
 REDIRECT_CONFIGS: {}
