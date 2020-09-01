@@ -22,10 +22,12 @@ def upgrade():
         sa.Column("request_id", postgresql.UUID(), nullable=False),
         sa.Column("username", sa.String(), nullable=False),
         sa.Column("resource_path", sa.String(), nullable=False),
-        sa.Column("resource_name", sa.String()),
+        sa.Column("resource_id", sa.String()),
+        sa.Column("resource_display_name", sa.String()),
         sa.Column("status", sa.String(), nullable=False),
+        sa.Column("created_time", sa.DateTime(), nullable=False),
+        sa.Column("updated_time", sa.DateTime(), nullable=False),
         sa.PrimaryKeyConstraint("request_id"),
-        sa.UniqueConstraint("username", "resource_path"),
     )
 
 

@@ -17,11 +17,15 @@ DB_DATABASE: requestor_test
 # Request statuses
 
 ALLOWED_REQUEST_STATUSES:
-  - STATUS_0
-  - STATUS_10
-  - STATUS_20
-DEFAULT_INITIAL_STATUS: STATUS_0
-GRANT_ACCESS_STATUS: STATUS_20
+  - CREATED
+  - INTERMEDIATE_STATUS
+  - APPROVED
+  - CANCELLED
+DEFAULT_INITIAL_STATUS: CREATED
+GRANT_ACCESS_STATUS: APPROVED
+FINAL_STATUSES:
+  - APPROVED
+  - CANCELLED
 
 # Configure actions on request status update
 
@@ -30,7 +34,8 @@ REDIRECT_CONFIGS:
     redirect_url: http://localhost?something
     params:
       - request_id
-      - resource_name
+      - resource_id
+      - resource_display_name
 
 EXTERNAL_CALL_CONFIGS:
   let_someone_know:
@@ -38,16 +43,16 @@ EXTERNAL_CALL_CONFIGS:
     url: ""
     params:
       - request_id
-      - resource_name
+      - resource_display_name
     body:
       - request_id
-      - resource_name
+      - resource_display_name
 
 EMAIL_CONFIGS:
   email_from_niaid: "TBD"
 
 ACTION_ON_UPDATE:
   /resource-with-redirect:
-    STATUS_0:
+    CREATED:
       redirect_configs:
         - to_niaid_dua

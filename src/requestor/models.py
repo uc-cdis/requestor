@@ -1,7 +1,8 @@
 import enum
 
+from datetime import datetime
 from gino.ext.starlette import Gino
-from sqlalchemy import Column, String, Enum, UniqueConstraint
+from sqlalchemy import Column, DateTime, Enum, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 
 from .config import config
@@ -24,8 +25,8 @@ class Request(db.Model):
     request_id = Column(UUID, primary_key=True)
     username = Column(String, nullable=False)
     resource_path = Column(String, nullable=False)
-    resource_name = Column(String)
+    resource_id = Column(String)
+    resource_display_name = Column(String)
     status = Column(String, nullable=False)
-
-    # users can only request access to a resource once
-    _uniq = UniqueConstraint("username", "resource_path")
+    created_time = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_time = Column(DateTime, default=datetime.utcnow, nullable=False)

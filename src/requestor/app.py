@@ -59,9 +59,9 @@ def app_init():
     get_logger("requestor", log_level="debug" if debug == True else "info")
 
     logger.info("Initializing Arborist client")
-    if config["ARBORIST_URL"]:
+    if os.environ.get("ARBORIST_URL"):
         app.arborist_client = ArboristClient(
-            arborist_base_url=config["ARBORIST_URL"],
+            arborist_base_url=os.environ["ARBORIST_URL"],
             authz_provider="requestor",
             logger=logger,
         )

@@ -39,6 +39,16 @@ class RequestorConfig(Config):
             self["GRANT_ACCESS_STATUS"], allowed_statuses
         )
 
+        final_statuses = self["FINAL_STATUSES"]
+        for s in final_statuses:
+            assert s in allowed_statuses, msg.format(s, allowed_statuses)
+        assert self["GRANT_ACCESS_STATUS"] in final_statuses, msg.format(
+            self["GRANT_ACCESS_STATUS"], final_statuses
+        )
+        assert (
+            self["GRANT_ACCESS_STATUS"] != self["DEFAULT_INITIAL_STATUS"]
+        ), "GRANT_ACCESS_STATUS cannot be the same as DEFAULT_INITIAL_STATUS (if we need this, we need to add logic in `create_request`)"
+
         allowed_actions = [
             "redirect_configs",
             "external_call_configs",
