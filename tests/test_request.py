@@ -167,7 +167,7 @@ def test_create_duplicate_request(client):
     # update the orignal request's status to a final status
     status = config["FINAL_STATUSES"][-1]
     res = client.put(f"/request/{request_id}", json={"status": status})
-    assert res.status_code == 204, res.text
+    assert res.status_code == 200, res.text
 
     # create a request with the same username and resource_path
     # now it should work: the previous request is not in progress anymore
@@ -211,7 +211,7 @@ def test_update_request(client):
     # update the request status
     status = config["ALLOWED_REQUEST_STATUSES"][1]
     res = client.put(f"/request/{request_id}", json={"status": status})
-    assert res.status_code == 204, res.text
+    assert res.status_code == 200, res.text
     request_data = res.json()
     assert request_data["status"] == status
     assert request_data["created_time"] == created_time
@@ -223,7 +223,7 @@ def test_update_request(client):
         mock_request.return_value.status_code = 204
         res = client.put(f"/request/{request_id}", json={"status": status})
         assert mock_request.called
-    assert res.status_code == 204, res.text
+    assert res.status_code == 200, res.text
     request_data = res.json()
     assert request_data["status"] == status
 
@@ -264,7 +264,7 @@ def test_delete_request(client):
 
     # create a request with the same username and resource_path
     res = client.delete(f"/request/{request_id}")
-    assert res.status_code == 204, res.text
+    assert res.status_code == 200, res.text
 
     # list requests: empty
     res = client.get("/request")

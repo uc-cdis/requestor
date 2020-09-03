@@ -9,7 +9,6 @@ from starlette.requests import Request
 from starlette.status import (
     HTTP_200_OK,
     HTTP_201_CREATED,
-    HTTP_204_NO_CONTENT,
     HTTP_400_BAD_REQUEST,
     HTTP_409_CONFLICT,
     HTTP_500_INTERNAL_SERVER_ERROR,
