@@ -51,20 +51,18 @@ async def get_request(
     bearer_token: HTTPAuthorizationCredentials = Security(bearer),
 ) -> dict:
     logger.debug(f"Getting request '{request_id}'")
-    request = (
-        await RequestModel.query.where(RequestModel.request_id == request_id)
-        .gino.first_or_404()
-        .to_dict()
-    )
+    request = await RequestModel.query.where(
+        RequestModel.request_id == request_id
+    ).gino.first_or_404()
 
     await authorize(
         api_request.app.arborist_client,
         bearer_token,
         "read",
-        [request["resource_path"]],
+        [request.to_dict()["resource_path"]],
     )
 
-    return request
+    return request.to_dict()
 
 
 @router.post("/request", status_code=HTTP_201_CREATED)
