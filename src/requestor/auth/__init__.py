@@ -1,7 +1,9 @@
 from authutils.token.fastapi import access_token
 from fastapi import HTTPException
-from fastapi.security import HTTPBearer
-from starlette.status import HTTP_401_UNAUTHORIZED
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from starlette.status import HTTP_401_UNAUTHORIZED, HTTP_403_FORBIDDEN
+
+from gen3authz.client.arborist.client import ArboristClient
 
 from .. import logger
 
@@ -12,7 +14,7 @@ from .. import logger
 bearer = HTTPBearer(auto_error=False)
 
 
-async def get_token_claims(bearer_token):
+async def get_token_claims(bearer_token: HTTPAuthorizationCredentials) -> dict:
     if not bearer_token:
         err_msg = "Must provide an access token."
         logger.error(err_msg)
@@ -35,3 +37,32 @@ async def get_token_claims(bearer_token):
         )
 
     return token_claims
+
+
+async def authorize(
+    arborist_client: ArboristClient,
+    bearer_token: HTTPAuthorizationCredentials,
+    method: str,
+    resources: list,
+    throw: bool = True,
+) -> bool:
+    token = (
+        bearer_token.credentials
+        if bearer_token and hasattr(bearer_token, "credentials")
+        else None
+    )
+
+    authorized = await arborist_client.auth_request(
+        token, "requestor", method, resources
+    )
+    if not authorized:
+        logger.error(
+            f"Authorization error: user must have '{method}' access on '{resources}' for service 'requestor'."
+        )
+        if throw:
+            raise HTTPException(
+                HTTP_403_FORBIDDEN,
+                "Permission denied",
+            )
+
+    return authorized

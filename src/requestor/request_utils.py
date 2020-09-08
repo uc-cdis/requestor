@@ -33,7 +33,7 @@ def post_status_update(status: str, data: dict):
         return get_redirect_url(redirect_action, data)
 
 
-def get_redirect_url(action_id, data):
+def get_redirect_url(action_id: str, data: dict) -> str:
     conf = config["REDIRECT_CONFIGS"][action_id]
     redirect_url = conf["redirect_url"]
     base_query_params = parse_qsl(urlparse(redirect_url).query, keep_blank_values=True)

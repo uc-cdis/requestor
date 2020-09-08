@@ -12,7 +12,7 @@ class RequestorConfig(Config):
     def __init__(self, *args, **kwargs):
         super(RequestorConfig, self).__init__(*args, **kwargs)
 
-    def post_process(self):
+    def post_process(self) -> None:
         # generate DB_URL from DB configs
         self["DB_URL"] = make_url(
             URL(
@@ -25,7 +25,7 @@ class RequestorConfig(Config):
             ),
         )
 
-    def validate(self):
+    def validate(self) -> None:
         """
         Perform a series of sanity checks on a loaded config.
         """
