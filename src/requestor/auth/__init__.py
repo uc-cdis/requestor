@@ -4,6 +4,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from starlette.status import HTTP_401_UNAUTHORIZED, HTTP_403_FORBIDDEN
 
 from gen3authz.client.arborist.client import ArboristClient
+from gen3authz.client.arborist.errors import ArboristError
 
 from .. import logger
 
@@ -52,9 +53,14 @@ async def authorize(
         else None
     )
 
-    authorized = await arborist_client.auth_request(
-        token, "requestor", method, resources
-    )
+    try:
+        authorized = await arborist_client.auth_request(
+            token, "requestor", method, resources
+        )
+    except ArboristError as e:
+        logger.error(f"Error while talking to arborist: {e}")
+        authorized = False
+
     if not authorized:
         logger.error(
             f"Authorization error: user must have '{method}' access on '{resources}' for service 'requestor'."
