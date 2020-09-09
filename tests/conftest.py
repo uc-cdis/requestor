@@ -64,6 +64,17 @@ def access_token_patcher(client, request):
     access_token_patch.stop()
 
 
+@pytest.fixture(autouse=True)
+def clean_db(client):
+    # before each test, delete all existing requests from the DB
+    res = client.get("/request")
+    assert res.status_code == 200
+    for r in res.json():
+        res = client.delete("/request/" + r["request_id"])
+
+    yield
+
+
 @pytest.fixture(scope="function")
 def mock_arborist_requests(request):
     """

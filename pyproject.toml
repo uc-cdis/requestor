@@ -31,8 +31,9 @@ pytest-cov = "^2.8"
 requests = "^2.24.0"
 
 [tool.poetry.plugins."requestor.modules"]
-"request" = "requestor.routes.request"
 "system" = "requestor.routes.system"
+"maintain" = "requestor.routes.maintain"
+"query" = "requestor.routes.query"
 
 [build-system]
 requires = ["poetry>=1.0.0"]

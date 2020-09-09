@@ -4,62 +4,6 @@ from unittest.mock import patch
 from requestor.config import config
 
 
-@pytest.fixture(autouse=True)
-def clean_db(client):
-    # before each test, delete all existing requests from the DB
-    res = client.get("/request")
-    assert res.status_code == 200
-    for r in res.json():
-        res = client.delete("/request/" + r["request_id"])
-
-    yield
-
-
-def test_create_get_and_list_request(client):
-    fake_jwt = "1.2.3"
-
-    # list requests: empty
-    res = client.get("/request")
-    assert res.status_code == 200
-    assert res.json() == []
-
-    # create a request
-    data = {
-        "username": "requestor_user",
-        "resource_path": "/my/resource",
-        "resource_id": "uniqid",
-        "resource_display_name": "My Resource",
-    }
-    res = client.post(
-        "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
-    )
-    assert res.status_code == 201, res.text
-    request_data = res.json()
-    request_id = request_data.get("request_id")
-    assert request_id, "POST /request did not return a request_id"
-    assert request_data == {
-        "request_id": request_id,
-        "username": data["username"],
-        "resource_path": data["resource_path"],
-        "resource_id": data["resource_id"],
-        "resource_display_name": data["resource_display_name"],
-        "status": config["DEFAULT_INITIAL_STATUS"],
-        # just ensure created_time and updated_time are there:
-        "created_time": request_data["created_time"],
-        "updated_time": request_data["updated_time"],
-    }
-
-    # get the request
-    res = client.get(f"/request/{request_id}")
-    assert res.status_code == 200, res.text
-    assert res.json() == request_data
-
-    # list requests
-    res = client.get("/request")
-    assert res.status_code == 200, res.text
-    assert res.json() == [request_data]
-
-
 def test_create_request_with_redirect(client):
     """
     When a redirect is configured for the requested resource, a

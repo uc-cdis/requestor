@@ -21,6 +21,7 @@ from ..models import Request as RequestModel
 from ..request_utils import post_status_update
 from ..auth import bearer, get_token_claims, authorize
 
+
 router = APIRouter()
 
 
@@ -36,35 +37,6 @@ class CreateRequestInput(BaseModel):
     status: str = None
 
 
-@router.get("/request")
-async def list_requests() -> list:
-    # TODO GET requests for resource path - returns requests for prefixes that include the resource path - optional username param
-    # TODO filter requests with read access
-    logger.debug("Listing all requests")
-    return [r.to_dict() for r in (await RequestModel.query.gino.all())]
-
-
-@router.get("/request/{request_id}", status_code=HTTP_200_OK)
-async def get_request(
-    request_id: uuid.UUID,
-    api_request: Request,
-    bearer_token: HTTPAuthorizationCredentials = Security(bearer),
-) -> dict:
-    logger.debug(f"Getting request '{request_id}'")
-    request = await RequestModel.query.where(
-        RequestModel.request_id == request_id
-    ).gino.first_or_404()
-
-    await authorize(
-        api_request.app.arborist_client,
-        bearer_token,
-        "read",
-        [request.to_dict()["resource_path"]],
-    )
-
-    return request.to_dict()
-
-
 @router.post("/request", status_code=HTTP_201_CREATED)
 async def create_request(
     api_request: Request,
@@ -73,10 +45,12 @@ async def create_request(
 ) -> dict:
     """
     Create a new access request.
+
     If no "status" is specified in the request body, will use the configured
     DEFAULT_INITIAL_STATUS. Because users can only request access to a
     resource once, (username, resource_path) must be unique unless past
     requests' statuses are in FINAL_STATUSES.
+
     If no "username" is specified in the request body, will create an access
     request for the user who provided the token.
     """
@@ -134,10 +108,10 @@ async def create_request(
         )
 
     res = request.to_dict()
-    redirect_url = post_status_update(data["status"], res)
 
+    # CORS limits redirections, so we redirect on the client side
+    redirect_url = post_status_update(data["status"], res)
     if redirect_url:
-        # CORS limits redirections, so we redirect on the client side
         res["redirect_url"] = redirect_url
 
     return res
@@ -207,9 +181,9 @@ async def update_request(
     res = request.to_dict()
 
     # CORS limits redirections, so we redirect on the client side
-    redirect_response = post_status_update(status, res)
-    if redirect_response:
-        res["redirect_url"] = redirect_response
+    redirect_url = post_status_update(status, res)
+    if redirect_url:
+        res["redirect_url"] = redirect_url
 
     return res
 
@@ -243,20 +217,5 @@ async def delete_request(
     return {"request_id": request_id}
 
 
-async def get_requests_for_resource_prefix(
-    api_request: Request, resource_prefix
-) -> list:
-    # TODO use this
-    logger.debug(f"Getting requests for resource prefix '{resource_prefix}'")
-    return [
-        r.to_dict()
-        for r in (
-            await RequestModel.query.where(
-                RequestModel.resource_path.startswith(resource_prefix)
-            ).gino.all()
-        )
-    ]
-
-
 def init_app(app: FastAPI):
-    app.include_router(router, tags=["Request"])
+    app.include_router(router, tags=["Maintain"])

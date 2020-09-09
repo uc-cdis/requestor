@@ -2,6 +2,7 @@ from fastapi import APIRouter, FastAPI, Request
 
 from ..models import Request as RequestModel
 
+
 router = APIRouter()
 
 
