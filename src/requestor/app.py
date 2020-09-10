@@ -31,7 +31,7 @@ except:
 from .models import db
 
 
-def load_modules(app=None):
+def load_modules(app: FastAPI = None) -> None:
     for ep in entry_points()["requestor.modules"]:
         logger.info("Loading module: %s", ep.name)
         mod = ep.load()
@@ -41,7 +41,7 @@ def load_modules(app=None):
                 init_app(app)
 
 
-def app_init():
+def app_init() -> FastAPI:
     logger.info("Initializing app")
     config.validate()
 

@@ -19,7 +19,8 @@ from .. import logger, arborist
 from ..config import config
 from ..models import Request as RequestModel
 from ..request_utils import post_status_update
-from ..auth import bearer, get_token_claims
+from ..auth import bearer, get_token_claims, authorize
+
 
 router = APIRouter()
 
@@ -36,44 +37,33 @@ class CreateRequestInput(BaseModel):
     status: str = None
 
 
-@router.get("/request")
-async def list_requests():
-    logger.debug("Listing all requests")
-    return [r.to_dict() for r in (await RequestModel.query.gino.all())]
-
-
-@router.get("/request/{request_id}", status_code=HTTP_200_OK)
-async def get_request(request_id: uuid.UUID):
-    logger.debug(f"Getting request '{request_id}'")
-    request = await RequestModel.query.where(
-        RequestModel.request_id == request_id
-    ).gino.first_or_404()
-    return request.to_dict()
-
-
 @router.post("/request", status_code=HTTP_201_CREATED)
 async def create_request(
+    api_request: Request,
     body: CreateRequestInput,
     bearer_token: HTTPAuthorizationCredentials = Security(bearer),
-):
+) -> dict:
     """
     Create a new access request.
+
     If no "status" is specified in the request body, will use the configured
     DEFAULT_INITIAL_STATUS. Because users can only request access to a
     resource once, (username, resource_path) must be unique unless past
     requests' statuses are in FINAL_STATUSES.
+
     If no "username" is specified in the request body, will create an access
     request for the user who provided the token.
     """
-    request_id = str(uuid.uuid4())
+    data = body.dict()
+    await authorize(
+        api_request.app.arborist_client, bearer_token, "create", [data["resource_path"]]
+    )
 
     token_claims = await get_token_claims(bearer_token)
     token_username = token_claims["context"]["user"]["name"]
     logger.debug(f"Got username from token: {token_username}")
 
-    # TODO arborist check access
-
-    data = body.dict()
+    request_id = str(uuid.uuid4())
     logger.debug(f"Creating request. request_id: {request_id}. Received body: {data}")
 
     if not data.get("status"):
@@ -118,10 +108,10 @@ async def create_request(
         )
 
     res = request.to_dict()
-    redirect_url = post_status_update(data["status"], res)
 
+    # CORS limits redirections, so we redirect on the client side
+    redirect_url = post_status_update(data["status"], res)
     if redirect_url:
-        # CORS limits redirections, so we redirect on the client side
         res["redirect_url"] = redirect_url
 
     return res
@@ -129,14 +119,25 @@ async def create_request(
 
 @router.put("/request/{request_id}", status_code=HTTP_200_OK)
 async def update_request(
-    request_id: uuid.UUID,
     api_request: Request,
+    request_id: uuid.UUID,
     status: str = Body(..., embed=True),
-):
+    bearer_token: HTTPAuthorizationCredentials = Security(bearer),
+) -> dict:
     """
     Update an access request with a new "status".
     """
-    # TODO arborist check access
+    request = await RequestModel.query.where(
+        RequestModel.request_id == request_id
+    ).gino.first_or_404()
+
+    await authorize(
+        api_request.app.arborist_client,
+        bearer_token,
+        "update",
+        [request.to_dict()["resource_path"]],
+    )
+
     logger.debug(f"Updating request '{request_id}' with status '{status}'")
 
     allowed_statuses = config["ALLOWED_REQUEST_STATUSES"]
@@ -152,9 +153,6 @@ async def update_request(
         logger.debug(
             f"Status is '{approved_status}', attempting to grant access in Arborist"
         )
-        request = await RequestModel.query.where(
-            RequestModel.request_id == request_id
-        ).gino.first_or_404()
 
         # assume we are always granting a user access to a resource.
         # in the future we may want to handle more use cases
@@ -177,33 +175,47 @@ async def update_request(
         RequestModel.update.where(RequestModel.request_id == request_id)
         .values(status=status, updated_time=datetime.utcnow())
         .returning(*RequestModel)
-        .gino.first_or_404()
+        .gino.first()
     )
 
     res = request.to_dict()
 
     # CORS limits redirections, so we redirect on the client side
-    redirect_response = post_status_update(status, res)
-    if redirect_response:
-        res["redirect_url"] = redirect_response
+    redirect_url = post_status_update(status, res)
+    if redirect_url:
+        res["redirect_url"] = redirect_url
 
     return res
 
 
 @router.delete("/request/{request_id}", status_code=HTTP_200_OK)
-async def delete_request(request_id: uuid.UUID):
+async def delete_request(
+    api_request: Request,
+    request_id: uuid.UUID,
+    bearer_token: HTTPAuthorizationCredentials = Security(bearer),
+) -> dict:
     """
     Delete an access request.
     """
-    # TODO arborist check access
+    request = await RequestModel.query.where(
+        RequestModel.request_id == request_id
+    ).gino.first_or_404()
+
+    await authorize(
+        api_request.app.arborist_client,
+        bearer_token,
+        "delete",
+        [request.to_dict()["resource_path"]],
+    )
+
     logger.debug(f"Deleting request '{request_id}'")
     request = (
         await RequestModel.delete.where(RequestModel.request_id == request_id)
         .returning(*RequestModel)
-        .gino.first_or_404()
+        .gino.first()
     )
     return {"request_id": request_id}
 
 
 def init_app(app: FastAPI):
-    app.include_router(router, tags=["Request"])
+    app.include_router(router, tags=["Maintain"])

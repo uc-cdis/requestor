@@ -103,9 +103,10 @@ paths:
           description: Successful Response
       summary: List Requests
       tags:
-      - Request
+      - Query
     post:
       description: 'Create a new access request.
+
 
         If no "status" is specified in the request body, will use the configured
 
@@ -114,6 +115,7 @@ paths:
         resource once, (username, resource_path) must be unique unless past
 
         requests'' statuses are in FINAL_STATUSES.
+
 
         If no "username" is specified in the request body, will create an access
 
@@ -141,7 +143,7 @@ paths:
       - HTTPBearer: []
       summary: Create Request
       tags:
-      - Request
+      - Maintain
   /request/{request_id}:
     delete:
       description: Delete an access request.
@@ -166,9 +168,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
           description: Validation Error
+      security:
+      - HTTPBearer: []
       summary: Delete Request
       tags:
-      - Request
+      - Maintain
     get:
       operationId: get_request_request__request_id__get
       parameters:
@@ -191,9 +195,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
           description: Validation Error
+      security:
+      - HTTPBearer: []
       summary: Get Request
       tags:
-      - Request
+      - Query
     put:
       description: Update an access request with a new "status".
       operationId: update_request_request__request_id__put
@@ -223,6 +229,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
           description: Validation Error
+      security:
+      - HTTPBearer: []
       summary: Update Request
       tags:
-      - Request
+      - Maintain
