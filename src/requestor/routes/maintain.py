@@ -75,7 +75,7 @@ async def create_request(
     # get requests for this (username, resource_path) for which the status is
     # not in FINAL_STATUSES. users can only request access to a resource once.
     previous_requests = [
-        (str(r.request_id), r.status)
+        r
         for r in (
             await RequestModel.query.where(
                 and_(
@@ -86,11 +86,16 @@ async def create_request(
             ).gino.all()
         )
     ]
-    if previous_requests:
+    draft_previous_requests = [
+        r for r in previous_requests if r.status in config["DRAFT_STATUSES"]
+    ]
+
+    if previous_requests and not draft_previous_requests:
         # a request for this (username, resource_path) already exists
         msg = f'An open access request for username \'{data["username"]}\' and resource_path \'{data["resource_path"]}\' already exists. Users can only request access to a resource once.'
         logger.error(
-            msg + f" body: {body}. existing requests: {previous_requests}",
+            msg
+            + f" body: {body}. existing requests: {[r.request_id for r in previous_requests]}",
             exc_info=True,
         )
         raise HTTPException(
@@ -98,16 +103,19 @@ async def create_request(
             msg,
         )
 
-    # create the request
-    try:
-        request = await RequestModel.create(request_id=request_id, **data)
-    except UniqueViolationError:
-        raise HTTPException(
-            HTTP_409_CONFLICT,
-            "request_id already exists. Please try again",
-        )
-
-    res = request.to_dict()
+    if draft_previous_requests:
+        # reuse the draft request
+        res = draft_previous_requests[0].to_dict()
+    else:
+        # create a new request
+        try:
+            request = await RequestModel.create(request_id=request_id, **data)
+        except UniqueViolationError:
+            raise HTTPException(
+                HTTP_409_CONFLICT,
+                "request_id already exists. Please try again",
+            )
+        res = request.to_dict()
 
     # CORS limits redirections, so we redirect on the client side
     redirect_url = post_status_update(data["status"], res)
@@ -148,10 +156,9 @@ async def update_request(
         )
 
     # the access request is approved: grant access
-    approved_status = config["GRANT_ACCESS_STATUS"]
-    if status == approved_status:
+    if status in config["UPDATE_ACCESS_STATUSES"]:
         logger.debug(
-            f"Status is '{approved_status}', attempting to grant access in Arborist"
+            f"Status is one of '{config['UPDATE_ACCESS_STATUSES']}', attempting to grant access in Arborist"
         )
 
         # assume we are always granting a user access to a resource.

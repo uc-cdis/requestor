@@ -39,6 +39,37 @@ async def list_requests() -> list:
     return [r.to_dict() for r in (await RequestModel.query.gino.all())]
 
 
+# @router.get("/request/{request_id}", status_code=HTTP_200_OK)
+# async def get_user_request(
+#     request_id: uuid.UUID,
+#     api_request: Request,
+#     bearer_token: HTTPAuthorizationCredentials = Security(bearer),
+# ) -> dict:
+#     logger.debug(f"Getting request '{request_id}'")
+
+#     request = await RequestModel.query.where(
+#         RequestModel.request_id == request_id
+#     ).gino.first()
+
+#     if request:
+#         authorized = await authorize(
+#             api_request.app.arborist_client,
+#             bearer_token,
+#             "read",
+#             [request.to_dict()["resource_path"]],
+#             throw=False,
+#         )
+
+#     if not request or not authorized:
+#         # return the same error for unauthorized and not found
+#         raise HTTPException(
+#             HTTP_404_NOT_FOUND,
+#             "Not found",
+#         )
+
+#     return request.to_dict()
+
+
 @router.get("/request/{request_id}", status_code=HTTP_200_OK)
 async def get_request(
     request_id: uuid.UUID,
@@ -68,6 +99,21 @@ async def get_request(
         )
 
     return request.to_dict()
+
+
+async def get_requests_for_resource_prefix(
+    api_request: Request, resource_prefix
+) -> list:
+    # TODO use this
+    logger.debug(f"Getting requests for resource prefix '{resource_prefix}'")
+    return [
+        r.to_dict()
+        for r in (
+            await RequestModel.query.where(
+                RequestModel.resource_path.startswith(resource_prefix)
+            ).gino.all()
+        )
+    ]
 
 
 def init_app(app: FastAPI):
