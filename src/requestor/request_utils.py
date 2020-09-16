@@ -5,6 +5,21 @@ from . import logger
 from .config import config
 
 
+def is_path_prefix_of_path(resource_prefix, resource_path):
+    """
+    Return True if the arborist resource path "resource_prefix" is a
+    prefix of the arborist resource path "resource_path".
+    """
+    prefix_list = resource_prefix.rstrip("/").split("/")
+    path_list = resource_path.rstrip("/").split("/")
+    if len(prefix_list) > len(path_list):
+        return False
+    for i, prefix_item in enumerate(prefix_list):
+        if path_list[i] != prefix_item:
+            return False
+    return True
+
+
 def post_status_update(status: str, data: dict):
     """
     Handle actions after a successful status update.
@@ -12,7 +27,7 @@ def post_status_update(status: str, data: dict):
     resource_path = data["resource_path"]
     redirects = []
     for resource_prefix, status_actions in config["ACTION_ON_UPDATE"].items():
-        if not resource_path.startswith(resource_prefix):
+        if not is_path_prefix_of_path(resource_prefix, resource_path):
             continue
         if status not in status_actions:
             return
