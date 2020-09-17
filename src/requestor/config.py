@@ -78,10 +78,16 @@ class RequestorConfig(Config):
                                 rule, self["REDIRECT_CONFIGS"]
                             )
                         elif key == "external_call_configs":
+                            raise NotImplementedError(
+                                "external_call_configs is not available yet"
+                            )
                             assert rule in self["EXTERNAL_CALL_CONFIGS"], msg.format(
                                 rule, self["EXTERNAL_CALL_CONFIGS"]
                             )
                         elif key == "email_configs":
+                            raise NotImplementedError(
+                                "email_configs is not available yet"
+                            )
                             assert rule in self["EMAIL_CONFIGS"], msg.format(
                                 rule, self["EMAIL_CONFIGS"]
                             )

@@ -74,11 +74,38 @@ FINAL_STATUSES:
 # ACTIONS ON STATUS UPDATE #
 ############################
 
-# TODO add examples
 REDIRECT_CONFIGS: {}
+  # my_redirect:
+  #   redirect_url: http://localhost?something
+  #   params:
+  #     - request_id
+  #     - resource_id
+  #     - resource_display_name
 
+# ====== not implemented yet
 EXTERNAL_CALL_CONFIGS: {}
+  # let_someone_know:
+  #   method: ""
+  #   url: ""
+  #   params:
+  #     - request_id
+  #     - resource_display_name
+  #   body:
+  #     - request_id
+  #     - resource_display_name
 
+# ====== not implemented yet
 EMAIL_CONFIGS: {}
+  # email_from_gen3: "TBD"
 
+# configure actions to trigger when the status of an access
+# request for the specified resource path is updated
 ACTION_ON_UPDATE: {}
+  # /resource/with/redirect:
+  #   DRAFT:
+  #     redirect_configs:
+  #       - my_redirect
+  #     external_call_configs:
+  #       - let_someone_know
+  #     email_configs:
+  #       - email_from_gen3
