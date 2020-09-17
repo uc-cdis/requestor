@@ -100,6 +100,8 @@ async def check_user_resource_paths(
     """
     Return whether the current user has already requested access to the
     specified resource path(s), including prefixes of the resource path(s).
+    If the previous request was denied or is still in draft status, will
+    return False.
 
     Args:
         resource_paths (list): list of resource paths
@@ -118,7 +120,9 @@ async def check_user_resource_paths(
         requests = [
             r
             for r in user_requests
-            if is_path_prefix_of_path(r.resource_path, resource_path)
+            if r.status not in config["DRAFT_STATUSES"]
+            and r.status not in config["FINAL_STATUSES"]
+            and is_path_prefix_of_path(r.resource_path, resource_path)
         ]
         res[resource_path] = len(requests) > 0
     return res

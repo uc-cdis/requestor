@@ -171,6 +171,8 @@ def test_check_user_resource_paths_prefixes(client, test_data):
         "resource_path": test_data["resource_path"],
         "resource_id": "uniqid",
         "resource_display_name": "My Resource",
+        # skip the draft status so that the access is not re-requestable
+        "status": "INTERMEDIATE_STATUS",
     }
     res = client.post(
         "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
@@ -207,6 +209,8 @@ def test_check_user_resource_paths_multiple(client):
             "resource_path": resource_path,
             "resource_id": "uniqid",
             "resource_display_name": "My Resource",
+            # skip the draft status so that the access is not re-requestable
+            "status": "INTERMEDIATE_STATUS",
         }
         res = client.post(
             "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
@@ -227,14 +231,16 @@ def test_check_user_resource_paths_multiple(client):
 def test_check_user_resource_paths_username(client):
     fake_jwt = "1.2.3"
 
-    resource_paths_to_match = "/a/b"
+    resource_path_to_match = "/a/b"
 
     # create a request that matches but is for a different user
     data = {
         "username": "not-the-same-user",
-        "resource_path": resource_paths_to_match,
+        "resource_path": resource_path_to_match,
         "resource_id": "uniqid",
         "resource_display_name": "My Resource",
+        # skip the draft status so that the access is not re-requestable
+        "status": "INTERMEDIATE_STATUS",
     }
     res = client.post(
         "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
@@ -242,11 +248,56 @@ def test_check_user_resource_paths_username(client):
     assert res.status_code == 201, res.text
 
     # check that the resource path does not match the request we created
-    data = {"resource_paths": [resource_paths_to_match]}
+    data = {"resource_paths": [resource_path_to_match]}
     res = client.post(
         "/request/user_resource_paths",
         json=data,
         headers={"Authorization": f"bearer {fake_jwt}"},
     )
     assert res.status_code == 200, res.text
-    assert res.json() == {resource_paths_to_match: False}
+    assert res.json() == {resource_path_to_match: False}
+
+
+@pytest.mark.parametrize(
+    "test_data",
+    [
+        {
+            "status": config["DRAFT_STATUSES"][0],
+            "should_match": False,
+        },
+        {
+            "status": config["FINAL_STATUSES"][0],
+            "should_match": False,
+        },
+        {
+            "status": "INTERMEDIATE_STATUS",
+            "should_match": True,
+        },
+    ],
+)
+def test_check_user_resource_paths_status(client, test_data):
+    fake_jwt = "1.2.3"
+    resource_path_to_match = "/a"
+
+    # create a request with the status to test
+    data = {
+        "resource_path": resource_path_to_match,
+        "resource_id": "uniqid",
+        "resource_display_name": "My Resource",
+        "status": test_data["status"],
+    }
+    res = client.post(
+        "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+    )
+    assert res.status_code == 201, res.text
+
+    # check whether there is a match
+    # (True if the access is re-requestable, False otherwise)
+    data = {"resource_paths": [resource_path_to_match]}
+    res = client.post(
+        "/request/user_resource_paths",
+        json=data,
+        headers={"Authorization": f"bearer {fake_jwt}"},
+    )
+    assert res.status_code == 200, res.text
+    assert res.json() == {resource_path_to_match: test_data["should_match"]}
