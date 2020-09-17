@@ -173,8 +173,9 @@ paths:
     post:
       description: "Return whether the current user has already requested access to\
         \ the\nspecified resource path(s), including prefixes of the resource path(s).\n\
-        \nArgs:\n    resource_paths (list): list of resource paths\n\nReturn: (dict)\
-        \ { resource_path1: true, resource_path2: false, ... }"
+        If the previous request was denied or is still in draft status, will\nreturn\
+        \ False.\n\nArgs:\n    resource_paths (list): list of resource paths\n\nReturn:\
+        \ (dict) { resource_path1: true, resource_path2: false, ... }"
       operationId: check_user_resource_paths_request_user_resource_paths_post
       requestBody:
         content:
