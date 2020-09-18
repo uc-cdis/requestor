@@ -1,10 +1,6 @@
-# Server
-
 DEBUG: true
 TEST_KEEP_DB: false
 DOCS_URL_PREFIX: /
-
-# Database
 
 # These are required for automated testing (see .github/workflows/ci.yaml)
 DB_DRIVER: postgresql
@@ -13,8 +9,6 @@ DB_PORT: 5432
 DB_USER: postgres
 DB_PASSWORD: postgres
 DB_DATABASE: requestor_test
-
-# Request statuses
 
 ALLOWED_REQUEST_STATUSES:
   - CREATED
@@ -29,32 +23,16 @@ UPDATE_ACCESS_STATUSES:
 FINAL_STATUSES:
   - CANCELLED
 
-# Configure actions on request status update
-
 REDIRECT_CONFIGS:
-  to_niaid_dua:
+  my_redirect:
     redirect_url: http://localhost?something
     params:
       - request_id
       - resource_id
       - resource_display_name
 
-EXTERNAL_CALL_CONFIGS:
-  let_someone_know:
-    method: ""
-    url: ""
-    params:
-      - request_id
-      - resource_display_name
-    body:
-      - request_id
-      - resource_display_name
-
-EMAIL_CONFIGS:
-  email_from_niaid: "TBD"
-
 ACTION_ON_UPDATE:
   /resource-with-redirect:
     CREATED:
       redirect_configs:
-        - to_niaid_dua
+        - my_redirect

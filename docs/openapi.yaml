@@ -1,5 +1,15 @@
 components:
   schemas:
+    Body_check_user_resource_paths_request_user_resource_paths_post:
+      properties:
+        resource_paths:
+          items: {}
+          title: Resource Paths
+          type: array
+      required:
+      - resource_paths
+      title: Body_check_user_resource_paths_request_user_resource_paths_post
+      type: object
     Body_update_request_request__request_id__put:
       properties:
         status:
@@ -144,6 +154,52 @@ paths:
       summary: Create Request
       tags:
       - Maintain
+  /request/user:
+    get:
+      description: List the current user's requests.
+      operationId: list_user_requests_request_user_get
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+      security:
+      - HTTPBearer: []
+      summary: List User Requests
+      tags:
+      - Query
+  /request/user_resource_paths:
+    post:
+      description: "Return whether the current user has already requested access to\
+        \ the\nspecified resource path(s), including prefixes of the resource path(s).\n\
+        If the previous request was denied or is still in draft status, will\nreturn\
+        \ False.\n\nArgs:\n    resource_paths (list): list of resource paths\n\nReturn:\
+        \ (dict) { resource_path1: true, resource_path2: false, ... }"
+      operationId: check_user_resource_paths_request_user_resource_paths_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Body_check_user_resource_paths_request_user_resource_paths_post'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Check User Resource Paths
+      tags:
+      - Query
   /request/{request_id}:
     delete:
       description: Delete an access request.

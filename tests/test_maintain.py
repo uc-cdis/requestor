@@ -77,7 +77,8 @@ def test_create_request_without_username(client):
 def test_create_duplicate_request(client):
     """
     Users can only request access to a resource once.
-    (username, resource_path) should be unique.
+    (username, resource_path) should be unique, except if other
+    requests statuses are in DRAFT_STATUSES or FINAL_STATUSES.
     """
     fake_jwt = "1.2.3"
 

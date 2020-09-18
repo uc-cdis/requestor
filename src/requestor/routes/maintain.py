@@ -13,13 +13,12 @@ from starlette.status import (
     HTTP_409_CONFLICT,
     HTTP_500_INTERNAL_SERVER_ERROR,
 )
-from sqlalchemy import and_
 
 from .. import logger, arborist
+from ..auth import bearer, get_token_claims, authorize
 from ..config import config
 from ..models import Request as RequestModel
 from ..request_utils import post_status_update
-from ..auth import bearer, get_token_claims, authorize
 
 
 router = APIRouter()
@@ -59,17 +58,17 @@ async def create_request(
         api_request.app.arborist_client, bearer_token, "create", [data["resource_path"]]
     )
 
-    token_claims = await get_token_claims(bearer_token)
-    token_username = token_claims["context"]["user"]["name"]
-    logger.debug(f"Got username from token: {token_username}")
-
     request_id = str(uuid.uuid4())
     logger.debug(f"Creating request. request_id: {request_id}. Received body: {data}")
 
     if not data.get("status"):
         data["status"] = config["DEFAULT_INITIAL_STATUS"]
+
     if not data.get("username"):
         logger.debug("No username provided in body, using token username")
+        token_claims = await get_token_claims(bearer_token)
+        token_username = token_claims["context"]["user"]["name"]
+        logger.debug(f"Got username from token: {token_username}")
         data["username"] = token_username
 
     # get requests for this (username, resource_path) for which the status is
@@ -78,12 +77,15 @@ async def create_request(
         r
         for r in (
             await RequestModel.query.where(
-                and_(
-                    RequestModel.username == data["username"],
-                    RequestModel.resource_path == data["resource_path"],
-                    RequestModel.status.notin_(config["FINAL_STATUSES"]),
-                )
-            ).gino.all()
+                RequestModel.username == data["username"],
+            )
+            .where(
+                RequestModel.resource_path == data["resource_path"],
+            )
+            .where(
+                RequestModel.status.notin_(config["FINAL_STATUSES"]),
+            )
+            .gino.all()
         )
     ]
     draft_previous_requests = [
