@@ -5,7 +5,6 @@ from datetime import datetime
 from fastapi import APIRouter, FastAPI, HTTPException, Body, Security
 from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel
-from sqlalchemy import and_
 from starlette.requests import Request
 from starlette.status import (
     HTTP_200_OK,
@@ -78,12 +77,15 @@ async def create_request(
         r
         for r in (
             await RequestModel.query.where(
-                and_(
-                    RequestModel.username == data["username"],
-                    RequestModel.resource_path == data["resource_path"],
-                    RequestModel.status.notin_(config["FINAL_STATUSES"]),
-                )
-            ).gino.all()
+                RequestModel.username == data["username"],
+            )
+            .where(
+                RequestModel.resource_path == data["resource_path"],
+            )
+            .where(
+                RequestModel.status.notin_(config["FINAL_STATUSES"]),
+            )
+            .gino.all()
         )
     ]
     draft_previous_requests = [

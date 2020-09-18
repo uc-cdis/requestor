@@ -4,7 +4,6 @@ from datetime import datetime
 from fastapi import APIRouter, Body, FastAPI, HTTPException, Security
 from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel
-from sqlalchemy import and_
 from starlette.requests import Request
 from starlette.status import (
     HTTP_200_OK,
@@ -25,11 +24,7 @@ async def get_user_requests(username: str) -> list:
     return [
         r
         for r in (
-            await RequestModel.query.where(
-                and_(
-                    RequestModel.username == username,
-                )
-            ).gino.all()
+            await RequestModel.query.where(RequestModel.username == username).gino.all()
         )
     ]
 
