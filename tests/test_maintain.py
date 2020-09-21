@@ -158,7 +158,7 @@ def test_create_request_without_access(client, mock_arborist_requests):
     assert res.status_code == 403, res.text
 
     # check that no request was created
-    res = client.get("/request")
+    res = client.get("/request", headers={"Authorization": f"bearer {fake_jwt}"})
     assert res.status_code == 200, res.text
     assert res.json() == []
 

@@ -11,10 +11,10 @@ from starlette.status import (
 )
 
 from .. import logger, arborist
+from ..arborist import is_path_prefix_of_path
 from ..auth import bearer, get_token_claims, authorize
 from ..config import config
 from ..models import Request as RequestModel
-from ..request_utils import is_path_prefix_of_path
 
 
 router = APIRouter()
@@ -30,10 +30,37 @@ async def get_user_requests(username: str) -> list:
 
 
 @router.get("/request")
-async def list_requests() -> list:
-    # TODO filter requests with read access
-    logger.debug("Listing all requests")
-    return [r.to_dict() for r in (await RequestModel.query.gino.all())]
+async def list_requests(
+    api_request: Request,
+    bearer_token: HTTPAuthorizationCredentials = Security(bearer),
+) -> list:
+    """
+    List all the requests the current user has access to see.
+    """
+    # get the resources the current user has access to see
+    token_claims = await get_token_claims(bearer_token)
+    username = token_claims["context"]["user"]["name"]
+    authz_mapping = await api_request.app.arborist_client.auth_mapping(username)
+    authorized_resource_paths = [
+        resource_path
+        for resource_path, access in authz_mapping.items()
+        if any(
+            e["service"] in ["requestor", "*"] and e["method"] in ["read", "*"]
+            for e in access
+        )
+    ]
+
+    # filter requests with read access
+    requests = await RequestModel.query.gino.all()
+    authorized_requests = [
+        r
+        for r in requests
+        if any(
+            is_path_prefix_of_path(authorized_resource_path, r.resource_path)
+            for authorized_resource_path in authorized_resource_paths
+        )
+    ]
+    return [r.to_dict() for r in authorized_requests]
 
 
 @router.get("/request/user", status_code=HTTP_200_OK)

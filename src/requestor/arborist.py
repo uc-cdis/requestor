@@ -3,15 +3,27 @@ from gen3authz.client.arborist.client import ArboristClient
 from . import logger
 
 
+def is_path_prefix_of_path(resource_prefix, resource_path):
+    """
+    Return True if the arborist resource path "resource_prefix" is a
+    prefix of the arborist resource path "resource_path".
+    """
+    prefix_list = resource_prefix.rstrip("/").split("/")
+    path_list = resource_path.rstrip("/").split("/")
+    if len(prefix_list) > len(path_list):
+        return False
+    for i, prefix_item in enumerate(prefix_list):
+        if path_list[i] != prefix_item:
+            return False
+    return True
+
+
 async def grant_user_access_to_resource(
     arborist_client: ArboristClient,
     username: str,
     resource_path: str,
     resource_description: str,
 ) -> int:
-    """
-    TODO: cache things that already exist
-    """
     # create the user
     logger.debug(f"Attempting to create user {username} in Arborist")
     await arborist_client.create_user_if_not_exist(username)

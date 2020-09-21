@@ -67,10 +67,14 @@ def access_token_patcher(client, request):
 @pytest.fixture(autouse=True)
 def clean_db(client):
     # before each test, delete all existing requests from the DB
-    res = client.get("/request")
+    fake_jwt = "1.2.3"
+    res = client.get("/request", headers={"Authorization": f"bearer {fake_jwt}"})
     assert res.status_code == 200
     for r in res.json():
-        res = client.delete("/request/" + r["request_id"])
+        res = client.delete(
+            "/request/" + r["request_id"],
+            headers={"Authorization": f"bearer {fake_jwt}"},
+        )
 
     yield
 
@@ -92,6 +96,12 @@ def mock_arborist_requests(request):
             },
             "http://arborist-service/user/requestor_user/policy": {
                 "POST": ({}, 204 if authorized else 403)
+            },
+            "http://arborist-service/auth/mapping": {
+                "POST": (
+                    {"/": [{"service": "*", "method": "*"}]} if authorized else {},
+                    200,
+                )
             },
         }
 

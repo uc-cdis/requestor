@@ -148,6 +148,10 @@ async def update_request(
         [request.to_dict()["resource_path"]],
     )
 
+    if request.status == status:
+        logger.debug(f"Request '{request_id}' already has status '{status}'")
+        return request.to_dict()
+
     logger.debug(f"Updating request '{request_id}' with status '{status}'")
 
     allowed_statuses = config["ALLOWED_REQUEST_STATUSES"]
