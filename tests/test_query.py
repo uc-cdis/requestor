@@ -8,7 +8,7 @@ def test_create_get_and_list_request(client):
     fake_jwt = "1.2.3"
 
     # list requests: empty
-    res = client.get("/request")
+    res = client.get("/request", headers={"Authorization": f"bearer {fake_jwt}"})
     assert res.status_code == 200
     assert res.json() == []
 
@@ -44,7 +44,7 @@ def test_create_get_and_list_request(client):
     assert res.json() == request_data
 
     # list requests
-    res = client.get("/request")
+    res = client.get("/request", headers={"Authorization": f"bearer {fake_jwt}"})
     assert res.status_code == 200, res.text
     assert res.json() == [request_data]
 
