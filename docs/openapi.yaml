@@ -104,6 +104,7 @@ paths:
       - System
   /request:
     get:
+      description: List all the requests the current user has access to see.
       operationId: list_requests_request_get
       responses:
         '200':
@@ -111,6 +112,8 @@ paths:
             application/json:
               schema: {}
           description: Successful Response
+      security:
+      - HTTPBearer: []
       summary: List Requests
       tags:
       - Query
