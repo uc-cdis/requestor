@@ -124,6 +124,31 @@ def test_get_user_requests(client):
     assert res.status_code == 401, res.text
 
 
+def test_list_requests_with_access(client):
+    fake_jwt = "1.2.3"
+
+    # create requests
+    request_data = {}
+    for resource_path in ["/my/resource", "/a/b/c", "something-i-cant-access"]:
+        data = {
+            "resource_path": resource_path,
+            "resource_id": "uniqid",
+            "resource_display_name": "My Resource",
+        }
+        res = client.post(
+            "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+        )
+        assert res.status_code == 201, res.text
+        request_data[resource_path] = res.json()
+
+    # list requests
+    # the mocked auth_mapping response in mock_arborist_requests does not
+    # include "something-i-cant-access", so it should not be returned
+    res = client.get("/request", headers={"Authorization": f"bearer {fake_jwt}"})
+    assert res.status_code == 200, res.text
+    assert res.json() == [request_data["/my/resource"], request_data["/a/b/c"]]
+
+
 @pytest.mark.parametrize(
     "test_data",
     [
