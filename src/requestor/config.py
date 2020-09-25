@@ -43,9 +43,6 @@ class RequestorConfig(Config):
         assert self["DEFAULT_INITIAL_STATUS"] in allowed_statuses, msg.format(
             self["DEFAULT_INITIAL_STATUS"], allowed_statuses
         )
-        assert self["DEFAULT_INITIAL_STATUS"] in draft_statuses, msg.format(
-            self["DEFAULT_INITIAL_STATUS"], draft_statuses
-        )
 
         update_access_statuses = self["UPDATE_ACCESS_STATUSES"]
         for s in update_access_statuses:
