@@ -9,6 +9,7 @@ from starlette.status import (
     HTTP_200_OK,
     HTTP_201_CREATED,
     HTTP_400_BAD_REQUEST,
+    HTTP_403_FORBIDDEN,
     HTTP_409_CONFLICT,
     HTTP_500_INTERNAL_SERVER_ERROR,
 )
@@ -213,23 +214,27 @@ async def delete_request(
     """
     Delete an access request.
     """
-    # try to delete in a transaction, if no access, roll back => only 1 query
-    # transaction.raise_rollback()
-    request = await RequestModel.query.where(
-        RequestModel.request_id == request_id
-    ).gino.first_or_404()
-
-    await auth.authorize(
-        "delete",
-        [request.resource_path],
-    )
-
     logger.debug(f"Deleting request '{request_id}'")
-    request = (
-        await RequestModel.delete.where(RequestModel.request_id == request_id)
-        .returning(*RequestModel)
-        .gino.first()
-    )
+    async with db.transaction():
+        request = (
+            await RequestModel.delete.where(RequestModel.request_id == request_id)
+            .returning(*RequestModel)
+            .gino.first_or_404()
+        )
+
+        authorized = await auth.authorize(
+            "delete",
+            [request.resource_path],
+            throw=False,
+        )
+
+        if not authorized:
+            # will rollback the transaction
+            raise HTTPException(
+                HTTP_403_FORBIDDEN,
+                "Permission denied",
+            )
+
     return {"request_id": request_id}
 
 
