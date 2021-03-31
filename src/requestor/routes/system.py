@@ -6,7 +6,7 @@ from ..models import Request as RequestModel
 router = APIRouter()
 
 
-@router.get("/_version")
+@router.get("/_versionN")
 def get_version(request: Request) -> dict:
     return dict(version=request.app.version)
 
