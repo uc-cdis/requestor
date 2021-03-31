@@ -75,7 +75,7 @@ components:
       type: http
 info:
   title: Requestor
-  version: 0.0.0
+  version: 1.2.0
 openapi: 3.0.2
 paths:
   /_status:
@@ -90,9 +90,9 @@ paths:
       summary: Get Status
       tags:
       - System
-  /_version:
+  /_versionN:
     get:
-      operationId: get_version__version_get
+      operationId: get_version__versionN_get
       responses:
         '200':
           content:
