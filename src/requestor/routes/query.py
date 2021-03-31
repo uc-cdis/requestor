@@ -1,8 +1,7 @@
 import uuid
 
 from datetime import datetime
-from fastapi import APIRouter, Body, FastAPI, HTTPException, Security
-from fastapi.security import HTTPAuthorizationCredentials
+from fastapi import APIRouter, Body, Depends, FastAPI, HTTPException
 from pydantic import BaseModel
 from starlette.requests import Request
 from starlette.status import (
@@ -12,7 +11,7 @@ from starlette.status import (
 
 from .. import logger, arborist
 from ..arborist import is_path_prefix_of_path
-from ..auth import bearer, get_token_claims, authorize
+from ..auth import Auth
 from ..config import config
 from ..models import Request as RequestModel
 
@@ -32,13 +31,13 @@ async def get_user_requests(username: str) -> list:
 @router.get("/request")
 async def list_requests(
     api_request: Request,
-    bearer_token: HTTPAuthorizationCredentials = Security(bearer),
+    auth=Depends(Auth),
 ) -> list:
     """
     List all the requests the current user has access to see.
     """
     # get the resources the current user has access to see
-    token_claims = await get_token_claims(bearer_token)
+    token_claims = await auth.get_token_claims()
     username = token_claims["context"]["user"]["name"]
     authz_mapping = await api_request.app.arborist_client.auth_mapping(username)
     authorized_resource_paths = [
@@ -65,8 +64,7 @@ async def list_requests(
 
 @router.get("/request/user", status_code=HTTP_200_OK)
 async def list_user_requests(
-    api_request: Request,
-    bearer_token: HTTPAuthorizationCredentials = Security(bearer),
+    auth=Depends(Auth),
 ) -> dict:
     """
     List the current user's requests.
@@ -74,7 +72,7 @@ async def list_user_requests(
     # no authz checks because we assume the current user can read
     # their own requests.
 
-    token_claims = await get_token_claims(bearer_token)
+    token_claims = await auth.get_token_claims()
     username = token_claims["context"]["user"]["name"]
     logger.debug(f"Getting requests for user '{username}'")
 
@@ -85,8 +83,7 @@ async def list_user_requests(
 @router.get("/request/{request_id}", status_code=HTTP_200_OK)
 async def get_request(
     request_id: uuid.UUID,
-    api_request: Request,
-    bearer_token: HTTPAuthorizationCredentials = Security(bearer),
+    auth=Depends(Auth),
 ) -> dict:
     logger.debug(f"Getting request '{request_id}'")
 
@@ -95,11 +92,9 @@ async def get_request(
     ).gino.first()
 
     if request:
-        authorized = await authorize(
-            api_request.app.arborist_client,
-            bearer_token,
+        authorized = await auth.authorize(
             "read",
-            [request.to_dict()["resource_path"]],
+            [request.resource_path],
             throw=False,
         )
 
@@ -115,9 +110,8 @@ async def get_request(
 
 @router.post("/request/user_resource_paths", status_code=HTTP_200_OK)
 async def check_user_resource_paths(
-    api_request: Request,
     resource_paths: list = Body(..., embed=True),
-    bearer_token: HTTPAuthorizationCredentials = Security(bearer),
+    auth=Depends(Auth),
 ) -> dict:
     """
     Return whether the current user has already requested access to the
@@ -133,7 +127,7 @@ async def check_user_resource_paths(
     # no authz checks because we assume the current user can read
     # their own requests.
 
-    token_claims = await get_token_claims(bearer_token)
+    token_claims = await auth.get_token_claims()
     username = token_claims["context"]["user"]["name"]
 
     res = {}
