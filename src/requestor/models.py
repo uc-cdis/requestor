@@ -1,8 +1,6 @@
-import enum
-
 from datetime import datetime
 from gino.ext.starlette import Gino
-from sqlalchemy import Column, DateTime, Enum, String, UniqueConstraint
+from sqlalchemy import Column, DateTime, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 
 from .config import config

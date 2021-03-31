@@ -16,7 +16,7 @@ def post_status_update(status: str, data: dict):
         if not is_path_prefix_of_path(resource_prefix, resource_path):
             continue
         if status not in status_actions:
-            return
+            continue
 
         actions = status_actions[status]
         for redirect_action in actions.get("redirect_configs", []):
