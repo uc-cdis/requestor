@@ -284,6 +284,11 @@ def test_delete_request(client):
     res = client.get(f"/request/{request_id}")
     assert res.status_code == 404, res.text
 
+    # delete a request that doesn't exist
+    uuid = "571c6a1a-f21f-11ea-adc1-0242ac120002"
+    res = client.delete(f"/request/{uuid}")
+    assert res.status_code == 404, res.text
+
 
 def test_delete_request_without_access(client, mock_arborist_requests):
     fake_jwt = "1.2.3"
