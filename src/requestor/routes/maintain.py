@@ -139,7 +139,9 @@ async def update_request(
         request = (
             await RequestModel.query.where(RequestModel.request_id == request_id)
             # lock the row by using FOR UPDATE clause
-            .with_for_update().gino.first_or_404()
+            .execution_options(populate_existing=True)
+            .with_for_update()
+            .gino.first_or_404()
         )
 
         await auth.authorize(
@@ -222,18 +224,9 @@ async def delete_request(
             .gino.first_or_404()
         )
 
-        authorized = await auth.authorize(
-            "delete",
-            [request.resource_path],
-            throw=False,
-        )
-
-        if not authorized:
-            # will rollback the transaction
-            raise HTTPException(
-                HTTP_403_FORBIDDEN,
-                "Permission denied",
-            )
+        # if not authorized, the exception raised by `auth.authorize`
+        # triggers a transaction rollback, so we don't delete
+        await auth.authorize("delete", [request.resource_path])
 
     return {"request_id": request_id}
 
