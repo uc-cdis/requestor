@@ -39,11 +39,34 @@ async def grant_user_access_to_resource(
     }
     await arborist_client.create_resource(parent_path, resource, create_parents=True)
 
+    # Create "reader" and "storage_reader" roles in Arborist.
+    # If they already exist arborist would "Do Nothing"
+    roles = [
+        {
+            "id": "reader",
+            "permissions": [
+                {"id": "reader", "action": {"service": "*", "method": "read"}}
+            ],
+        },
+        {
+            "id": "storage_reader",
+            "permissions": [
+                {
+                    "id": "storage_reader",
+                    "action": {"service": "*", "method": "read-storage"},
+                }
+            ],
+        },
+    ]
+
+    for role in roles:
+        logger.debug(f"Attempting to create role \"{role['id']}\" in Arborist")
+        await arborist_client.create_role(role)
+
     # create the policy
     policy_id = ".".join(resources[1:]) + "_reader"
     logger.debug(f"Attempting to create policy {policy_id} in Arborist")
-    # assume "reader" and "storage_reader" roles already exist,
-    # what could go wrong :-) (TODO)
+
     policy = {
         "id": policy_id,
         "description": "policy created by requestor",
