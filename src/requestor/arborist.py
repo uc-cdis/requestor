@@ -1,4 +1,5 @@
 from gen3authz.client.arborist.client import ArboristClient
+from gen3authz.client.arborist.errors import ArboristError
 
 from . import logger
 
@@ -60,8 +61,16 @@ async def grant_user_access_to_resource(
     ]
 
     for role in roles:
-        logger.debug(f"Attempting to create role \"{role['id']}\" in Arborist")
-        await arborist_client.create_role(role)
+        try:
+            await arborist_client.update_role(role["id"], role)
+        except ArboristError as e:
+            logger.info(
+                "An error occured while updating role - '{}', '{}'".format(
+                    {role["id"]}, str(e)
+                )
+            )
+            logger.debug(f"Attempting to create role '{role['id']}' in Arborist")
+            await arborist_client.create_role(role)
 
     # create the policy
     policy_id = ".".join(resources[1:]) + "_reader"
