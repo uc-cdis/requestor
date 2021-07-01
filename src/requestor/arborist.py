@@ -2,7 +2,7 @@ from gen3authz.client.arborist.client import ArboristClient
 
 from . import logger
 
-
+# dummy comment
 def is_path_prefix_of_path(resource_prefix, resource_path):
     """
     Return True if the arborist resource path "resource_prefix" is a
