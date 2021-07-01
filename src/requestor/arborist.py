@@ -2,7 +2,7 @@ from gen3authz.client.arborist.client import ArboristClient
 
 from . import logger
 
-# dummy comment
+
 def is_path_prefix_of_path(resource_prefix, resource_path):
     """
     Return True if the arborist resource path "resource_prefix" is a
@@ -50,7 +50,7 @@ async def grant_user_access_to_resource(
         "role_ids": ["reader", "storage_reader"],
         "resource_paths": [resource_path],
     }
-    await arborist_client.create_policy(policy, skip_if_exists=True)
+    await arborist_client.create_policy(policy, skip_if_exists=False)
 
     # grant the user access to the resource
     logger.debug(f"Attempting to grant {username} access to {policy_id}")
