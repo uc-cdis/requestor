@@ -64,4 +64,4 @@ OR
 uvicorn requestor.asgi:app --reload
 ```
 
-Try out the API at: <http://localhost:8000/docs>.
+Try out the API at <http://localhost:8000/_status> or <http://localhost:8000/docs> (you might have to set `DOCS_URL_PREFIX` to `""` in your configuration file for the docs endpoint to work).
