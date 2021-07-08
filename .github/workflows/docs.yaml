@@ -7,7 +7,7 @@ on:
 jobs:
   build_docs:
 
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
 
     steps:
     - uses: actions/checkout@v2
@@ -16,7 +16,7 @@ jobs:
     - name: Set up Python 3.7
       uses: actions/setup-python@v1
       with:
-        python-version: 3.7.7
+        python-version: 3.7
     - uses: actions/cache@preview
       with:
         path: ~/.cache/pypoetry/virtualenvs
