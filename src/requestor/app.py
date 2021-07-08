@@ -1,4 +1,5 @@
 import asyncio
+from fastapi.routing import APIRoute
 import httpx
 import os
 from fastapi import FastAPI
@@ -70,6 +71,9 @@ def app_init() -> FastAPI:
 
     db.init_app(app)
     load_modules(app)
+    for route in app.routes:
+        if hasattr(route, "body_field") and route.body_field is not None:
+            print(route.body_field)
 
     @app.on_event("shutdown")
     async def shutdown_event():
