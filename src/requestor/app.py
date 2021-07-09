@@ -37,8 +37,7 @@ from .models import db
 
 
 def load_modules(app: FastAPI = None) -> None:
-    print(len(entry_points()["requestor.modules"]))
-    for ep in entry_points()["requestor.modules"]:
+    for ep in set(entry_points()["requestor.modules"]):
         logger.info("Loading module: %s", ep.name)
         mod = ep.load()
         if app:
