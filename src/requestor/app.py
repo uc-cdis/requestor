@@ -33,6 +33,8 @@ from .models import db
 
 
 def load_modules(app: FastAPI = None) -> None:
+    # FIXME: Identify the cause for duplicate entry points
+    # Added a set on entry points to dodge the intermittent duplicate modules issue
     for ep in set(entry_points()["requestor.modules"]):
         logger.info("Loading module: %s", ep.name)
         mod = ep.load()
