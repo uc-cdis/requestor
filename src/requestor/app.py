@@ -6,8 +6,12 @@ from fastapi import FastAPI
 
 try:
     from importlib.metadata import entry_points, version
+
+    print("[IMPORT ANALYSIS] importred importlib.metadata")
 except ImportError:
     from importlib_metadata import entry_points, version
+
+    print("[IMPORT ANALYSIS] importred importlib_metadata")
 
 from cdislogging import get_logger
 from gen3authz.client.arborist.client import ArboristClient
@@ -72,9 +76,9 @@ def app_init() -> FastAPI:
 
     db.init_app(app)
     load_modules(app)
-    for route in app.routes:
-        if hasattr(route, "body_field") and route.body_field is not None:
-            print(route.body_field)
+    # for route in app.routes:
+    #     if hasattr(route, "body_field") and route.body_field is not None:
+    #         print(route.body_field)
 
     @app.on_event("shutdown")
     async def shutdown_event():
