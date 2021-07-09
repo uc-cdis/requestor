@@ -7,7 +7,7 @@ on:
 jobs:
   build_docs:
 
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v2
@@ -27,8 +27,6 @@ jobs:
       run: |
         curl -sSL https://raw.githubusercontent.com/sdispater/poetry/master/get-poetry.py | python || true
         $HOME/.poetry/bin/poetry install || true
-    - name: Show all dependencies
-      run: $HOME/.poetry/bin/poetry show
     - name: Build docs
       run: REQUESTOR_CONFIG_PATH=src/requestor/config-default.yaml $HOME/.poetry/bin/poetry run python run.py openapi
 
