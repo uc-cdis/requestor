@@ -13,7 +13,7 @@ The server is built with [FastAPI](https://fastapi.tiangolo.com/) and packaged w
 Install required software:
 
 *   [PostgreSQL](PostgreSQL) 9.6 or above
-*   [Python](https://www.python.org/downloads/) 3.7 or above
+*   [Python](https://www.python.org/downloads/) 3.7.x
 *   [Poetry](https://poetry.eustace.io/docs/#installation)
 
 Then use `poetry install` to install the dependencies. Before that,
