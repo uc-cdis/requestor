@@ -6,6 +6,10 @@ Requestor exposes an API to manage access requests.
 
 The server is built with [FastAPI](https://fastapi.tiangolo.com/) and packaged with [Poetry](https://poetry.eustace.io/).
 
+## Example flow
+
+![Requestor example flow](docs/img/requestor_example_flow.png)
+
 ## Local installation
 
 ### Install Requestor
