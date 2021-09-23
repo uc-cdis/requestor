@@ -12,7 +12,7 @@
 
 Requestor can be configured to return a URL so users can be redirected to external pages, such as access request forms (see example below). However, at this time there is no Gen3 UI to interact with Requestor. Forms and UIs can be external, or calls can be made directly through the API.
 
-![Requestor example flow](docs/img/requestor_example_flow.png)
+![Requestor example flow](img/requestor_example_flow.png)
 
 The requestor service API is leveraged through the use of external forms/pages or services which are put in place and managed by the implementing organization.
 
