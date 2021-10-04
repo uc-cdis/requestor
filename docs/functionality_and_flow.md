@@ -17,7 +17,7 @@ Requestor can be configured to return a URL so users can be redirected to extern
 The requestor service API is leveraged through the use of external forms/pages or services which are put in place and managed by the implementing organization.
 
 A user interacts with the service in the following way:
-- From a Gen3 Commons, the implementing organization will expose a “Request Access” option which will be displayed to users if they are logged in and do not current have access to the resource (Program / Project).
+- From a Gen3 Commons, the implementing organization will expose a “Request Access” option which will be displayed to users if they are logged in and do not currently have access to the resource (Program / Project).
 - The user is directed to an external form to complete an access request which should contain at a minimum:
   - User name
   - Resource access is being requested for
