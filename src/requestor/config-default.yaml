@@ -6,6 +6,8 @@ DEBUG: true
 TEST_KEEP_DB: false
 DOCS_URL_PREFIX: /requestor
 
+ARBORIST_URL:
+
 ####################
 # DATABASE         #
 ####################
@@ -24,6 +26,10 @@ DB_SSL:
 DB_USE_CONNECTION_FOR_REQUEST: true
 DB_RETRY_LIMIT: 1
 DB_RETRY_INTERVAL: 1
+
+# set to true to disable requests to Arborist during database migrations;
+# useful when migrating a local database or running unit tests
+LOCAL_MIGRATION: false
 
 ####################
 # REQUEST STATUSES #
