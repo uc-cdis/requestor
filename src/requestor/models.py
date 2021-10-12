@@ -23,12 +23,12 @@ class Request(db.Model):
 
     request_id = Column(UUID, primary_key=True)
     username = Column(String, nullable=False)
-    # TODO remove `resource_id`, `resource_display_name` - waiting on answer
-    # from NCT devs
-    resource_id = Column(String)
-    resource_display_name = Column(String)
     policy_id = Column(String, nullable=False)
     revoke = Column(Boolean, nullable=False)
     status = Column(String, nullable=False)
     created_time = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_time = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # keep for backwards compatibility:
+    resource_id = Column(String)
+    resource_display_name = Column(String)
