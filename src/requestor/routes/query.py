@@ -10,7 +10,6 @@ from starlette.status import (
 )
 
 from .. import logger, arborist
-from ..arborist import is_path_prefix_of_path
 from ..auth import Auth
 from ..config import config
 from ..models import Request as RequestModel
@@ -51,12 +50,20 @@ async def list_requests(
 
     # filter requests with read access
     requests = await RequestModel.query.gino.all()
+    existing_policies = arborist.list_policies(
+        api_request.app.arborist_client, expand=True
+    )
     authorized_requests = [
         r
         for r in requests
-        if any(
-            is_path_prefix_of_path(authorized_resource_path, r.resource_path)
-            for authorized_resource_path in authorized_resource_paths
+        if all(
+            any(
+                arborist.is_path_prefix_of_path(authorized_resource_path, resource_path)
+                for authorized_resource_path in authorized_resource_paths
+            )
+            for resource_path in arborist.get_resource_paths_for_policy(
+                existing_policies, r.policy_id
+            )
         )
     ]
     return [r.to_dict() for r in authorized_requests]
@@ -82,6 +89,7 @@ async def list_user_requests(
 
 @router.get("/request/{request_id}", status_code=HTTP_200_OK)
 async def get_request(
+    api_request: Request,
     request_id: uuid.UUID,
     auth=Depends(Auth),
 ) -> dict:
@@ -90,11 +98,15 @@ async def get_request(
     request = await RequestModel.query.where(
         RequestModel.request_id == request_id
     ).gino.first()
-
+    existing_policies = arborist.list_policies(
+        api_request.app.arborist_client, expand=True
+    )
     if request:
         authorized = await auth.authorize(
             "read",
-            [request.resource_path],
+            arborist.get_resource_paths_for_policy(
+                existing_policies, request.policy_id
+            ),
             throw=False,
         )
 
@@ -138,7 +150,9 @@ async def check_user_resource_paths(
             for r in user_requests
             if r.status not in config["DRAFT_STATUSES"]
             and r.status not in config["FINAL_STATUSES"]
-            and is_path_prefix_of_path(r.resource_path, resource_path)
+            and arborist.is_path_prefix_of_path(
+                r.resource_path, resource_path
+            )  # TODO: (PXP-8829)
         ]
         res[resource_path] = len(requests) > 0
     return res

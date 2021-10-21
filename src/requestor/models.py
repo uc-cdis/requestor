@@ -28,7 +28,7 @@ class Request(db.Model):
     resource_id = Column(String)
     resource_display_name = Column(String)
     policy_id = Column(String, nullable=False)
-    revoke = Column(Boolean, nullable=False)
+    revoke = Column(Boolean, default=False, nullable=False)
     status = Column(String, nullable=False)
     created_time = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_time = Column(DateTime, default=datetime.utcnow, nullable=False)

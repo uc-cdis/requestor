@@ -6,11 +6,12 @@ from .arborist import is_path_prefix_of_path
 from .config import config
 
 
-def post_status_update(status: str, data: dict):
+def post_status_update(status: str, data: dict, resource_path: str):
     """
     Handle actions after a successful status update.
     """
-    resource_path = data["resource_path"]
+    if "resource_path" in data:
+        resource_path = data["resource_path"]
     redirects = []
     for resource_prefix, status_actions in config["ACTION_ON_UPDATE"].items():
         if not is_path_prefix_of_path(resource_prefix, resource_path):

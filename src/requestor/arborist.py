@@ -150,20 +150,15 @@ async def create_arborist_policy(
     return policy_id
 
 
-async def grant_user_access_to_resource(
+async def grant_user_access_to_policy(
     arborist_client: ArboristClient,
     username: str,
-    resource_path: str,
+    policy_id: str,
     resource_description: str,
 ) -> bool:
     # create the user
     logger.debug(f"Attempting to create user {username} in Arborist")
     await arborist_client.create_user_if_not_exist(username)
-
-    # create the resource, roles and policy
-    policy_id = await create_arborist_policy(
-        arborist_client, resource_path, resource_description
-    )
 
     # grant the user access to the resource
     logger.debug(f"Attempting to grant {username} access to {policy_id}")

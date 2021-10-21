@@ -3,6 +3,7 @@ import uuid
 from asyncpg.exceptions import UniqueViolationError
 from datetime import datetime
 from fastapi import APIRouter, Body, Depends, FastAPI, HTTPException
+from gen3authz.client.arborist.client import ArboristClient
 from pydantic import BaseModel
 from starlette.requests import Request
 from starlette.status import (
@@ -15,6 +16,7 @@ from starlette.status import (
 )
 
 from .. import logger, arborist
+from ..asgi import app
 from ..auth import Auth
 from ..config import config
 from ..models import db, Request as RequestModel
@@ -30,10 +32,11 @@ class CreateRequestInput(BaseModel):
     """
 
     username: str = None
-    resource_path: str
+    resource_path: str = None
     resource_id: str = None
     resource_display_name: str = None
     status: str = None
+    policy_id: str = None
 
 
 @router.post("/request", status_code=HTTP_201_CREATED)
@@ -53,7 +56,32 @@ async def create_request(
     request for the user who provided the token.
     """
     data = body.dict()
-    await auth.authorize("create", [data["resource_path"]])
+
+    if data.get("resource_path") and data.get("policy_id"):
+        msg = f"A Request cannot have both resource_path and policy_id."
+        logger.error(
+            msg + f" body: {body}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            HTTP_400_BAD_REQUEST,
+            msg,
+        )
+
+    if data["resource_path"]:
+        data["policy_id"] = arborist.get_auto_policy_id_for_resource_path(
+            data.get("resource_path")
+        )
+        resource_paths = [data["resource_path"]]
+        del data["resource_path"]
+    else:
+        client = app.arborist_client
+        existing_policies = arborist.list_policies(client, expand=True)
+        resource_paths = arborist.get_resource_paths_for_policy(
+            existing_policies, data.get("policy_id")
+        )
+
+    await auth.authorize("create", resource_paths)
 
     request_id = str(uuid.uuid4())
     logger.debug(f"Creating request. request_id: {request_id}. Received body: {data}")
@@ -68,7 +96,7 @@ async def create_request(
         logger.debug(f"Got username from token: {token_username}")
         data["username"] = token_username
 
-    # get requests for this (username, resource_path) for which the status is
+    # get requests for this (username, policy_id) for which the status is
     # not in FINAL_STATUSES. users can only request access to a resource once.
     previous_requests = [
         r
@@ -77,7 +105,7 @@ async def create_request(
                 RequestModel.username == data["username"],
             )
             .where(
-                RequestModel.resource_path == data["resource_path"],
+                RequestModel.policy_id == data["policy_id"],
             )
             .where(
                 RequestModel.status.notin_(config["FINAL_STATUSES"]),
@@ -91,7 +119,7 @@ async def create_request(
 
     if previous_requests and not draft_previous_requests:
         # a request for this (username, resource_path) already exists
-        msg = f'An open access request for username \'{data["username"]}\' and resource_path \'{data["resource_path"]}\' already exists. Users can only request access to a resource once.'
+        msg = f'An open access request for username \'{data["username"]}\' and policy_id \'{data["policy_id"]}\' already exists. Users can only request access to a resource once.'
         logger.error(
             msg
             + f" body: {body}. existing requests: {[r.request_id for r in previous_requests]}",
@@ -117,7 +145,9 @@ async def create_request(
         res = request.to_dict()
 
     # CORS limits redirections, so we redirect on the client side
-    redirect_url = post_status_update(data["status"], res)
+    redirect_url = post_status_update(
+        data["status"], res, resource_path=resource_paths[0]
+    )
     if redirect_url:
         res["redirect_url"] = redirect_url
 
@@ -143,10 +173,15 @@ async def update_request(
             .with_for_update()
             .gino.first_or_404()
         )
-
+        existing_policies = arborist.list_policies(
+            api_request.app.arborist_client, expand=True
+        )
+        resource_paths = arborist.get_resource_paths_for_policy(
+            existing_policies, request.policy_id
+        )
         await auth.authorize(
             "update",
-            [request.resource_path],
+            resource_paths,
         )
 
         if request.status == status:
@@ -171,12 +206,12 @@ async def update_request(
             # assume we are always granting a user access to a resource.
             # in the future we may want to handle more use cases
             logger.debug(
-                f"username: {request.username}, resource: {request.resource_path}"
+                f"username: {request.username}, policy_id: {request.policy_id}"
             )
-            success = await arborist.grant_user_access_to_resource(
+            success = await arborist.grant_user_access_to_policy(
                 api_request.app.arborist_client,
                 request.username,
-                request.resource_path,
+                request.policy_id,
                 request.resource_display_name,
             )
 
@@ -201,7 +236,7 @@ async def update_request(
     res = request.to_dict()
 
     # CORS limits redirections, so we redirect on the client side
-    redirect_url = post_status_update(status, res)
+    redirect_url = post_status_update(status, res, resource_path=resource_paths[0])
     if redirect_url:
         res["redirect_url"] = redirect_url
 
@@ -210,6 +245,7 @@ async def update_request(
 
 @router.delete("/request/{request_id}", status_code=HTTP_200_OK)
 async def delete_request(
+    api_request: Request,
     request_id: uuid.UUID,
     auth=Depends(Auth),
 ) -> dict:
@@ -226,7 +262,15 @@ async def delete_request(
 
         # if not authorized, the exception raised by `auth.authorize`
         # triggers a transaction rollback, so we don't delete
-        await auth.authorize("delete", [request.resource_path])
+        exisiting_policies = arborist.list_policies(
+            api_request.app.arborist_client, expand=True
+        )
+        await auth.authorize(
+            "delete",
+            arborist.get_resource_paths_for_policy(
+                exisiting_policies, request.policy_id
+            ),
+        )
 
     return {"request_id": request_id}
 
