@@ -73,13 +73,13 @@ async def create_request(
             data.get("resource_path")
         )
         resource_paths = [data["resource_path"]]
-        del data["resource_path"]
     else:
         client = app.arborist_client
-        existing_policies = arborist.list_policies(client, expand=True)
+        existing_policies = await arborist.list_policies(client, expand=True)
         resource_paths = arborist.get_resource_paths_for_policy(
-            existing_policies, data.get("policy_id")
+            existing_policies["policies"], data.get("policy_id")
         )
+    del data["resource_path"]  # Get rid off resource_path completely.
 
     await auth.authorize("create", resource_paths)
 
@@ -173,11 +173,11 @@ async def update_request(
             .with_for_update()
             .gino.first_or_404()
         )
-        existing_policies = arborist.list_policies(
+        existing_policies = await arborist.list_policies(
             api_request.app.arborist_client, expand=True
         )
         resource_paths = arborist.get_resource_paths_for_policy(
-            existing_policies, request.policy_id
+            existing_policies["policies"], request.policy_id
         )
         await auth.authorize(
             "update",
@@ -262,13 +262,13 @@ async def delete_request(
 
         # if not authorized, the exception raised by `auth.authorize`
         # triggers a transaction rollback, so we don't delete
-        exisiting_policies = arborist.list_policies(
+        exisiting_policies = await arborist.list_policies(
             api_request.app.arborist_client, expand=True
         )
         await auth.authorize(
             "delete",
             arborist.get_resource_paths_for_policy(
-                exisiting_policies, request.policy_id
+                exisiting_policies["policies"], request.policy_id
             ),
         )
 

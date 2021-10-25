@@ -5,6 +5,28 @@ from requestor import arborist
 from requestor.config import config
 
 
+def test_create_request_with_resource_path_and_policy(client):
+    """
+    When a redirect is configured for the requested resource, a
+    redirect URL should be returned to the client.
+    """
+    fake_jwt = "1.2.3"
+
+    # create a request
+    data = {
+        "username": "requestor_user",
+        "resource_path": "/test-resource-path/resource",
+        "policy_id": "test_policy",
+        "resource_id": "uniqid",
+        "resource_display_name": "My Resource",
+    }
+    res = client.post(
+        "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+    )
+
+    assert res.status_code == 400, res.text
+
+
 def test_create_request_with_redirect(client):
     """
     When a redirect is configured for the requested resource, a
@@ -38,7 +60,7 @@ def test_create_request_with_redirect(client):
         "status": config["DEFAULT_INITIAL_STATUS"],
         "redirect_url": f"http://localhost?something=&request_id={request_id}&resource_id=uniqid&resource_display_name=My+Resource",
         # just ensure created_time and updated_time are there:
-        "revoke": request_data["revoke"],
+        "revoke": False,
         "created_time": request_data["created_time"],
         "updated_time": request_data["updated_time"],
     }
@@ -53,7 +75,7 @@ def test_create_request_without_username(client):
 
     # create a request
     data = {
-        "resource_path": "/my/resource",
+        "policy_id": "test-policy",
         "resource_id": "uniqid",
         "resource_display_name": "My Resource",
     }
@@ -68,14 +90,12 @@ def test_create_request_without_username(client):
     assert request_data == {
         "request_id": request_id,
         "username": "requestor-user",  # username from access_token_patcher
-        "policy_id": arborist.get_auto_policy_id_for_resource_path(
-            data["resource_path"]
-        ),
+        "policy_id": data["policy_id"],
         "resource_id": data["resource_id"],
         "resource_display_name": data["resource_display_name"],
         "status": config["DEFAULT_INITIAL_STATUS"],
         # just ensure created_time and updated_time are there:
-        "revoke": request_data["revoke"],
+        "revoke": False,
         "created_time": request_data["created_time"],
         "updated_time": request_data["updated_time"],
     }
@@ -84,7 +104,7 @@ def test_create_request_without_username(client):
 def test_create_duplicate_request(client):
     """
     Users can only request access to a resource once.
-    (username, resource_path) should be unique, except if other
+    (username, policy_id) should be unique, except if other
     requests statuses are in DRAFT_STATUSES or FINAL_STATUSES.
     """
     fake_jwt = "1.2.3"
@@ -92,7 +112,7 @@ def test_create_duplicate_request(client):
     # create a request
     data = {
         "username": "requestor_user",
-        "resource_path": "/my/resource",
+        "policy_id": "test-policy",
         "resource_id": "uniqid",
         "resource_display_name": "My Resource",
     }
@@ -106,14 +126,12 @@ def test_create_duplicate_request(client):
     assert request_data == {
         "request_id": request_id,
         "username": data["username"],
-        "policy_id": arborist.get_auto_policy_id_for_resource_path(
-            data["resource_path"]
-        ),
+        "policy_id": data["policy_id"],
         "resource_id": data["resource_id"],
         "resource_display_name": data["resource_display_name"],
         "status": config["DEFAULT_INITIAL_STATUS"],
         # just ensure created_time and updated_time are there:
-        "revoke": request_data["revoke"],
+        "revoke": False,
         "created_time": request_data["created_time"],
         "updated_time": request_data["updated_time"],
     }
@@ -158,7 +176,7 @@ def test_create_request_without_access(client, mock_arborist_requests):
     # attempt to create a request
     data = {
         "username": "requestor_user",
-        "resource_path": "/my/resource",
+        "policy_id": "test-policy",
         "resource_id": "uniqid",
         "resource_display_name": "My Resource",
     }
@@ -185,7 +203,7 @@ def test_update_request(client):
         "/request",
         json={
             "username": "requestor_user",
-            "resource_path": "/my/resource",
+            "policy_id": "test-policy",
             "resource_id": "uniqid",
             "resource_display_name": "My Resource",
         },
@@ -230,7 +248,7 @@ def test_update_request_without_access(client, mock_arborist_requests):
         "/request",
         json={
             "username": "requestor_user",
-            "resource_path": "/my/resource",
+            "policy_id": "test-policy",
             "resource_id": "uniqid",
             "resource_display_name": "My Resource",
         },
@@ -269,7 +287,7 @@ def test_delete_request(client):
     # create a request
     data = {
         "username": "requestor_user",
-        "resource_path": "/my/resource",
+        "policy_id": "test-policy",
         "resource_id": "uniqid",
         "resource_display_name": "My Resource",
     }
@@ -306,7 +324,7 @@ def test_delete_request_without_access(client, mock_arborist_requests):
     # create a request
     data = {
         "username": "requestor_user",
-        "resource_path": "/my/resource",
+        "policy_id": "test-policy",
         "resource_id": "uniqid",
         "resource_display_name": "My Resource",
     }
