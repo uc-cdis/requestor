@@ -139,7 +139,7 @@ async def create_request(
             request = await RequestModel.create(request_id=request_id, **data)
         except UniqueViolationError:
             raise HTTPException(
-                HTTP_409_CONFLICT,
+                HTTP_400_BAD_REQUEST,
                 "request_id already exists. Please try again",
             )
         res = request.to_dict()
