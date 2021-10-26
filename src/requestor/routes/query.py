@@ -50,19 +50,20 @@ async def list_requests(
 
     # filter requests with read access
     requests = await RequestModel.query.gino.all()
-    existing_policies = arborist.list_policies(
+    existing_policies = await arborist.list_policies(
         api_request.app.arborist_client, expand=True
     )
+    # A request is authorized if all the resource_paths in the request are authorized.
     authorized_requests = [
         r
         for r in requests
         if all(
-            any(
+            any(  # A resource_path is authorized if the path or any of it's prefixes belong to the authorized_resource_paths
                 arborist.is_path_prefix_of_path(authorized_resource_path, resource_path)
                 for authorized_resource_path in authorized_resource_paths
             )
             for resource_path in arborist.get_resource_paths_for_policy(
-                existing_policies, r.policy_id
+                existing_policies["policies"], r.policy_id
             )
         )
     ]
@@ -98,14 +99,14 @@ async def get_request(
     request = await RequestModel.query.where(
         RequestModel.request_id == request_id
     ).gino.first()
-    existing_policies = arborist.list_policies(
+    existing_policies = await arborist.list_policies(
         api_request.app.arborist_client, expand=True
     )
     if request:
         authorized = await auth.authorize(
             "read",
             arborist.get_resource_paths_for_policy(
-                existing_policies, request.policy_id
+                existing_policies["policies"], request.policy_id
             ),
             throw=False,
         )

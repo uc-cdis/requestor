@@ -6,26 +6,27 @@ from .arborist import is_path_prefix_of_path
 from .config import config
 
 
-def post_status_update(status: str, data: dict, resource_path: str):
+def post_status_update(status: str, data: dict, resource_paths: list):
     """
     Handle actions after a successful status update.
     """
     if "resource_path" in data:
-        resource_path = data["resource_path"]
+        resource_paths = [data["resource_path"]]
     redirects = []
-    for resource_prefix, status_actions in config["ACTION_ON_UPDATE"].items():
-        if not is_path_prefix_of_path(resource_prefix, resource_path):
-            continue
-        if status not in status_actions:
-            continue
+    for resource_path in resource_paths:
+        for resource_prefix, status_actions in config["ACTION_ON_UPDATE"].items():
+            if not is_path_prefix_of_path(resource_prefix, resource_path):
+                continue
+            if status not in status_actions:
+                continue
 
-        actions = status_actions[status]
-        for redirect_action in actions.get("redirect_configs", []):
-            redirects.append((redirect_action, data))
-        for external_call_action in actions.get("external_call_configs", []):
-            raise NotImplementedError("TODO")
-        for email_action in actions.get("email_configs", []):
-            raise NotImplementedError("TODO")
+            actions = status_actions[status]
+            for redirect_action in actions.get("redirect_configs", []):
+                redirects.append((redirect_action, data))
+            for external_call_action in actions.get("external_call_configs", []):
+                raise NotImplementedError("TODO")
+            for email_action in actions.get("email_configs", []):
+                raise NotImplementedError("TODO")
 
     # redirect *after* doing other actions
     if redirects:

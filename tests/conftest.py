@@ -97,6 +97,35 @@ def mock_arborist_requests(request):
             "http://arborist-service/user/requestor_user/policy": {
                 "POST": ({}, 204 if authorized else 403)
             },
+            "http://arborist-service/policy?expand": {
+                "GET": (
+                    {
+                        "policies": [
+                            {
+                                "id": "test-policy",
+                                "resource_paths": ["/my/resource"],
+                                "roles": [
+                                    {
+                                        "id": "reader",
+                                        "description": "",
+                                        "permissions": [
+                                            {
+                                                "id": "read",
+                                                "description": "",
+                                                "action": {
+                                                    "service": "*",
+                                                    "method": "read",
+                                                },
+                                            }
+                                        ],
+                                    }
+                                ],
+                            }
+                        ]
+                    },
+                    204 if authorized else 403,
+                )
+            },
             "http://arborist-service/auth/mapping": {
                 "POST": (
                     {"/": [{"service": "*", "method": "*"}]} if authorized else {},

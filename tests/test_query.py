@@ -36,8 +36,8 @@ def test_create_get_and_list_request(client):
         "resource_id": data["resource_id"],
         "resource_display_name": data["resource_display_name"],
         "status": config["DEFAULT_INITIAL_STATUS"],
-        # just ensure created_time and updated_time are there:
-        "revoke": request_data["revoke"],
+        # just ensure revoke, created_time and updated_time are there:
+        "revoke": False,
         "created_time": request_data["created_time"],
         "updated_time": request_data["updated_time"],
     }

@@ -88,7 +88,9 @@ def downgrade():
 
     for policy_id in existing_policy_ids:
         if not config["LOCAL_MIGRATION"]:
-            resource_paths = get_resource_paths_for_policy(existing_policies, policy_id)
+            resource_paths = get_resource_paths_for_policy(
+                existing_policies["policies"], policy_id
+            )
             assert len(resource_paths) > 0, f"No resource_paths for policy {policy_id}"
         else:
             resource_paths = ["/test/resource/path"]
