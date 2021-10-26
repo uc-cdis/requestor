@@ -106,6 +106,8 @@ EMAIL_CONFIGS: {}
 
 # configure actions to trigger when the status of an access
 # request for the specified resource path is updated
+# Note: In the case when mutliple resource_paths of a request are authorized,
+# only the first resource_path is considered
 ACTION_ON_UPDATE: {}
   # /resource/with/redirect:
   #   DRAFT:
