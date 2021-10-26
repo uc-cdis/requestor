@@ -7,16 +7,28 @@ from requestor.config import config
 
 def test_create_request_with_resource_path_and_policy(client):
     """
-    When a redirect is configured for the requested resource, a
-    redirect URL should be returned to the client.
+    When a user attempts to create a request with both resource_path and
+    policy_id or with both of them missing, a 400 Bad request is returned to the client.
     """
     fake_jwt = "1.2.3"
 
-    # create a request
+    # create a request with both resource_path and policy_id
     data = {
         "username": "requestor_user",
         "resource_path": "/test-resource-path/resource",
         "policy_id": "test_policy",
+        "resource_id": "uniqid",
+        "resource_display_name": "My Resource",
+    }
+    res = client.post(
+        "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+    )
+
+    assert res.status_code == 400, res.text
+
+    # create a request which has neither resource_path nor policy_id
+    data = {
+        "username": "requestor_user",
         "resource_id": "uniqid",
         "resource_display_name": "My Resource",
     }
@@ -59,7 +71,7 @@ def test_create_request_with_redirect(client):
         "resource_display_name": data["resource_display_name"],
         "status": config["DEFAULT_INITIAL_STATUS"],
         "redirect_url": f"http://localhost?something=&request_id={request_id}&resource_id=uniqid&resource_display_name=My+Resource",
-        # just ensure created_time and updated_time are there:
+        # just ensure revoke, created_time and updated_time are there:
         "revoke": False,
         "created_time": request_data["created_time"],
         "updated_time": request_data["updated_time"],
@@ -94,7 +106,7 @@ def test_create_request_without_username(client):
         "resource_id": data["resource_id"],
         "resource_display_name": data["resource_display_name"],
         "status": config["DEFAULT_INITIAL_STATUS"],
-        # just ensure created_time and updated_time are there:
+        # just ensure revoke, created_time and updated_time are there:
         "revoke": False,
         "created_time": request_data["created_time"],
         "updated_time": request_data["updated_time"],
@@ -130,7 +142,7 @@ def test_create_duplicate_request(client):
         "resource_id": data["resource_id"],
         "resource_display_name": data["resource_display_name"],
         "status": config["DEFAULT_INITIAL_STATUS"],
-        # just ensure created_time and updated_time are there:
+        # just ensure revoke, created_time and updated_time are there:
         "revoke": False,
         "created_time": request_data["created_time"],
         "updated_time": request_data["updated_time"],

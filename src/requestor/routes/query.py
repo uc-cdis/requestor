@@ -53,11 +53,12 @@ async def list_requests(
     existing_policies = await arborist.list_policies(
         api_request.app.arborist_client, expand=True
     )
+    # A request is authorized if all the resource_paths in the request are authorized.
     authorized_requests = [
         r
         for r in requests
         if all(
-            any(
+            any(  # A resource_path is authorized if the path or any of it's prefixes belong to the authorized_resource_paths
                 arborist.is_path_prefix_of_path(authorized_resource_path, resource_path)
                 for authorized_resource_path in authorized_resource_paths
             )

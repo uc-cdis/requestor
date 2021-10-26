@@ -37,7 +37,7 @@ def test_create_request_with_redirect(client):
         "resource_display_name": data["resource_display_name"],
         "status": config["DEFAULT_INITIAL_STATUS"],
         "redirect_url": f"http://localhost?something=&request_id={request_id}&resource_id=uniqid&resource_display_name=My+Resource",
-        # just ensure created_time and updated_time are there:
+        # just ensure revoke, created_time and updated_time are there:
         "revoke": False,
         "created_time": request_data["created_time"],
         "updated_time": request_data["updated_time"],
@@ -74,7 +74,7 @@ def test_create_request_without_username(client):
         "resource_id": data["resource_id"],
         "resource_display_name": data["resource_display_name"],
         "status": config["DEFAULT_INITIAL_STATUS"],
-        # just ensure created_time and updated_time are there:
+        # just ensure revoke, created_time and updated_time are there:
         "revoke": False,
         "created_time": request_data["created_time"],
         "updated_time": request_data["updated_time"],
@@ -112,7 +112,7 @@ def test_create_duplicate_request(client):
         "resource_id": data["resource_id"],
         "resource_display_name": data["resource_display_name"],
         "status": config["DEFAULT_INITIAL_STATUS"],
-        # just ensure created_time and updated_time are there:
+        # just ensure revoke, created_time and updated_time are there:
         "revoke": False,
         "created_time": request_data["created_time"],
         "updated_time": request_data["updated_time"],

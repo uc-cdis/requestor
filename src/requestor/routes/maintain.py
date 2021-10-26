@@ -3,20 +3,17 @@ import uuid
 from asyncpg.exceptions import UniqueViolationError
 from datetime import datetime
 from fastapi import APIRouter, Body, Depends, FastAPI, HTTPException
-from gen3authz.client.arborist.client import ArboristClient
 from pydantic import BaseModel
 from starlette.requests import Request
 from starlette.status import (
     HTTP_200_OK,
     HTTP_201_CREATED,
     HTTP_400_BAD_REQUEST,
-    HTTP_403_FORBIDDEN,
     HTTP_409_CONFLICT,
     HTTP_500_INTERNAL_SERVER_ERROR,
 )
 
 from .. import logger, arborist
-from ..asgi import app
 from ..auth import Auth
 from ..config import config
 from ..models import db, Request as RequestModel
@@ -41,6 +38,7 @@ class CreateRequestInput(BaseModel):
 
 @router.post("/request", status_code=HTTP_201_CREATED)
 async def create_request(
+    api_request: Request,
     body: CreateRequestInput,
     auth=Depends(Auth),
 ) -> dict:
@@ -56,9 +54,9 @@ async def create_request(
     request for the user who provided the token.
     """
     data = body.dict()
-
-    if data.get("resource_path") and data.get("policy_id"):
-        msg = f"A Request cannot have both resource_path and policy_id."
+    # Raise Exception (if we have both resource_path and policy_id) OR (if we have neither). : Hence performing XNOR
+    if bool(data.get("resource_path")) == bool(data.get("policy_id")):
+        msg = f"A Request can have either only a resource_path or only a policy_id. But not both."
         logger.error(
             msg + f" body: {body}",
             exc_info=True,
@@ -68,18 +66,20 @@ async def create_request(
             msg,
         )
 
-    if data["resource_path"]:
-        data["policy_id"] = arborist.get_auto_policy_id_for_resource_path(
-            data.get("resource_path")
+    resource_paths = None
+    client = api_request.app.arborist_client
+    if not data["policy_id"]:
+        data["policy_id"] = arborist.create_arborist_policy(
+            client, data.get("resource_path")
         )
         resource_paths = [data["resource_path"]]
-    else:
-        client = app.arborist_client
+
+    if not resource_paths:
         existing_policies = await arborist.list_policies(client, expand=True)
         resource_paths = arborist.get_resource_paths_for_policy(
             existing_policies["policies"], data.get("policy_id")
         )
-    del data["resource_path"]  # Get rid off resource_path completely.
+    del data["resource_path"]  # Get rid of resource_path completely.
 
     await auth.authorize("create", resource_paths)
 
@@ -139,15 +139,13 @@ async def create_request(
             request = await RequestModel.create(request_id=request_id, **data)
         except UniqueViolationError:
             raise HTTPException(
-                HTTP_409_CONFLICT,
+                HTTP_400_BAD_REQUEST,
                 "request_id already exists. Please try again",
             )
         res = request.to_dict()
 
     # CORS limits redirections, so we redirect on the client side
-    redirect_url = post_status_update(
-        data["status"], res, resource_path=resource_paths[0]
-    )
+    redirect_url = post_status_update(data["status"], res, resource_paths)
     if redirect_url:
         res["redirect_url"] = redirect_url
 
@@ -164,6 +162,9 @@ async def update_request(
     """
     Update an access request with a new "status".
     """
+    existing_policies = await arborist.list_policies(
+        api_request.app.arborist_client, expand=True
+    )
     # only allow 1 update request at a time on the same row
     async with db.transaction():
         request = (
@@ -172,9 +173,6 @@ async def update_request(
             .execution_options(populate_existing=True)
             .with_for_update()
             .gino.first_or_404()
-        )
-        existing_policies = await arborist.list_policies(
-            api_request.app.arborist_client, expand=True
         )
         resource_paths = arborist.get_resource_paths_for_policy(
             existing_policies["policies"], request.policy_id
@@ -260,17 +258,17 @@ async def delete_request(
             .gino.first_or_404()
         )
 
-        # if not authorized, the exception raised by `auth.authorize`
-        # triggers a transaction rollback, so we don't delete
-        exisiting_policies = await arborist.list_policies(
-            api_request.app.arborist_client, expand=True
-        )
-        await auth.authorize(
-            "delete",
-            arborist.get_resource_paths_for_policy(
-                exisiting_policies["policies"], request.policy_id
-            ),
-        )
+    # if not authorized, the exception raised by `auth.authorize`
+    # triggers a transaction rollback, so we don't delete
+    exisiting_policies = await arborist.list_policies(
+        api_request.app.arborist_client, expand=True
+    )
+    await auth.authorize(
+        "delete",
+        arborist.get_resource_paths_for_policy(
+            exisiting_policies["policies"], request.policy_id
+        ),
+    )
 
     return {"request_id": request_id}
 
