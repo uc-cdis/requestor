@@ -69,15 +69,16 @@ async def create_request(
     resource_paths = None
     client = api_request.app.arborist_client
     if not data["policy_id"]:
+        # fallback to body `resource_path` for backwards compatibility
         data["policy_id"] = await arborist.create_arborist_policy(
-            client, data.get("resource_path")
+            client, data["resource_path"]
         )
         resource_paths = [data["resource_path"]]
 
     if not resource_paths:
         existing_policies = await arborist.list_policies(client, expand=True)
         resource_paths = arborist.get_resource_paths_for_policy(
-            existing_policies["policies"], data.get("policy_id")
+            existing_policies["policies"], data["policy_id"]
         )
     del data["resource_path"]  # Get rid of resource_path completely.
 
