@@ -24,7 +24,7 @@ class Request(db.Model):
     request_id = Column(UUID, primary_key=True)
     username = Column(String, nullable=False)
     policy_id = Column(String, nullable=False)
-    revoke = Column(Boolean, nullable=False)
+    revoke = Column(Boolean, default=False, nullable=False)
     status = Column(String, nullable=False)
     created_time = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_time = Column(DateTime, default=datetime.utcnow, nullable=False)

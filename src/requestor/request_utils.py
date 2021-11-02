@@ -6,25 +6,25 @@ from .arborist import is_path_prefix_of_path
 from .config import config
 
 
-def post_status_update(status: str, data: dict):
+def post_status_update(status: str, data: dict, resource_paths: list):
     """
     Handle actions after a successful status update.
     """
-    resource_path = data["resource_path"]
     redirects = []
     for resource_prefix, status_actions in config["ACTION_ON_UPDATE"].items():
-        if not is_path_prefix_of_path(resource_prefix, resource_path):
-            continue
-        if status not in status_actions:
-            continue
-
-        actions = status_actions[status]
-        for redirect_action in actions.get("redirect_configs", []):
-            redirects.append((redirect_action, data))
-        for external_call_action in actions.get("external_call_configs", []):
-            raise NotImplementedError("TODO")
-        for email_action in actions.get("email_configs", []):
-            raise NotImplementedError("TODO")
+        for resource_path in resource_paths:
+            if (
+                is_path_prefix_of_path(resource_prefix, resource_path)
+                and status in status_actions
+            ):
+                actions = status_actions[status]
+                for redirect_action in actions.get("redirect_configs", []):
+                    redirects.append((redirect_action, data))
+                for external_call_action in actions.get("external_call_configs", []):
+                    raise NotImplementedError("TODO")
+                for email_action in actions.get("email_configs", []):
+                    raise NotImplementedError("TODO")
+                break  # So that we only do the action once, even if more than 1 resource_path matches
 
     # redirect *after* doing other actions
     if redirects:
