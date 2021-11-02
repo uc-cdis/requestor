@@ -97,7 +97,8 @@ def mock_arborist_requests(request):
             "http://arborist-service/user/requestor_user/policy": {
                 "POST": ({}, 204 if authorized else 403)
             },
-            "http://arborist-service/policy?expand": {
+            "http://arborist-service/policy/": {
+                # TODO add "?expand" once we use the latest gen3authz
                 "GET": (
                     {
                         "policies": [
@@ -120,7 +121,12 @@ def mock_arborist_requests(request):
                                         ],
                                     }
                                 ],
-                            }
+                            },
+                            {
+                                "id": "test-policy-with-redirect",
+                                "resource_paths": ["/resource-with-redirect/resource"],
+                                "roles": [],
+                            },
                         ]
                     },
                     204 if authorized else 403,
@@ -137,7 +143,6 @@ def mock_arborist_requests(request):
         def make_mock_response(method, url, *args, **kwargs):
             method = method.upper()
             mocked_response = MagicMock(requests.Response)
-
             if url not in urls_to_responses:
                 mocked_response.status_code = 404
                 mocked_response.text = "NOT FOUND"

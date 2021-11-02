@@ -49,6 +49,7 @@ def is_path_prefix_of_path(resource_prefix: str, resource_path: str) -> bool:
     return True
 
 
+# TODO async/await?
 def list_policies(arborist_client: ArboristClient, expand: bool = False) -> list:
     """
     We can cache this data later if needed, but it's tricky - the length
@@ -61,7 +62,6 @@ def list_policies(arborist_client: ArboristClient, expand: bool = False) -> list
 
 
 def get_resource_paths_for_policy(expanded_policies: list, policy_id: str) -> list:
-    return ["/my/resource"]  # TODO remove once we have expanded policies
     for p in expanded_policies:
         if p["id"] == policy_id:
             return p["resource_paths"]

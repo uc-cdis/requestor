@@ -1,7 +1,4 @@
-import pytest
-from unittest.mock import patch
 from requestor import arborist
-
 from requestor.config import config
 
 
@@ -49,7 +46,7 @@ def test_create_request_with_redirect(client):
     # create a request
     data = {
         "username": "requestor_user",
-        "resource_path": "/resource-with-redirect/resource",
+        "policy_id": "test-policy-with-redirect",
         "resource_id": "uniqid",
         "resource_display_name": "My Resource",
     }
@@ -64,9 +61,7 @@ def test_create_request_with_redirect(client):
     assert request_data == {
         "request_id": request_id,
         "username": data["username"],
-        "policy_id": arborist.get_auto_policy_id_for_resource_path(
-            data["resource_path"]
-        ),
+        "policy_id": data["policy_id"],
         "resource_id": data["resource_id"],
         "resource_display_name": data["resource_display_name"],
         "status": config["DEFAULT_INITIAL_STATUS"],
@@ -148,7 +143,7 @@ def test_create_duplicate_request(client):
         "updated_time": request_data["updated_time"],
     }
 
-    # create a request with the same username and resource_path.
+    # create a request with the same username and policy_id.
     # since the previous request is still a draft, it should work.
     res = client.post(
         "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
@@ -161,7 +156,7 @@ def test_create_duplicate_request(client):
     res = client.put(f"/request/{request_id}", json={"status": "INTERMEDIATE_STATUS"})
     assert res.status_code == 200, res.text
 
-    # attempt to create a request with the same username and resource_path.
+    # attempt to create a request with the same username and policy_id.
     # it should not work: the previous request is in progress.
     res = client.post(
         "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
@@ -173,7 +168,7 @@ def test_create_duplicate_request(client):
     res = client.put(f"/request/{request_id}", json={"status": status})
     assert res.status_code == 200, res.text
 
-    # create a request with the same username and resource_path.
+    # create a request with the same username and policy_id.
     # now it should work: the previous request is not in progress anymore.
     res = client.post(
         "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}

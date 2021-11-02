@@ -1,7 +1,10 @@
-import pytest
-from unittest.mock import patch
-from requestor import arborist
+"""
+We now use `policy_id` instead of `resource_path` in access requests.
+This set of tests ensures backwards compatibility.
+"""
 
+
+from requestor import arborist
 from requestor.config import config
 
 
