@@ -332,3 +332,23 @@ def test_delete_request_without_access(client, mock_arborist_requests):
     res = client.get(f"/request/{request_id}")
     assert res.status_code == 200, res.text
     assert res.json() == request_data
+
+
+def test_no_revoke_requests(client):
+    """
+    The "revoke" query parameter is not compatible with the "resource_path"
+    body field.
+    """
+    fake_jwt = "1.2.3"
+
+    # attempt to create a request with the 'revoke' query parameter
+    data = {
+        "username": "requestor_user",
+        "resource_path": "/my/resource",
+        "resource_id": "uniqid",
+        "resource_display_name": "My Resource",
+    }
+    res = client.post(
+        "/request?revoke", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+    )
+    assert res.status_code == 400, res.text

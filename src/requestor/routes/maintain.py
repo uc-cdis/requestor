@@ -97,6 +97,29 @@ async def create_request(
         logger.debug(f"Got username from token: {token_username}")
         data["username"] = token_username
 
+    if "revoke" in api_request.query_params:
+        if api_request.query_params["revoke"]:
+            raise HTTPException(
+                HTTP_400_BAD_REQUEST,
+                f"The 'revoke' parameter should not be assigned a value. Received '{api_request.query_params['revoke']}'",
+            )
+        if data.get("resource_path"):
+            # no technical reason for this; it's just not implemented/tested
+            raise HTTPException(
+                HTTP_400_BAD_REQUEST,
+                f"The 'revoke' parameter is not compatible with the 'resource_path' body field",
+            )
+        data["revoke"] = True
+
+        # check if the user has the policy we want to revoke
+        if not await arborist.user_has_policy(
+            client, data["username"], data["policy_id"]
+        ):
+            raise HTTPException(
+                HTTP_400_BAD_REQUEST,
+                f"Unable to revoke access: '{data['username']}' does not have access to policy '{data['policy_id']}'",
+            )
+
     # get requests for this (username, policy_id) for which the status is
     # not in FINAL_STATUSES. users can only request access to a resource once.
     previous_requests = [
@@ -198,8 +221,9 @@ async def update_request(
 
         # the access request is approved: grant access
         if status in config["UPDATE_ACCESS_STATUSES"]:
+            action = "revoke" if request.revoke else "grant"
             logger.debug(
-                f"Status is one of '{config['UPDATE_ACCESS_STATUSES']}', attempting to grant access in Arborist"
+                f"Status is one of '{config['UPDATE_ACCESS_STATUSES']}', attempting to {action} access in Arborist"
             )
 
             # assume we are always granting a user access to a resource.
@@ -207,18 +231,26 @@ async def update_request(
             logger.debug(
                 f"username: {request.username}, policy_id: {request.policy_id}"
             )
-            success = await arborist.grant_user_access_to_policy(
-                api_request.app.arborist_client,
-                request.username,
-                request.policy_id,
-                request.resource_display_name,
-            )
+            if request.revoke:
+                success = await arborist.revoke_user_access_to_policy(
+                    api_request.app.arborist_client,
+                    request.username,
+                    request.policy_id,
+                )
+            else:
+                success = await arborist.grant_user_access_to_policy(
+                    api_request.app.arborist_client,
+                    request.username,
+                    request.policy_id,
+                )
 
             if not success:
-                logger.error(f"Unable to grant access. Check previous logs for errors")
+                logger.error(
+                    f"Unable to {action} access. Check previous logs for errors"
+                )
                 raise HTTPException(
                     HTTP_500_INTERNAL_SERVER_ERROR,
-                    "Something went wrong, unable to grant access",
+                    f"Something went wrong, unable to {action} access",
                 )
 
         request = await (

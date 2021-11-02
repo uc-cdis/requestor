@@ -354,3 +354,71 @@ def test_delete_request_without_access(client, mock_arborist_requests):
     res = client.get(f"/request/{request_id}")
     assert res.status_code == 200, res.text
     assert res.json() == request_data
+
+
+def test_revoke_request_success(client):
+    """
+    When updating a "revoke" request with an UPDATE_ACCESS_STATUS, a call
+    should be made to Arborist to revoke the user access.
+    """
+    fake_jwt = "1.2.3"
+    data = {
+        "username": "requestor_user",
+        "policy_id": "test-policy",
+        "resource_id": "uniqid",
+        "resource_display_name": "My Resource",
+    }
+
+    # create a request with the 'revoke' query parameter
+    res = client.post(
+        "/request?revoke", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+    )
+    assert res.status_code == 201, res.text
+    request_data = res.json()
+    request_id = request_data.get("request_id")
+    assert request_id, "POST /request did not return a request_id"
+    assert request_data == {
+        "request_id": request_id,
+        "username": data["username"],
+        "policy_id": data["policy_id"],
+        "resource_id": data["resource_id"],
+        "resource_display_name": data["resource_display_name"],
+        "status": config["DEFAULT_INITIAL_STATUS"],
+        "revoke": True,
+        # just ensure created_time and updated_time are there:
+        "created_time": request_data["created_time"],
+        "updated_time": request_data["updated_time"],
+    }
+
+    # update the request status and revoke access
+    status = config["UPDATE_ACCESS_STATUSES"][0]
+    res = client.put(f"/request/{request_id}", json={"status": status})
+
+    assert res.status_code == 200, res.text
+    request_data = res.json()
+    assert request_data["status"] == status
+
+
+def test_revoke_request_failure(client):
+    fake_jwt = "1.2.3"
+    data = {
+        "username": "requestor_user",
+        "policy_id": "test-policy",
+        "resource_id": "uniqid",
+        "resource_display_name": "My Resource",
+    }
+
+    # create a request with an invalid 'revoke' query parameter
+    res = client.post(
+        "/request?revoke=false",
+        json=data,
+        headers={"Authorization": f"bearer {fake_jwt}"},
+    )
+    assert res.status_code == 400, res.text
+
+    # attempt to revoke access to a policy the user doesn't have
+    data["policy_id"] = "super-access"
+    res = client.post(
+        "/request?revoke", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+    )
+    assert res.status_code == 400, res.text

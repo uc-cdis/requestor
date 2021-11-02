@@ -94,8 +94,21 @@ def mock_arborist_requests(request):
             "http://arborist-service/auth/request": {
                 "POST": ({"auth": authorized}, 200)
             },
+            "http://arborist-service/user/requestor_user": {
+                "GET": (
+                    {
+                        "name": "pauline",
+                        "groups": [],
+                        "policies": [{"policy": "test-policy"}],
+                    },
+                    204 if authorized else 403,
+                )
+            },
             "http://arborist-service/user/requestor_user/policy": {
                 "POST": ({}, 204 if authorized else 403)
+            },
+            "http://arborist-service/user/requestor_user/policy/test-policy": {
+                "DELETE": ({}, 204 if authorized else 403)
             },
             "http://arborist-service/policy/": {
                 # TODO add "?expand" once we use the latest gen3authz
