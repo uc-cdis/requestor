@@ -57,7 +57,10 @@ async def list_policies(arborist_client: ArboristClient, expand: bool = False) -
     invalidate the cache whenever Arborist changes a policy.
     For now, just make a call to Arborist every time we need this information.
     """
-    return await arborist_client.list_policies(expand=expand)
+    res = arborist_client.list_policies(expand=expand)
+    if inspect.isawaitable(res):
+        res = await res
+    return res
 
 
 def get_resource_paths_for_policy(expanded_policies: list, policy_id: str) -> list:
