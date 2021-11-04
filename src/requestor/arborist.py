@@ -57,8 +57,7 @@ async def list_policies(arborist_client: ArboristClient, expand: bool = False) -
     invalidate the cache whenever Arborist changes a policy.
     For now, just make a call to Arborist every time we need this information.
     """
-    # TODO add `expand` parameter to `gen3authz` `list_policies` and pass it
-    return await arborist_client.list_policies()
+    return await arborist_client.list_policies(expand=expand)
 
 
 def get_resource_paths_for_policy(expanded_policies: list, policy_id: str) -> list:

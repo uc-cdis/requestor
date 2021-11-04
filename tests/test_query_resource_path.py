@@ -1,3 +1,9 @@
+"""
+We now use `policy_id` instead of `resource_path` in access requests.
+This set of tests ensures backwards compatibility.
+"""
+
+
 import pytest
 from requestor import arborist
 
@@ -15,7 +21,7 @@ def test_create_get_and_list_request(client):
     # create a request
     data = {
         "username": "requestor_user",
-        "policy_id": "test-policy",
+        "resource_path": "/my/resource",
         "resource_id": "uniqid",
         "resource_display_name": "My Resource",
     }
@@ -29,7 +35,9 @@ def test_create_get_and_list_request(client):
     assert request_data == {
         "request_id": request_id,
         "username": data["username"],
-        "policy_id": data["policy_id"],
+        "policy_id": arborist.get_auto_policy_id_for_resource_path(
+            data["resource_path"]
+        ),
         "resource_id": data["resource_id"],
         "resource_display_name": data["resource_display_name"],
         "status": config["DEFAULT_INITIAL_STATUS"],
@@ -60,7 +68,7 @@ def test_get_request_without_access(client, mock_arborist_requests):
     # create a request
     data = {
         "username": "requestor_user",
-        "policy_id": "test-policy",
+        "resource_path": "/my/resource",
         "resource_id": "uniqid",
         "resource_display_name": "My Resource",
     }
@@ -98,7 +106,7 @@ def test_get_user_requests(client):
 
     # create a request for the current user
     data = {
-        "policy_id": "test-policy",
+        "resource_path": "/my/resource",
         "resource_id": "uniqid",
         "resource_display_name": "My Resource",
     }
@@ -110,6 +118,7 @@ def test_get_user_requests(client):
 
     # create a request for a different user
     data["username"] = "not-the-same-user"
+    data["resource_display_name"] = "test_get_user_requests2"
     res = client.post(
         "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
     )
@@ -130,9 +139,9 @@ def test_list_requests_with_access(client):
 
     # create requests
     request_data = {}
-    for policy_id in ["test-policy", "test-policy-i-cant-access"]:
+    for resource_path in ["/my/resource", "something-i-cant-access"]:
         data = {
-            "policy_id": policy_id,
+            "resource_path": resource_path,
             "resource_id": "uniqid",
             "resource_display_name": "My Resource",
         }
@@ -140,15 +149,14 @@ def test_list_requests_with_access(client):
             "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
         )
         assert res.status_code == 201, res.text
-        request_data[policy_id] = res.json()
+        request_data[resource_path] = res.json()
 
     # list requests
     # the mocked auth_mapping response in mock_arborist_requests does not
-    # include "test-policy-i-cant-access"'s resource paths, so it should not
-    # be returned
+    # include "something-i-cant-access", so it should not be returned
     res = client.get("/request", headers={"Authorization": f"bearer {fake_jwt}"})
     assert res.status_code == 200, res.text
-    assert res.json() == [request_data["test-policy"]]
+    assert res.json() == [request_data["/my/resource"]]
 
 
 # TODO update logic to handle `policy_id` (PXP-8829)
@@ -258,34 +266,34 @@ def test_list_requests_with_access(client):
 
 
 # TODO update logic to handle `policy_id` (PXP-8829)
-# def test_check_user_resource_paths_username(client):
-#     fake_jwt = "1.2.3"
+def test_check_user_resource_paths_username(client):
+    fake_jwt = "1.2.3"
 
-#     resource_path_to_match = "/a/b"
+    resource_path_to_match = "/a/b"
 
-#     # create a request that matches but is for a different user
-#     data = {
-#         "username": "not-the-same-user",
-#         "resource_path": resource_path_to_match,
-#         "resource_id": "uniqid",
-#         "resource_display_name": "My Resource",
-#         # skip the draft status so that the access is not re-requestable
-#         "status": "INTERMEDIATE_STATUS",
-#     }
-#     res = client.post(
-#         "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
-#     )
-#     assert res.status_code == 201, res.text
+    # create a request that matches but is for a different user
+    data = {
+        "username": "not-the-same-user",
+        "resource_path": resource_path_to_match,
+        "resource_id": "uniqid",
+        "resource_display_name": "My Resource",
+        # skip the draft status so that the access is not re-requestable
+        "status": "INTERMEDIATE_STATUS",
+    }
+    res = client.post(
+        "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+    )
+    assert res.status_code == 201, res.text
 
-#     # check that the resource path does not match the request we created
-#     data = {"resource_paths": [resource_path_to_match]}
-#     res = client.post(
-#         "/request/user_resource_paths",
-#         json=data,
-#         headers={"Authorization": f"bearer {fake_jwt}"},
-#     )
-#     assert res.status_code == 200, res.text
-#     assert res.json() == {resource_path_to_match: False}
+    # check that the resource path does not match the request we created
+    data = {"resource_paths": [resource_path_to_match]}
+    res = client.post(
+        "/request/user_resource_paths",
+        json=data,
+        headers={"Authorization": f"bearer {fake_jwt}"},
+    )
+    assert res.status_code == 200, res.text
+    assert res.json() == {resource_path_to_match: False}
 
 
 # TODO update logic to handle `policy_id` (PXP-8829)

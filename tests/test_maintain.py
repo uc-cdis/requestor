@@ -65,7 +65,7 @@ def test_create_request_with_redirect(client):
         "resource_id": data["resource_id"],
         "resource_display_name": data["resource_display_name"],
         "status": config["DEFAULT_INITIAL_STATUS"],
-        "redirect_url": f"http://localhost?something=&request_id={request_id}&resource_id=uniqid&resource_display_name=My+Resource",
+        "redirect_url": f"http://localhost?something=&request_id={request_id}&resource_id={data['resource_id']}&resource_display_name=My+Resource",
         # just ensure revoke, created_time and updated_time are there:
         "revoke": False,
         "created_time": request_data["created_time"],
@@ -96,7 +96,7 @@ def test_create_request_without_username(client):
     assert request_id, "POST /request did not return a request_id"
     assert request_data == {
         "request_id": request_id,
-        "username": "requestor-user",  # username from access_token_patcher
+        "username": "requestor_user",  # username from access_token_patcher
         "policy_id": data["policy_id"],
         "resource_id": data["resource_id"],
         "resource_display_name": data["resource_display_name"],
