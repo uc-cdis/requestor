@@ -22,6 +22,9 @@ components:
     CreateRequestInput:
       description: Create an access request.
       properties:
+        policy_id:
+          title: Policy Id
+          type: string
         resource_display_name:
           title: Resource Display Name
           type: string
@@ -37,8 +40,6 @@ components:
         username:
           title: Username
           type: string
-      required:
-      - resource_path
       title: CreateRequestInput
       type: object
     HTTPValidationError:
@@ -121,13 +122,18 @@ paths:
       description: 'Create a new access request.
 
 
+        Use the "revoke" query parameter to create a request to revoke access
+
+        instead of a request to grant access.
+
+
         If no "status" is specified in the request body, will use the configured
 
         DEFAULT_INITIAL_STATUS. Because users can only request access to a
 
-        resource once, (username, resource_path) must be unique unless past
+        resource once, each ("username", "resource_path") combination must be
 
-        requests'' statuses are in FINAL_STATUSES.
+        unique unless past requests'' statuses are in FINAL_STATUSES.
 
 
         If no "username" is specified in the request body, will create an access
@@ -174,11 +180,14 @@ paths:
       - Query
   /request/user_resource_paths:
     post:
-      description: "Return whether the current user has already requested access to\
-        \ the\nspecified resource path(s), including prefixes of the resource path(s).\n\
-        If the previous request was denied or is still in draft status, will\nreturn\
-        \ False.\n\nArgs:\n    resource_paths (list): list of resource paths\n\nReturn:\
-        \ (dict) { resource_path1: true, resource_path2: false, ... }"
+      description: 'Return whether the current user has already requested access to
+        the
+
+        specified resource path(s), including prefixes of the resource path(s).
+
+        If the previous request was denied or is still in draft status, will
+
+        return False.'
       operationId: check_user_resource_paths_request_user_resource_paths_post
       requestBody:
         content:

@@ -139,11 +139,6 @@ async def check_user_resource_paths(
     specified resource path(s), including prefixes of the resource path(s).
     If the previous request was denied or is still in draft status, will
     return False.
-
-    Args:
-        resource_paths (list): list of resource paths
-
-    Return: (dict) { resource_path1: true, resource_path2: false, ... }
     """
     # no authz checks because we assume the current user can read
     # their own requests.

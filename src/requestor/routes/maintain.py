@@ -45,10 +45,13 @@ async def create_request(
     """
     Create a new access request.
 
+    Use the "revoke" query parameter to create a request to revoke access
+    instead of a request to grant access.
+
     If no "status" is specified in the request body, will use the configured
     DEFAULT_INITIAL_STATUS. Because users can only request access to a
-    resource once, (username, resource_path) must be unique unless past
-    requests' statuses are in FINAL_STATUSES.
+    resource once, each ("username", "resource_path") combination must be
+    unique unless past requests' statuses are in FINAL_STATUSES.
 
     If no "username" is specified in the request body, will create an access
     request for the user who provided the token.
