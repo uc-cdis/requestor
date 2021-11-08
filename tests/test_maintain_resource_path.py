@@ -206,6 +206,7 @@ def test_update_request(client):
     status = "this is not allowed"
     res = client.put(f"/request/{request_id}", json={"status": status})
     assert res.status_code == 400, res.text
+    assert "is not an allowed request status" in res.json()["detail"]
 
     # update the request status
     status = config["ALLOWED_REQUEST_STATUSES"][1]
@@ -244,13 +245,6 @@ def test_update_request_without_access(client, mock_arborist_requests):
     request_id = request_data["request_id"]
     assert request_id, "POST /request did not return a request_id"
     assert request_data["status"] == config["DEFAULT_INITIAL_STATUS"]
-    created_time = request_data["created_time"]
-    updated_time = request_data["updated_time"]
-
-    # try to update the request with a status that's not allowed
-    status = "this is not allowed"
-    res = client.put(f"/request/{request_id}", json={"status": status})
-    assert res.status_code == 400, res.text
 
     mock_arborist_requests(authorized=False)
 
@@ -341,7 +335,7 @@ def test_no_revoke_requests(client):
     """
     fake_jwt = "1.2.3"
 
-    # attempt to create a request with the 'revoke' query parameter
+    # attempt to create a request with both 'revoke' and 'resource_path'
     data = {
         "username": "requestor_user",
         "resource_path": "/my/resource",
@@ -352,3 +346,4 @@ def test_no_revoke_requests(client):
         "/request?revoke", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
     )
     assert res.status_code == 400, res.text
+    assert "not compatible" in res.json()["detail"]

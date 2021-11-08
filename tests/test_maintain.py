@@ -22,6 +22,7 @@ def test_create_request_with_resource_path_and_policy(client):
     )
 
     assert res.status_code == 400, res.text
+    assert "not both" in res.json()["detail"]
 
     # create a request which has neither resource_path nor policy_id
     data = {
@@ -34,6 +35,7 @@ def test_create_request_with_resource_path_and_policy(client):
     )
 
     assert res.status_code == 400, res.text
+    assert "can have either" in res.json()["detail"]
 
 
 def test_create_request_with_redirect(client):
@@ -228,6 +230,7 @@ def test_update_request(client):
     status = "this is not allowed"
     res = client.put(f"/request/{request_id}", json={"status": status})
     assert res.status_code == 400, res.text
+    assert "not an allowed request status" in res.json()["detail"]
 
     # update the request status
     status = config["ALLOWED_REQUEST_STATUSES"][1]
@@ -266,13 +269,6 @@ def test_update_request_without_access(client, mock_arborist_requests):
     request_id = request_data["request_id"]
     assert request_id, "POST /request did not return a request_id"
     assert request_data["status"] == config["DEFAULT_INITIAL_STATUS"]
-    created_time = request_data["created_time"]
-    updated_time = request_data["updated_time"]
-
-    # try to update the request with a status that's not allowed
-    status = "this is not allowed"
-    res = client.put(f"/request/{request_id}", json={"status": status})
-    assert res.status_code == 400, res.text
 
     mock_arborist_requests(authorized=False)
 
@@ -415,6 +411,7 @@ def test_revoke_request_failure(client):
         headers={"Authorization": f"bearer {fake_jwt}"},
     )
     assert res.status_code == 400, res.text
+    assert "should not be assigned a value" in res.json()["detail"]
 
     # attempt to revoke access to a policy the user doesn't have
     data["policy_id"] = "super-access"
@@ -422,3 +419,4 @@ def test_revoke_request_failure(client):
         "/request?revoke", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
     )
     assert res.status_code == 400, res.text
+    assert "does not have access to policy" in res.json()["detail"]

@@ -50,7 +50,7 @@ async def create_request(
 
     If no "status" is specified in the request body, will use the configured
     DEFAULT_INITIAL_STATUS. Because users can only request access to a
-    resource once, each ("username", "resource_path") combination must be
+    policy once, each ("username", "policy_id") combination must be
     unique unless past requests' statuses are in FINAL_STATUSES.
 
     If no "username" is specified in the request body, will create an access
@@ -83,7 +83,6 @@ async def create_request(
         resource_paths = arborist.get_resource_paths_for_policy(
             existing_policies["policies"], data["policy_id"]
         )
-    del data["resource_path"]  # Get rid of resource_path completely.
 
     await auth.authorize("create", resource_paths)
 
@@ -156,6 +155,9 @@ async def create_request(
             HTTP_409_CONFLICT,
             msg,
         )
+
+    # we don't store `resource_path` in the database, so get rid of it
+    del data["resource_path"]
 
     if draft_previous_requests:
         # reuse the draft request

@@ -131,7 +131,7 @@ paths:
 
         DEFAULT_INITIAL_STATUS. Because users can only request access to a
 
-        resource once, each ("username", "resource_path") combination must be
+        policy once, each ("username", "policy_id") combination must be
 
         unique unless past requests'' statuses are in FINAL_STATUSES.
 
