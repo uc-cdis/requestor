@@ -53,27 +53,33 @@ async def list_requests(
     existing_policies = await arborist.list_policies(
         api_request.app.arborist_client, expand=True
     )
-    # A request is authorized if all the resource_paths in the request are authorized.
-    authorized_requests = [
-        r
-        for r in requests
+    authorized_requests = []
+    for r in requests:
+        resource_paths = arborist.get_resource_paths_for_policy(
+            existing_policies["policies"], r.policy_id
+        )
+        if not resource_paths:
+            # Note that GETting a request with no resource paths would require
+            # admin access - not implemented
+            continue
+        # A request is authorized if all the resource_paths in the request's
+        # policy are authorized.
         if all(
-            any(  # A resource_path is authorized if the path or any of it's prefixes belong to the authorized_resource_paths
+            # A resource_path is authorized if authorized_resource_paths
+            # contains the path or any of its prefixes
+            any(
                 arborist.is_path_prefix_of_path(authorized_resource_path, resource_path)
                 for authorized_resource_path in authorized_resource_paths
             )
-            for resource_path in arborist.get_resource_paths_for_policy(
-                existing_policies["policies"], r.policy_id
-            )
-        )
-    ]
+            for resource_path in resource_paths
+        ):
+            authorized_requests.append(r)
+
     return [r.to_dict() for r in authorized_requests]
 
 
 @router.get("/request/user", status_code=HTTP_200_OK)
-async def list_user_requests(
-    auth=Depends(Auth),
-) -> dict:
+async def list_user_requests(auth=Depends(Auth)) -> dict:
     """
     List the current user's requests.
     """
@@ -105,6 +111,8 @@ async def get_request(
     if request:
         authorized = await auth.authorize(
             "read",
+            # Note that GETting a request with no resource paths would require
+            # admin access - not implemented
             arborist.get_resource_paths_for_policy(
                 existing_policies["policies"], request.policy_id
             ),
@@ -131,11 +139,6 @@ async def check_user_resource_paths(
     specified resource path(s), including prefixes of the resource path(s).
     If the previous request was denied or is still in draft status, will
     return False.
-
-    Args:
-        resource_paths (list): list of resource paths
-
-    Return: (dict) { resource_path1: true, resource_path2: false, ... }
     """
     # no authz checks because we assume the current user can read
     # their own requests.
@@ -151,9 +154,8 @@ async def check_user_resource_paths(
             for r in user_requests
             if r.status not in config["DRAFT_STATUSES"]
             and r.status not in config["FINAL_STATUSES"]
-            and arborist.is_path_prefix_of_path(
-                r.resource_path, resource_path
-            )  # TODO: (PXP-8829)
+            # TODO update logic to handle `policy_id` (PXP-8829)
+            and arborist.is_path_prefix_of_path(r.resource_path, resource_path)
         ]
         res[resource_path] = len(requests) > 0
     return res

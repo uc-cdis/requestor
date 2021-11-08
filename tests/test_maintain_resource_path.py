@@ -1,7 +1,10 @@
-import pytest
-from unittest.mock import patch
-from requestor import arborist
+"""
+We now use `policy_id` instead of `resource_path` in access requests.
+This set of tests ensures backwards compatibility.
+"""
 
+
+from requestor import arborist
 from requestor.config import config
 
 
@@ -36,7 +39,7 @@ def test_create_request_with_redirect(client):
         "resource_id": data["resource_id"],
         "resource_display_name": data["resource_display_name"],
         "status": config["DEFAULT_INITIAL_STATUS"],
-        "redirect_url": f"http://localhost?something=&request_id={request_id}&resource_id=uniqid&resource_display_name=My+Resource",
+        "redirect_url": f"http://localhost?something=&request_id={request_id}&resource_id={data['resource_id']}&resource_display_name=My+Resource",
         # just ensure revoke, created_time and updated_time are there:
         "revoke": False,
         "created_time": request_data["created_time"],
@@ -67,7 +70,7 @@ def test_create_request_without_username(client):
     assert request_id, "POST /request did not return a request_id"
     assert request_data == {
         "request_id": request_id,
-        "username": "requestor-user",  # username from access_token_patcher
+        "username": "requestor_user",  # username from access_token_patcher
         "policy_id": arborist.get_auto_policy_id_for_resource_path(
             data["resource_path"]
         ),
@@ -203,6 +206,7 @@ def test_update_request(client):
     status = "this is not allowed"
     res = client.put(f"/request/{request_id}", json={"status": status})
     assert res.status_code == 400, res.text
+    assert "is not an allowed request status" in res.json()["detail"]
 
     # update the request status
     status = config["ALLOWED_REQUEST_STATUSES"][1]
@@ -241,13 +245,6 @@ def test_update_request_without_access(client, mock_arborist_requests):
     request_id = request_data["request_id"]
     assert request_id, "POST /request did not return a request_id"
     assert request_data["status"] == config["DEFAULT_INITIAL_STATUS"]
-    created_time = request_data["created_time"]
-    updated_time = request_data["updated_time"]
-
-    # try to update the request with a status that's not allowed
-    status = "this is not allowed"
-    res = client.put(f"/request/{request_id}", json={"status": status})
-    assert res.status_code == 400, res.text
 
     mock_arborist_requests(authorized=False)
 
@@ -329,3 +326,24 @@ def test_delete_request_without_access(client, mock_arborist_requests):
     res = client.get(f"/request/{request_id}")
     assert res.status_code == 200, res.text
     assert res.json() == request_data
+
+
+def test_no_revoke_requests(client):
+    """
+    The "revoke" query parameter is not compatible with the "resource_path"
+    body field.
+    """
+    fake_jwt = "1.2.3"
+
+    # attempt to create a request with both 'revoke' and 'resource_path'
+    data = {
+        "username": "requestor_user",
+        "resource_path": "/my/resource",
+        "resource_id": "uniqid",
+        "resource_display_name": "My Resource",
+    }
+    res = client.post(
+        "/request?revoke", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+    )
+    assert res.status_code == 400, res.text
+    assert "not compatible" in res.json()["detail"]

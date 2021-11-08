@@ -49,19 +49,21 @@ def is_path_prefix_of_path(resource_prefix: str, resource_path: str) -> bool:
     return True
 
 
-def list_policies(arborist_client: ArboristClient, expand: bool = False) -> list:
+@maybe_sync
+async def list_policies(arborist_client: ArboristClient, expand: bool = False) -> list:
     """
     We can cache this data later if needed, but it's tricky - the length
     we can cache depends on the source of the information, so this MUST
     invalidate the cache whenever Arborist changes a policy.
     For now, just make a call to Arborist every time we need this information.
     """
-    # TODO add `expand` parameter to `gen3authz` `list_policies` and pass it
-    return arborist_client.list_policies()
+    res = arborist_client.list_policies(expand=expand)
+    if inspect.isawaitable(res):
+        res = await res
+    return res
 
 
 def get_resource_paths_for_policy(expanded_policies: list, policy_id: str) -> list:
-    return ["/my/resource"]  # TODO remove once we have expanded policies
     for p in expanded_policies:
         if p["id"] == policy_id:
             return p["resource_paths"]
@@ -77,6 +79,16 @@ def get_auto_policy_id_for_resource_path(resource_path: str) -> str:
     resources = resource_path.split("/")
     policy_id = ".".join(resources[1:]) + "_reader"
     return policy_id
+
+
+async def user_has_policy(
+    arborist_client: ArboristClient, username: str, policy_id: str
+) -> bool:
+    user = await arborist_client.get_user(username)
+    for policy_data in user["policies"]:
+        if policy_data["policy"] == policy_id:
+            return True
+    return False
 
 
 @maybe_sync
@@ -154,7 +166,6 @@ async def grant_user_access_to_policy(
     arborist_client: ArboristClient,
     username: str,
     policy_id: str,
-    resource_description: str,
 ) -> bool:
     # create the user
     logger.debug(f"Attempting to create user {username} in Arborist")
@@ -167,3 +178,13 @@ async def grant_user_access_to_policy(
         logger.error(f"Unable to grant access, got status code: {status_code}")
 
     return status_code == 204
+
+
+async def revoke_user_access_to_policy(
+    arborist_client: ArboristClient,
+    username: str,
+    policy_id: str,
+) -> bool:
+    logger.debug(f"Attempting to revoke {username}'s access to {policy_id}")
+    success = await arborist_client.revoke_user_policy(username, policy_id)
+    return success == True

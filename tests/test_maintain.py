@@ -1,7 +1,4 @@
-import pytest
-from unittest.mock import patch
 from requestor import arborist
-
 from requestor.config import config
 
 
@@ -25,6 +22,7 @@ def test_create_request_with_resource_path_and_policy(client):
     )
 
     assert res.status_code == 400, res.text
+    assert "not both" in res.json()["detail"]
 
     # create a request which has neither resource_path nor policy_id
     data = {
@@ -37,6 +35,7 @@ def test_create_request_with_resource_path_and_policy(client):
     )
 
     assert res.status_code == 400, res.text
+    assert "can have either" in res.json()["detail"]
 
 
 def test_create_request_with_redirect(client):
@@ -49,7 +48,7 @@ def test_create_request_with_redirect(client):
     # create a request
     data = {
         "username": "requestor_user",
-        "resource_path": "/resource-with-redirect/resource",
+        "policy_id": "test-policy-with-redirect",
         "resource_id": "uniqid",
         "resource_display_name": "My Resource",
     }
@@ -64,13 +63,11 @@ def test_create_request_with_redirect(client):
     assert request_data == {
         "request_id": request_id,
         "username": data["username"],
-        "policy_id": arborist.get_auto_policy_id_for_resource_path(
-            data["resource_path"]
-        ),
+        "policy_id": data["policy_id"],
         "resource_id": data["resource_id"],
         "resource_display_name": data["resource_display_name"],
         "status": config["DEFAULT_INITIAL_STATUS"],
-        "redirect_url": f"http://localhost?something=&request_id={request_id}&resource_id=uniqid&resource_display_name=My+Resource",
+        "redirect_url": f"http://localhost?something=&request_id={request_id}&resource_id={data['resource_id']}&resource_display_name=My+Resource",
         # just ensure revoke, created_time and updated_time are there:
         "revoke": False,
         "created_time": request_data["created_time"],
@@ -101,7 +98,7 @@ def test_create_request_without_username(client):
     assert request_id, "POST /request did not return a request_id"
     assert request_data == {
         "request_id": request_id,
-        "username": "requestor-user",  # username from access_token_patcher
+        "username": "requestor_user",  # username from access_token_patcher
         "policy_id": data["policy_id"],
         "resource_id": data["resource_id"],
         "resource_display_name": data["resource_display_name"],
@@ -148,7 +145,7 @@ def test_create_duplicate_request(client):
         "updated_time": request_data["updated_time"],
     }
 
-    # create a request with the same username and resource_path.
+    # create a request with the same username and policy_id.
     # since the previous request is still a draft, it should work.
     res = client.post(
         "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
@@ -161,7 +158,7 @@ def test_create_duplicate_request(client):
     res = client.put(f"/request/{request_id}", json={"status": "INTERMEDIATE_STATUS"})
     assert res.status_code == 200, res.text
 
-    # attempt to create a request with the same username and resource_path.
+    # attempt to create a request with the same username and policy_id.
     # it should not work: the previous request is in progress.
     res = client.post(
         "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
@@ -173,7 +170,7 @@ def test_create_duplicate_request(client):
     res = client.put(f"/request/{request_id}", json={"status": status})
     assert res.status_code == 200, res.text
 
-    # create a request with the same username and resource_path.
+    # create a request with the same username and policy_id.
     # now it should work: the previous request is not in progress anymore.
     res = client.post(
         "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
@@ -233,6 +230,7 @@ def test_update_request(client):
     status = "this is not allowed"
     res = client.put(f"/request/{request_id}", json={"status": status})
     assert res.status_code == 400, res.text
+    assert "not an allowed request status" in res.json()["detail"]
 
     # update the request status
     status = config["ALLOWED_REQUEST_STATUSES"][1]
@@ -271,13 +269,6 @@ def test_update_request_without_access(client, mock_arborist_requests):
     request_id = request_data["request_id"]
     assert request_id, "POST /request did not return a request_id"
     assert request_data["status"] == config["DEFAULT_INITIAL_STATUS"]
-    created_time = request_data["created_time"]
-    updated_time = request_data["updated_time"]
-
-    # try to update the request with a status that's not allowed
-    status = "this is not allowed"
-    res = client.put(f"/request/{request_id}", json={"status": status})
-    assert res.status_code == 400, res.text
 
     mock_arborist_requests(authorized=False)
 
@@ -359,3 +350,73 @@ def test_delete_request_without_access(client, mock_arborist_requests):
     res = client.get(f"/request/{request_id}")
     assert res.status_code == 200, res.text
     assert res.json() == request_data
+
+
+def test_revoke_request_success(client):
+    """
+    When updating a "revoke" request with an UPDATE_ACCESS_STATUS, a call
+    should be made to Arborist to revoke the user access.
+    """
+    fake_jwt = "1.2.3"
+    data = {
+        "username": "requestor_user",
+        "policy_id": "test-policy",
+        "resource_id": "uniqid",
+        "resource_display_name": "My Resource",
+    }
+
+    # create a request with the 'revoke' query parameter
+    res = client.post(
+        "/request?revoke", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+    )
+    assert res.status_code == 201, res.text
+    request_data = res.json()
+    request_id = request_data.get("request_id")
+    assert request_id, "POST /request did not return a request_id"
+    assert request_data == {
+        "request_id": request_id,
+        "username": data["username"],
+        "policy_id": data["policy_id"],
+        "resource_id": data["resource_id"],
+        "resource_display_name": data["resource_display_name"],
+        "status": config["DEFAULT_INITIAL_STATUS"],
+        "revoke": True,
+        # just ensure created_time and updated_time are there:
+        "created_time": request_data["created_time"],
+        "updated_time": request_data["updated_time"],
+    }
+
+    # update the request status and revoke access
+    status = config["UPDATE_ACCESS_STATUSES"][0]
+    res = client.put(f"/request/{request_id}", json={"status": status})
+
+    assert res.status_code == 200, res.text
+    request_data = res.json()
+    assert request_data["status"] == status
+
+
+def test_revoke_request_failure(client):
+    fake_jwt = "1.2.3"
+    data = {
+        "username": "requestor_user",
+        "policy_id": "test-policy",
+        "resource_id": "uniqid",
+        "resource_display_name": "My Resource",
+    }
+
+    # create a request with an invalid 'revoke' query parameter
+    res = client.post(
+        "/request?revoke=false",
+        json=data,
+        headers={"Authorization": f"bearer {fake_jwt}"},
+    )
+    assert res.status_code == 400, res.text
+    assert "should not be assigned a value" in res.json()["detail"]
+
+    # attempt to revoke access to a policy the user doesn't have
+    data["policy_id"] = "super-access"
+    res = client.post(
+        "/request?revoke", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+    )
+    assert res.status_code == 400, res.text
+    assert "does not have access to policy" in res.json()["detail"]

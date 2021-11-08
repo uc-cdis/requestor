@@ -1,6 +1,5 @@
 from alembic.config import main as alembic_main
 import copy
-import importlib
 import os
 import pytest
 import requests
@@ -14,8 +13,8 @@ CURRENT_DIR = os.path.dirname(os.path.realpath(__file__))
 environ["REQUESTOR_CONFIG_PATH"] = os.path.join(
     CURRENT_DIR, "test-requestor-config.yaml"
 )
-from requestor.config import config
 from requestor.app import app_init
+from requestor.config import config
 
 
 @pytest.fixture(scope="session")
@@ -51,7 +50,7 @@ def client():
 @pytest.fixture(autouse=True, scope="function")
 def access_token_patcher(client, request):
     async def get_access_token(*args, **kwargs):
-        return {"sub": "1", "context": {"user": {"name": "requestor-user"}}}
+        return {"sub": "1", "context": {"user": {"name": "requestor_user"}}}
 
     access_token_mock = MagicMock()
     access_token_mock.return_value = get_access_token
@@ -65,16 +64,22 @@ def access_token_patcher(client, request):
 
 
 @pytest.fixture(autouse=True)
-def clean_db(client):
-    # before each test, delete all existing requests from the DB
-    fake_jwt = "1.2.3"
-    res = client.get("/request", headers={"Authorization": f"bearer {fake_jwt}"})
-    assert res.status_code == 200
-    for r in res.json():
-        res = client.delete(
-            "/request/" + r["request_id"],
-            headers={"Authorization": f"bearer {fake_jwt}"},
-        )
+def clean_db():
+    """
+    Before each test, delete all existing requests from the DB
+    """
+    # The code below doesn't work because of this issue
+    # https://github.com/encode/starlette/issues/440, so for now reset
+    # using alembic.
+    # pytest-asyncio = "^0.14.0"
+    # from requestor.models import Request as RequestModel
+    # @pytest.mark.asyncio
+    # async def clean_db():
+    #     await RequestModel.delete.gino.all()
+    #     yield
+
+    alembic_main(["--raiseerr", "downgrade", "base"])
+    alembic_main(["--raiseerr", "upgrade", "head"])
 
     yield
 
@@ -94,10 +99,23 @@ def mock_arborist_requests(request):
             "http://arborist-service/auth/request": {
                 "POST": ({"auth": authorized}, 200)
             },
+            "http://arborist-service/user/requestor_user": {
+                "GET": (
+                    {
+                        "name": "pauline",
+                        "groups": [],
+                        "policies": [{"policy": "test-policy"}],
+                    },
+                    204 if authorized else 403,
+                )
+            },
             "http://arborist-service/user/requestor_user/policy": {
                 "POST": ({}, 204 if authorized else 403)
             },
-            "http://arborist-service/policy?expand": {
+            "http://arborist-service/user/requestor_user/policy/test-policy": {
+                "DELETE": ({}, 204 if authorized else 403)
+            },
+            "http://arborist-service/policy/?expand": {
                 "GET": (
                     {
                         "policies": [
@@ -120,7 +138,22 @@ def mock_arborist_requests(request):
                                         ],
                                     }
                                 ],
-                            }
+                            },
+                            {
+                                "id": "test-policy-with-redirect",
+                                "resource_paths": ["/resource-with-redirect/resource"],
+                                "roles": [],
+                            },
+                            {
+                                "id": "test-policy-i-cant-access",
+                                "resource_paths": ["something-i-cant-access"],
+                                "roles": [],
+                            },
+                            {
+                                "id": "my.resource_reader",
+                                "resource_paths": ["/my/resource"],
+                                "roles": [],
+                            },
                         ]
                     },
                     204 if authorized else 403,
