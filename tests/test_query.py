@@ -203,7 +203,7 @@ def test_check_user_resource_paths_prefixes(
 
     # create request
     data = {
-        "resource_path": test_data["resource_path"],
+        "policy_id": test_data["policy_id"],
         "resource_id": "uniqid",
         "resource_display_name": "My Resource",
         # skip the draft status so that the access is not re-requestable
