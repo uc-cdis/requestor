@@ -131,7 +131,9 @@ async def get_request(
 
 @router.post("/request/user_resource_paths", status_code=HTTP_200_OK)
 async def check_user_resource_paths(
+    api_request: Request,
     resource_paths: list = Body(..., embed=True),
+    permissions: Optional[list] = None,
     auth=Depends(Auth),
 ) -> dict:
     """
@@ -145,20 +147,87 @@ async def check_user_resource_paths(
 
     token_claims = await auth.get_token_claims()
     username = token_claims["context"]["user"]["name"]
-
+    if not permissions:
+        permissions = ["reader", "storage-reader"]
+    # matched_policy = get_policy_match(resource_paths, permissions)
     res = {}
     user_requests = await get_user_requests(username)
-    for resource_path in resource_paths:
-        requests = [
-            r
-            for r in user_requests
-            if r.status not in config["DRAFT_STATUSES"]
-            and r.status not in config["FINAL_STATUSES"]
-            # TODO update logic to handle `policy_id` (PXP-8829)
-            and arborist.is_path_prefix_of_path(r.resource_path, resource_path)
+    positive_requests = [
+        r
+        for r in user_requests
+        if not r.revoke
+        and r.status not in config["DRAFT_STATUSES"]
+        and r.status not in config["FINAL_STATUSES"]
+    ]
+    existing_policies = await arborist.list_policies(
+        api_request.app.arborist_client, expand=True
+    )
+    # Initiate everything to False
+    res = {r: False for r in resource_paths}
+    for r in positive_requests:
+        # Get the policy
+        policy_list = [
+            p for p in existing_policies["policies"] if p["id"] == r.policy_id
         ]
-        res[resource_path] = len(requests) > 0
+        if not policy_list:
+            continue
+        policy = policy_list[0]
+        policy_permission_ids = None
+        # find if a resource path matches
+        for rp in policy["resource_path"]:
+            for resource_path in resource_paths:
+                if arborist.is_path_prefix_of_path(rp, resource_path):
+                    # Flatten permissions
+                    if not policy_permission_ids:
+                        policy_permission_ids = [
+                            permission["id"]
+                            for permission in role["permissions"]
+                            for role in policy["roles"]
+                        ]
+                    if all(
+                        permission in policy_permission_ids
+                        for permission in permissions
+                    ):
+                        # update res dictionary
+                        res[f"{resource_path}"] = True
+
+    # Brute Force approach but probably simple to read
+    # for resource_path in resource_paths:
+    #     for permission in permissions:
+    #         requests = [
+    #             r
+    #             for r in positive_requests
+    #             if matched_policy(r.policy_id, resource_path, permission)
+    #         ]
+    #         res[f"{resource_path}-{permission}"] = len(requests) > 0
     return res
+
+
+# FIXME: brute force
+async def get_policy_match():
+    policies = await arborist.list_policies(expand=True)
+
+    def policy_matcher(policy_id: str, resource_path: str, permission: str) -> bool:
+        # TODO: using the aforementioned policies, permissions and resource paths
+        #      verify if this policy_id is eligible
+        for policy in policies:
+            if policy["id"] != policy_id:
+                continue
+            for policy_resource_path in policy["resource_path"]:
+                if not arborist.is_path_prefix_of_path(
+                    policy_resource_path, resource_path
+                ):
+                    continue
+                for role in policy["roles"]:
+                    # Assuming all roles have permissions as a mandatory field
+                    return any(
+                        permission == available_permission["id"]
+                        for available_permission in role["permissions"]
+                    )
+
+        return False
+
+    return policy_matcher
 
 
 def init_app(app: FastAPI):
