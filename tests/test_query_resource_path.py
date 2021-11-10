@@ -159,113 +159,115 @@ def test_list_requests_with_access(client):
     assert res.json() == [request_data["/my/resource"]]
 
 
-# TODO update logic to handle `policy_id` (PXP-8829)
-# @pytest.mark.parametrize(
-#     "test_data",
-#     [
-#         {
-#             "resource_path": "/a",
-#             "should_match": True,
-#         },
-#         {
-#             "resource_path": "/a/b",
-#             "should_match": True,
-#         },
-#         {
-#             "resource_path": "/a/b/",
-#             "should_match": True,
-#         },
-#         {
-#             "resource_path": "/a/b/d",
-#             "should_match": False,
-#         },
-#         {
-#             "resource_path": "/a/bc",
-#             "should_match": False,
-#         },
-#         {
-#             "resource_path": "/a/bc/d",
-#             "should_match": False,
-#         },
-#         {
-#             "resource_path": "/e",
-#             "should_match": False,
-#         },
-#     ],
-# )
-# def test_check_user_resource_paths_prefixes(client, test_data):
-#     """
-#     Test if having requested access to the resource path in
-#     test_data["resource_path"] means having requested access to
-#     resource_path_to_match (arborist paths logic).
-#     """
-#     fake_jwt = "1.2.3"
-#     resource_path_to_match = "/a/b"
+@pytest.mark.parametrize(
+    "test_data",
+    [
+        {
+            "resource_path": "/a",
+            "should_match": True,
+        },
+        {
+            "resource_path": "/a/b",
+            "should_match": True,
+        },
+        {
+            "resource_path": "/a/b/",
+            "should_match": True,
+        },
+        {
+            "resource_path": "/a/b/d",
+            "should_match": False,
+        },
+        {
+            "resource_path": "/a/bc",
+            "should_match": False,
+        },
+        {
+            "resource_path": "/a/bc/d",
+            "should_match": False,
+        },
+        {
+            "resource_path": "/e",
+            "should_match": False,
+        },
+    ],
+)
+def test_check_user_resource_paths_prefixes(
+    client, list_policies_with_resource_path_patcher, test_data
+):
+    """
+    Test if having requested access to the resource path in
+    test_data["resource_path"] means having requested access to
+    resource_path_to_match (arborist paths logic).
+    """
+    fake_jwt = "1.2.3"
+    resource_path_to_match = "/a/b"
 
-#     # create request
-#     data = {
-#         "resource_path": test_data["resource_path"],
-#         "resource_id": "uniqid",
-#         "resource_display_name": "My Resource",
-#         # skip the draft status so that the access is not re-requestable
-#         "status": "INTERMEDIATE_STATUS",
-#     }
-#     res = client.post(
-#         "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
-#     )
-#     assert res.status_code == 201, res.text
+    # create request
+    data = {
+        "resource_path": test_data["resource_path"],
+        "resource_id": "uniqid",
+        "resource_display_name": "My Resource",
+        # skip the draft status so that the access is not re-requestable
+        "status": "INTERMEDIATE_STATUS",
+    }
+    res = client.post(
+        "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+    )
+    assert res.status_code == 201, res.text
 
-#     # check whether the resource path matches the request we created
-#     data = {"resource_paths": [resource_path_to_match]}
-#     res = client.post(
-#         "/request/user_resource_paths",
-#         json=data,
-#         headers={"Authorization": f"bearer {fake_jwt}"},
-#     )
-#     assert res.status_code == 200, res.text
-#     err_msg = f"{resource_path_to_match} should {'' if test_data['should_match'] else 'not '}match {test_data['resource_path']}"
-#     expected = {resource_path_to_match: test_data["should_match"]}
-#     assert res.json() == expected, err_msg
+    # check whether the resource path matches the request we created
+    data = {"resource_paths": [resource_path_to_match]}
+    res = client.post(
+        "/request/user_resource_paths",
+        json=data,
+        headers={"Authorization": f"bearer {fake_jwt}"},
+    )
 
-
-# TODO update logic to handle `policy_id` (PXP-8829)
-# def test_check_user_resource_paths_multiple(client):
-#     fake_jwt = "1.2.3"
-
-#     existing_resource_paths = ["/a/b", "/c"]
-#     expected_matches = {
-#         "/a/b": True,
-#         "/c/d": True,  # if i request all of /c, i also request /c/d
-#         "/a": False,  # if i request /a/b, i don't request all of /a
-#         "/e/f": False,
-#     }
-
-#     # create requests
-#     for resource_path in existing_resource_paths:
-#         data = {
-#             "resource_path": resource_path,
-#             "resource_id": "uniqid",
-#             "resource_display_name": "My Resource",
-#             # skip the draft status so that the access is not re-requestable
-#             "status": "INTERMEDIATE_STATUS",
-#         }
-#         res = client.post(
-#             "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
-#         )
-#         assert res.status_code == 201, res.text
-
-#     # check whether the resource path matches the requests we created
-#     data = {"resource_paths": list(expected_matches.keys())}
-#     res = client.post(
-#         "/request/user_resource_paths",
-#         json=data,
-#         headers={"Authorization": f"bearer {fake_jwt}"},
-#     )
-#     assert res.status_code == 200, res.text
-#     assert res.json() == expected_matches
+    assert res.status_code == 200, res.text
+    err_msg = f"{resource_path_to_match} should {'' if test_data['should_match'] else 'not '}match {test_data['resource_path']}"
+    expected = {resource_path_to_match: test_data["should_match"]}
+    assert res.json() == expected, err_msg
 
 
-# TODO update logic to handle `policy_id` (PXP-8829)
+@pytest.mark.parametrize("test_data", [["/a/b", "/c"]])
+def test_check_user_resource_paths_multiple(
+    client, list_policies_with_resource_path_patcher, test_data
+):
+    fake_jwt = "1.2.3"
+    existing_resource_paths = test_data
+    expected_matches = {
+        "/a/b": True,
+        "/c/d": True,  # if i request all of /c, i also request /c/d
+        "/a": False,  # if i request /a/b, i don't request all of /a
+        "/e/f": False,
+    }
+
+    # create requests
+    for resource_path in existing_resource_paths:
+        data = {
+            "resource_path": resource_path,
+            "resource_id": "uniqid",
+            "resource_display_name": "My Resource",
+            # skip the draft status so that the access is not re-requestable
+            "status": "INTERMEDIATE_STATUS",
+        }
+        res = client.post(
+            "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+        )
+        assert res.status_code == 201, res.text
+
+    # check whether the resource path matches the requests we created
+    data = {"resource_paths": list(expected_matches.keys())}
+    res = client.post(
+        "/request/user_resource_paths",
+        json=data,
+        headers={"Authorization": f"bearer {fake_jwt}"},
+    )
+    assert res.status_code == 200, res.text
+    assert res.json() == expected_matches
+
+
 def test_check_user_resource_paths_username(client):
     fake_jwt = "1.2.3"
 
@@ -296,47 +298,51 @@ def test_check_user_resource_paths_username(client):
     assert res.json() == {resource_path_to_match: False}
 
 
-# TODO update logic to handle `policy_id` (PXP-8829)
-# @pytest.mark.parametrize(
-#     "test_data",
-#     [
-#         {
-#             "status": config["DRAFT_STATUSES"][0],
-#             "should_match": False,
-#         },
-#         {
-#             "status": config["FINAL_STATUSES"][0],
-#             "should_match": False,
-#         },
-#         {
-#             "status": "INTERMEDIATE_STATUS",
-#             "should_match": True,
-#         },
-#     ],
-# )
-# def test_check_user_resource_paths_status(client, test_data):
-#     fake_jwt = "1.2.3"
-#     resource_path_to_match = "/a"
+@pytest.mark.parametrize(
+    "test_data",
+    [
+        {
+            "resource_path": "/a",
+            "status": config["DRAFT_STATUSES"][0],
+            "should_match": False,
+        },
+        {
+            "resource_path": "/a",
+            "status": config["FINAL_STATUSES"][0],
+            "should_match": False,
+        },
+        {
+            "resource_path": "/a",
+            "status": "INTERMEDIATE_STATUS",
+            "should_match": True,
+        },
+    ],
+)
+def test_check_user_resource_paths_status(
+    client, list_policies_with_resource_path_patcher, test_data
+):
+    fake_jwt = "1.2.3"
+    resource_path_to_match = test_data["resource_path"]
 
-#     # create a request with the status to test
-#     data = {
-#         "resource_path": resource_path_to_match,
-#         "resource_id": "uniqid",
-#         "resource_display_name": "My Resource",
-#         "status": test_data["status"],
-#     }
-#     res = client.post(
-#         "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
-#     )
-#     assert res.status_code == 201, res.text
+    # create a request with the status to test
+    data = {
+        "resource_path": resource_path_to_match,
+        "resource_id": "uniqid",
+        "resource_display_name": "My Resource",
+        "status": test_data["status"],
+    }
+    res = client.post(
+        "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+    )
+    assert res.status_code == 201, res.text
 
-#     # check whether there is a match
-#     # (True if the access is re-requestable, False otherwise)
-#     data = {"resource_paths": [resource_path_to_match]}
-#     res = client.post(
-#         "/request/user_resource_paths",
-#         json=data,
-#         headers={"Authorization": f"bearer {fake_jwt}"},
-#     )
-#     assert res.status_code == 200, res.text
-#     assert res.json() == {resource_path_to_match: test_data["should_match"]}
+    # check whether there is a match
+    # (True if the access is re-requestable, False otherwise)
+    data = {"resource_paths": [resource_path_to_match]}
+    res = client.post(
+        "/request/user_resource_paths",
+        json=data,
+        headers={"Authorization": f"bearer {fake_jwt}"},
+    )
+    assert res.status_code == 200, res.text
+    assert res.json() == {resource_path_to_match: test_data["should_match"]}

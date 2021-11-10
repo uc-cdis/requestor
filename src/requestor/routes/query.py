@@ -130,6 +130,11 @@ async def get_request(
     return request.to_dict()
 
 
+def get_policy_for_id(policy_id: str, existing_policies: list) -> dict:
+    policy_list = [p for p in existing_policies["policies"] if p["id"] == policy_id]
+    return policy_list[0] if policy_list else None
+
+
 @router.post("/request/user_resource_paths", status_code=HTTP_200_OK)
 async def check_user_resource_paths(
     api_request: Request,
@@ -166,30 +171,24 @@ async def check_user_resource_paths(
     res = {r: False for r in resource_paths}
     for r in positive_requests:
         # Get the policy
-        policy_list = [
-            p for p in existing_policies["policies"] if p["id"] == r.policy_id
-        ]
-        if not policy_list:
+        policy = get_policy_for_id(r.policy_id, existing_policies)
+        if policy is None:
             continue
-        policy = policy_list[0]
-        policy_permission_ids = None
+        # Flatten permissions
+        policy_permission_ids = [
+            permission["id"]
+            for role in policy["roles"]
+            for permission in role["permissions"]
+        ]
+        # Continue to next request if all permissions in the request are not present in the policy
+        if not all(permission in policy_permission_ids for permission in permissions):
+            continue
         # find if a resource path matches
         for rp in policy["resource_paths"]:
             for resource_path in resource_paths:
                 if arborist.is_path_prefix_of_path(rp, resource_path):
-                    # Flatten permissions
-                    if not policy_permission_ids:
-                        policy_permission_ids = [
-                            permission["id"]
-                            for role in policy["roles"]
-                            for permission in role["permissions"]
-                        ]
-                    if all(
-                        permission in policy_permission_ids
-                        for permission in permissions
-                    ):
-                        # update res dictionary
-                        res[f"{resource_path}"] = True
+                    # update res dictionary
+                    res[f"{resource_path}"] = True
 
     return res
 

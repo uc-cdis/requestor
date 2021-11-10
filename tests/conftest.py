@@ -50,47 +50,17 @@ def client():
 
 
 @pytest.fixture(scope="function")
-def list_policies_patcher(test_data):
+def list_policies_with_resource_path_patcher(test_data):
     resource_paths = (
         [test_data["resource_path"]] if isinstance(test_data, dict) else test_data
     )
     list_policies_mock = MagicMock()
     future = asyncio.Future()
     future.set_result(
-        {
-            "policies": [
-                {
-                    "id": arborist.get_auto_policy_id_for_resource_path(
-                        resource_paths[0]
-                    ),
-                    "resource_paths": resource_paths,
-                    "roles": [
-                        {
-                            "id": "reader",
-                            "description": "",
-                            "permissions": [
-                                {
-                                    "id": "reader",
-                                    "description": "",
-                                    "action": {
-                                        "service": "*",
-                                        "method": "read",
-                                    },
-                                },
-                                {
-                                    "id": "storage-reader",
-                                    "description": "",
-                                    "action": {
-                                        "service": "*",
-                                        "method": "read-storage",
-                                    },
-                                },
-                            ],
-                        }
-                    ],
-                },
-            ]
-        }
+        get_list_policies_response(
+            arborist.get_auto_policy_id_for_resource_path(resource_paths[0]),
+            resource_paths,
+        )
     )
     list_policies_mock.return_value = future
     policy_expand_patch = patch(
@@ -99,6 +69,62 @@ def list_policies_patcher(test_data):
     policy_expand_patch.start()
     yield
     policy_expand_patch.stop()
+
+
+@pytest.fixture(scope="function")
+def list_policies_with_policy_id_patcher(test_data):
+    resource_paths = (
+        [test_data["resource_path"]]
+        if "resource_path" in test_data
+        else test_data["resource_paths"]
+    )
+    list_policies_mock = MagicMock()
+    future = asyncio.Future()
+    future.set_result(
+        get_list_policies_response(test_data["policy_id"], resource_paths)
+    )
+    list_policies_mock.return_value = future
+    policy_expand_patch = patch(
+        "requestor.routes.query.arborist.list_policies", list_policies_mock
+    )
+    policy_expand_patch.start()
+    yield
+    policy_expand_patch.stop()
+
+
+def get_list_policies_response(policy_id, resource_paths):
+    return {
+        "policies": [
+            {
+                "id": policy_id,
+                "resource_paths": resource_paths,
+                "roles": [
+                    {
+                        "id": "reader",
+                        "description": "",
+                        "permissions": [
+                            {
+                                "id": "reader",
+                                "description": "",
+                                "action": {
+                                    "service": "*",
+                                    "method": "read",
+                                },
+                            },
+                            {
+                                "id": "storage-reader",
+                                "description": "",
+                                "action": {
+                                    "service": "*",
+                                    "method": "read-storage",
+                                },
+                            },
+                        ],
+                    }
+                ],
+            },
+        ]
+    }
 
 
 @pytest.fixture(autouse=True, scope="function")

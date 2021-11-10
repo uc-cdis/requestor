@@ -150,41 +150,49 @@ def test_list_requests_with_access(client):
     assert res.json() == [request_data["test-policy"]]
 
 
-# TODO update logic to handle `policy_id` (PXP-8829)
 @pytest.mark.parametrize(
     "test_data",
     [
         {
+            "policy_id": "test-policy",
             "resource_path": "/a",
             "should_match": True,
         },
         {
+            "policy_id": "test-policy",
             "resource_path": "/a/b",
             "should_match": True,
         },
         {
+            "policy_id": "test-policy",
             "resource_path": "/a/b/",
             "should_match": True,
         },
         {
+            "policy_id": "test-policy",
             "resource_path": "/a/b/d",
             "should_match": False,
         },
         {
+            "policy_id": "test-policy",
             "resource_path": "/a/bc",
             "should_match": False,
         },
         {
+            "policy_id": "test-policy",
             "resource_path": "/a/bc/d",
             "should_match": False,
         },
         {
+            "policy_id": "test-policy",
             "resource_path": "/e",
             "should_match": False,
         },
     ],
 )
-def test_check_user_resource_paths_prefixes(client, list_policies_patcher, test_data):
+def test_check_user_resource_paths_prefixes(
+    client, list_policies_with_policy_id_patcher, test_data
+):
     """
     Test if having requested access to the resource path in
     test_data["resource_path"] means having requested access to
@@ -220,11 +228,13 @@ def test_check_user_resource_paths_prefixes(client, list_policies_patcher, test_
     assert res.json() == expected, err_msg
 
 
-# TODO update logic to handle `policy_id` (PXP-8829)
-@pytest.mark.parametrize("test_data", [["/a/b", "/c"]])
-def test_check_user_resource_paths_multiple(client, list_policies_patcher, test_data):
+@pytest.mark.parametrize(
+    "test_data", [{"policy_id": "test-policy", "resource_paths": ["/a/b", "/c"]}]
+)
+def test_check_user_resource_paths_multiple(
+    client, list_policies_with_policy_id_patcher, test_data
+):
     fake_jwt = "1.2.3"
-    existing_resource_paths = test_data
     expected_matches = {
         "/a/b": True,
         "/c/d": True,  # if i request all of /c, i also request /c/d
@@ -232,19 +242,18 @@ def test_check_user_resource_paths_multiple(client, list_policies_patcher, test_
         "/e/f": False,
     }
 
-    # create requests
-    for resource_path in existing_resource_paths:
-        data = {
-            "resource_path": resource_path,
-            "resource_id": "uniqid",
-            "resource_display_name": "My Resource",
-            # skip the draft status so that the access is not re-requestable
-            "status": "INTERMEDIATE_STATUS",
-        }
-        res = client.post(
-            "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
-        )
-        assert res.status_code == 201, res.text
+    # create request
+    data = {
+        "policy_id": test_data["policy_id"],
+        "resource_id": "uniqid",
+        "resource_display_name": "My Resource",
+        # skip the draft status so that the access is not re-requestable
+        "status": "INTERMEDIATE_STATUS",
+    }
+    res = client.post(
+        "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+    )
+    assert res.status_code == 201, res.text
 
     # check whether the resource path matches the requests we created
     data = {"resource_paths": list(expected_matches.keys())}
@@ -257,7 +266,6 @@ def test_check_user_resource_paths_multiple(client, list_policies_patcher, test_
     assert res.json() == expected_matches
 
 
-# TODO update logic to handle `policy_id` (PXP-8829)
 def test_check_user_resource_paths_username(client):
     fake_jwt = "1.2.3"
 
@@ -266,7 +274,7 @@ def test_check_user_resource_paths_username(client):
     # create a request that matches but is for a different user
     data = {
         "username": "not-the-same-user",
-        "resource_path": resource_path_to_match,
+        "policy_id": "test-policy",
         "resource_id": "uniqid",
         "resource_display_name": "My Resource",
         # skip the draft status so that the access is not re-requestable
@@ -288,34 +296,37 @@ def test_check_user_resource_paths_username(client):
     assert res.json() == {resource_path_to_match: False}
 
 
-# TODO update logic to handle `policy_id` (PXP-8829)
 @pytest.mark.parametrize(
     "test_data",
     [
         {
+            "policy_id": "test-policy",
             "resource_path": "/a",
             "status": config["DRAFT_STATUSES"][0],
             "should_match": False,
         },
         {
+            "policy_id": "test-policy",
             "resource_path": "/a",
             "status": config["FINAL_STATUSES"][0],
             "should_match": False,
         },
         {
+            "policy_id": "test-policy",
             "resource_path": "/a",
             "status": "INTERMEDIATE_STATUS",
             "should_match": True,
         },
     ],
 )
-def test_check_user_resource_paths_status(client, list_policies_patcher, test_data):
+def test_check_user_resource_paths_status(
+    client, list_policies_with_policy_id_patcher, test_data
+):
     fake_jwt = "1.2.3"
-    resource_path_to_match = test_data["resource_path"]
 
     # create a request with the status to test
     data = {
-        "resource_path": resource_path_to_match,
+        "policy_id": test_data["policy_id"],
         "resource_id": "uniqid",
         "resource_display_name": "My Resource",
         "status": test_data["status"],
@@ -327,11 +338,11 @@ def test_check_user_resource_paths_status(client, list_policies_patcher, test_da
 
     # check whether there is a match
     # (True if the access is re-requestable, False otherwise)
-    data = {"resource_paths": [resource_path_to_match]}
+    data = {"resource_paths": [test_data["resource_path"]]}
     res = client.post(
         "/request/user_resource_paths",
         json=data,
         headers={"Authorization": f"bearer {fake_jwt}"},
     )
     assert res.status_code == 200, res.text
-    assert res.json() == {resource_path_to_match: test_data["should_match"]}
+    assert res.json() == {test_data["resource_path"]: test_data["should_match"]}
