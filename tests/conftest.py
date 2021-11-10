@@ -1,3 +1,4 @@
+import asyncio
 from alembic.config import main as alembic_main
 import copy
 import os
@@ -6,6 +7,7 @@ import requests
 from starlette.config import environ
 from starlette.testclient import TestClient
 from unittest.mock import MagicMock, patch
+from requestor import arborist
 
 
 # Set REQUESTOR_CONFIG_PATH *before* loading the configuration
@@ -45,6 +47,58 @@ def setup_test_database():
 def client():
     with TestClient(app_init()) as client:
         yield client
+
+
+@pytest.fixture(scope="function")
+def list_policies_patcher(test_data):
+    resource_paths = (
+        [test_data["resource_path"]] if isinstance(test_data, dict) else test_data
+    )
+    list_policies_mock = MagicMock()
+    future = asyncio.Future()
+    future.set_result(
+        {
+            "policies": [
+                {
+                    "id": arborist.get_auto_policy_id_for_resource_path(
+                        resource_paths[0]
+                    ),
+                    "resource_paths": resource_paths,
+                    "roles": [
+                        {
+                            "id": "reader",
+                            "description": "",
+                            "permissions": [
+                                {
+                                    "id": "reader",
+                                    "description": "",
+                                    "action": {
+                                        "service": "*",
+                                        "method": "read",
+                                    },
+                                },
+                                {
+                                    "id": "storage-reader",
+                                    "description": "",
+                                    "action": {
+                                        "service": "*",
+                                        "method": "read-storage",
+                                    },
+                                },
+                            ],
+                        }
+                    ],
+                },
+            ]
+        }
+    )
+    list_policies_mock.return_value = future
+    policy_expand_patch = patch(
+        "requestor.routes.query.arborist.list_policies", list_policies_mock
+    )
+    policy_expand_patch.start()
+    yield
+    policy_expand_patch.stop()
 
 
 @pytest.fixture(autouse=True, scope="function")
