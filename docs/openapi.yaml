@@ -2,6 +2,10 @@ components:
   schemas:
     Body_check_user_resource_paths_request_user_resource_paths_post:
       properties:
+        permissions:
+          items: {}
+          title: Permissions
+          type: array
         resource_paths:
           items: {}
           title: Resource Paths
