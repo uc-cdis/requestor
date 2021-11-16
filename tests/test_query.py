@@ -125,6 +125,42 @@ def test_get_user_requests(client):
     assert res.status_code == 401, res.text
 
 
+def test_get_active_user_requests(client):
+    fake_jwt = "1.2.3"
+
+    # create a request with no status
+    data = {
+        "policy_id": "test-draft-policy",
+        "resource_id": "draft_uniqid",
+        "resource_display_name": "My Draft Resource",
+    }
+    res = client.post(
+        "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+    )
+    assert res.status_code == 201, res.text
+    assert res.json()["status"] in config["DRAFT_STATUSES"]
+
+    # create a request for the current user with an "Active status"
+    data = {
+        "policy_id": "test-active-policy",
+        "resource_id": "active_uniqid",
+        "resource_display_name": "My Active Resource",
+        "status": "APPROVED",
+    }
+    res = client.post(
+        "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+    )
+    assert res.status_code == 201, res.text
+    user_request = res.json()
+
+    # check that only the request with an "Active Status" is listed
+    res = client.get(
+        "/request/user?active", headers={"Authorization": f"bearer {fake_jwt}"}
+    )
+    assert res.status_code == 200, res.text
+    assert res.json() == [user_request]
+
+
 def test_list_requests_with_access(client):
     fake_jwt = "1.2.3"
 
