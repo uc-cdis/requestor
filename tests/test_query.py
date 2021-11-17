@@ -139,7 +139,6 @@ def test_get_active_user_requests(client):
         "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
     )
     assert res.status_code == 201, res.text
-    assert res.json()["status"] in config["DRAFT_STATUSES"]
 
     # create a request for the current user with an "Active status"
     data = {
