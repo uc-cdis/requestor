@@ -165,7 +165,7 @@ def test_get_active_user_requests(client):
         "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
     )
     assert res.status_code == 201, res.text
-    assert res.json()["status"] in config["FINAL_STATUSES"]
+
     # check that only the request with an "Active Status" is listed
     res = client.get(
         "/request/user?active", headers={"Authorization": f"bearer {fake_jwt}"}
