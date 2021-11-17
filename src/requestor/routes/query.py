@@ -85,6 +85,9 @@ async def list_requests(
 async def list_user_requests(api_request: Request, auth=Depends(Auth)) -> dict:
     """
     List the current user's requests.
+
+    Use the "active" query parameter to get only those requests
+    created by the user that are not in DRAFT or FINAL statuses.
     """
     # no authz checks because we assume the current user can read
     # their own requests.

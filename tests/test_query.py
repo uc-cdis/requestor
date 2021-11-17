@@ -128,11 +128,12 @@ def test_get_user_requests(client):
 def test_get_active_user_requests(client):
     fake_jwt = "1.2.3"
 
-    # create a request with no status
+    # create a request with a DRAFT status
     data = {
         "policy_id": "test-draft-policy",
         "resource_id": "draft_uniqid",
         "resource_display_name": "My Draft Resource",
+        "status": "CREATED",
     }
     res = client.post(
         "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
@@ -153,6 +154,18 @@ def test_get_active_user_requests(client):
     assert res.status_code == 201, res.text
     user_request = res.json()
 
+    # create a request for the current user with an "Active status"
+    data = {
+        "policy_id": "test-final-policy",
+        "resource_id": "final",
+        "resource_display_name": "My Final Resource",
+        "status": "CANCELLED",
+    }
+    res = client.post(
+        "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+    )
+    assert res.status_code == 201, res.text
+    assert res.json()["status"] in config["FINAL_STATUSES"]
     # check that only the request with an "Active Status" is listed
     res = client.get(
         "/request/user?active", headers={"Authorization": f"bearer {fake_jwt}"}
