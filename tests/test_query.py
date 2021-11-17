@@ -159,7 +159,7 @@ def test_get_active_user_requests(client):
         "policy_id": "test-final-policy",
         "resource_id": "final",
         "resource_display_name": "My Final Resource",
-        "status": "CANCELLED",
+        "status": config["FINAL_STATUSES"][0],
     }
     res = client.post(
         "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
