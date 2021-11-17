@@ -154,7 +154,7 @@ def test_get_active_user_requests(client):
     assert res.status_code == 201, res.text
     user_request = res.json()
 
-    # create a request for the current user with an "Active status"
+    # create a request with a FINAL status
     data = {
         "policy_id": "test-final-policy",
         "resource_id": "final",
