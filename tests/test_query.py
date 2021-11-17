@@ -133,7 +133,7 @@ def test_get_active_user_requests(client):
         "policy_id": "test-draft-policy",
         "resource_id": "draft_uniqid",
         "resource_display_name": "My Draft Resource",
-        "status": "CREATED",
+        "status": config["DRAFT_STATUSES"][0],
     }
     res = client.post(
         "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
