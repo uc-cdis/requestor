@@ -156,43 +156,48 @@ def test_list_requests_with_access(client):
         {
             "policy_id": "test-policy",
             "resource_path": "/a",
+            "permissions": ["temp", "temp-reader"],
             "should_match": True,
         },
         {
             "policy_id": "test-policy",
             "resource_path": "/a/b",
+            "permissions": ["temp", "temp-reader"],
             "should_match": True,
         },
         {
             "policy_id": "test-policy",
             "resource_path": "/a/b/",
+            "permissions": ["temp", "temp-reader"],
             "should_match": True,
         },
         {
             "policy_id": "test-policy",
             "resource_path": "/a/b/d",
+            "permissions": ["temp", "temp-reader"],
             "should_match": False,
         },
         {
             "policy_id": "test-policy",
             "resource_path": "/a/bc",
+            "permissions": ["temp", "temp-reader"],
             "should_match": False,
         },
         {
             "policy_id": "test-policy",
             "resource_path": "/a/bc/d",
+            "permissions": ["temp", "temp-reader"],
             "should_match": False,
         },
         {
             "policy_id": "test-policy",
             "resource_path": "/e",
+            "permissions": ["temp", "temp-reader"],
             "should_match": False,
         },
     ],
 )
-def test_check_user_resource_paths_prefixes(
-    client, list_policies_with_policy_id_patcher, test_data
-):
+def test_check_user_resource_paths_prefixes(client, list_policies_patcher, test_data):
     """
     Test if having requested access to the resource path in
     test_data["resource_path"] means having requested access to
@@ -215,7 +220,10 @@ def test_check_user_resource_paths_prefixes(
     assert res.status_code == 201, res.text
 
     # check whether the resource path matches the request we created
-    data = {"resource_paths": [resource_path_to_match]}
+    data = {
+        "resource_paths": [resource_path_to_match],
+        "permissions": test_data["permissions"],
+    }
     res = client.post(
         "/request/user_resource_paths",
         json=data,
@@ -229,11 +237,16 @@ def test_check_user_resource_paths_prefixes(
 
 
 @pytest.mark.parametrize(
-    "test_data", [{"policy_id": "test-policy", "resource_paths": ["/a/b", "/c"]}]
+    "test_data",
+    [
+        {
+            "policy_id": "test-policy",
+            "resource_paths": ["/a/b", "/c"],
+            "permissions": ["temp", "temp-reader"],
+        }
+    ],
 )
-def test_check_user_resource_paths_multiple(
-    client, list_policies_with_policy_id_patcher, test_data
-):
+def test_check_user_resource_paths_multiple(client, list_policies_patcher, test_data):
     fake_jwt = "1.2.3"
     expected_matches = {
         "/a/b": True,
@@ -256,7 +269,10 @@ def test_check_user_resource_paths_multiple(
     assert res.status_code == 201, res.text
 
     # check whether the resource path matches the requests we created
-    data = {"resource_paths": list(expected_matches.keys())}
+    data = {
+        "resource_paths": list(expected_matches.keys()),
+        "permissions": test_data["permissions"],
+    }
     res = client.post(
         "/request/user_resource_paths",
         json=data,
@@ -286,7 +302,10 @@ def test_check_user_resource_paths_username(client):
     assert res.status_code == 201, res.text
 
     # check that the resource path does not match the request we created
-    data = {"resource_paths": [resource_path_to_match]}
+    data = {
+        "resource_paths": [resource_path_to_match],
+        "permissions": ["temp", "temp-reader"],
+    }
     res = client.post(
         "/request/user_resource_paths",
         json=data,
@@ -302,26 +321,27 @@ def test_check_user_resource_paths_username(client):
         {
             "policy_id": "test-policy",
             "resource_path": "/a",
+            "permissions": ["temp", "temp-reader"],
             "status": config["DRAFT_STATUSES"][0],
             "should_match": False,
         },
         {
             "policy_id": "test-policy",
             "resource_path": "/a",
+            "permissions": ["temp", "temp-reader"],
             "status": config["FINAL_STATUSES"][0],
             "should_match": False,
         },
         {
             "policy_id": "test-policy",
             "resource_path": "/a",
+            "permissions": ["temp", "temp-reader"],
             "status": "INTERMEDIATE_STATUS",
             "should_match": True,
         },
     ],
 )
-def test_check_user_resource_paths_status(
-    client, list_policies_with_policy_id_patcher, test_data
-):
+def test_check_user_resource_paths_status(client, list_policies_patcher, test_data):
     fake_jwt = "1.2.3"
 
     # create a request with the status to test
@@ -338,7 +358,10 @@ def test_check_user_resource_paths_status(
 
     # check whether there is a match
     # (True if the access is re-requestable, False otherwise)
-    data = {"resource_paths": [test_data["resource_path"]]}
+    data = {
+        "resource_paths": [test_data["resource_path"]],
+        "permissions": test_data["permissions"],
+    }
     res = client.post(
         "/request/user_resource_paths",
         json=data,

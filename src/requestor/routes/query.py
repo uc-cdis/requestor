@@ -166,7 +166,7 @@ async def check_user_resource_paths(
     res = {r: False for r in resource_paths}
     for r in positive_requests:
         # Get the policy
-        policy = arborist.get_policy_for_id(existing_policies, r.policy_id)
+        policy = arborist.get_policy_for_id(existing_policies["policies"], r.policy_id)
         if policy is None:
             continue
         # Flatten permissions
@@ -181,6 +181,8 @@ async def check_user_resource_paths(
         # find if a resource path matches
         for rp in policy["resource_paths"]:
             for resource_path in resource_paths:
+                if res[resource_path]:
+                    continue
                 if arborist.is_path_prefix_of_path(rp, resource_path):
                     # update res dictionary
                     res[resource_path] = True

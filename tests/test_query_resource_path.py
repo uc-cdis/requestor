@@ -192,9 +192,7 @@ def test_list_requests_with_access(client):
         },
     ],
 )
-def test_check_user_resource_paths_prefixes(
-    client, list_policies_with_resource_path_patcher, test_data
-):
+def test_check_user_resource_paths_prefixes(client, list_policies_patcher, test_data):
     """
     Test if having requested access to the resource path in
     test_data["resource_path"] means having requested access to
@@ -230,12 +228,10 @@ def test_check_user_resource_paths_prefixes(
     assert res.json() == expected, err_msg
 
 
-@pytest.mark.parametrize("test_data", [["/a/b", "/c"]])
-def test_check_user_resource_paths_multiple(
-    client, list_policies_with_resource_path_patcher, test_data
-):
+@pytest.mark.parametrize("test_data", [{"resource_paths": ["/a/b", "/c"]}])
+def test_check_user_resource_paths_multiple(client, list_policies_patcher, test_data):
     fake_jwt = "1.2.3"
-    existing_resource_paths = test_data
+    existing_resource_paths = test_data["resource_paths"]
     expected_matches = {
         "/a/b": True,
         "/c/d": True,  # if i request all of /c, i also request /c/d
@@ -318,9 +314,7 @@ def test_check_user_resource_paths_username(client):
         },
     ],
 )
-def test_check_user_resource_paths_status(
-    client, list_policies_with_resource_path_patcher, test_data
-):
+def test_check_user_resource_paths_status(client, list_policies_patcher, test_data):
     fake_jwt = "1.2.3"
     resource_path_to_match = test_data["resource_path"]
 
