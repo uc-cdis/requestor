@@ -173,6 +173,59 @@ def test_get_active_user_requests(client):
     assert res.json() == [user_request]
 
 
+def test_get_filtered_user_requests(client):
+    fake_jwt = "1.2.3"
+    filtered_requests = []
+    # create a request with policy_id foo, status = APPROVED and revoke = False
+    data = {
+        "policy_id": "foo",
+        "resource_id": "draft_uniqid",
+        "revoke": "False",
+        "resource_display_name": "My Draft Resource",
+        "status": "APPROVED",
+    }
+    res = client.post(
+        "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+    )
+    assert res.status_code == 201, res.text
+    filtered_requests.append(res.json())
+
+    # create a request with policy_id bar, status = APPROVED and revoke = False
+    data = {
+        "policy_id": "bar",
+        "resource_id": "active_uniqid",
+        "revoke": "False",
+        "resource_display_name": "My Active Resource",
+        "status": "APPROVED",
+    }
+    res = client.post(
+        "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+    )
+    assert res.status_code == 201, res.text
+    filtered_requests.append(res.json())
+
+    # create a request with a different policy_id and status but with revoke=False
+    data = {
+        "policy_id": "random",
+        "resource_id": "final",
+        "resource_display_name": "My Final Resource",
+        "revoke": "False",
+        "status": "CANCELLED",
+    }
+    res = client.post(
+        "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+    )
+    assert res.status_code == 201, res.text
+
+    # check that only get those requests which match the filtered criteria
+    res = client.get(
+        "/request/user?policy_id=foo&policy_id=bar&revoke=False&status=APPROVED",
+        headers={"Authorization": f"bearer {fake_jwt}"},
+    )
+    assert res.status_code == 200, res.text
+    assert res.json() == filtered_requests
+
+
 def test_list_requests_with_access(client):
     fake_jwt = "1.2.3"
 

@@ -1,5 +1,6 @@
 from fastapi.responses import RedirectResponse
 from urllib.parse import urlparse, urlencode, parse_qsl
+from starlette.datastructures import QueryParams
 
 from . import logger
 from .arborist import is_path_prefix_of_path
@@ -45,3 +46,12 @@ def get_redirect_url(action_id: str, data: dict) -> str:
     final_redirect_url = redirect_url.split("?")[0] + "?" + final_query_params
     logger.debug(f"End user should be redirected to: {final_redirect_url}")
     return final_redirect_url
+
+
+def flatten_query_params(query_params: QueryParams):
+    multi_items = query_params.multi_items()
+    paramDict = {k: [] for k, _ in multi_items}
+    for k, v in multi_items:
+        if v:
+            paramDict[k].append(v)
+    return paramDict

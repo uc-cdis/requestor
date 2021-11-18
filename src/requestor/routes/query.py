@@ -14,12 +14,20 @@ from .. import logger, arborist
 from ..auth import Auth
 from ..config import config
 from ..models import Request as RequestModel
+from ..request_utils import flatten_query_params
 
 
 router = APIRouter()
 
 
-async def get_user_requests(username: str, active: bool = False) -> list:
+async def get_user_requests(
+    username: str, active: bool = False, filters: dict = {}
+) -> list:
+    """
+    Get all the requests made by current user.
+    If only active requests are needed then set active=True
+    Add filters if neccessary as a dictionary of {param : <List of values>} to get filtered results
+    """
     query = RequestModel.query.where(RequestModel.username == username)
     if active:
         query = query.where(
@@ -27,6 +35,11 @@ async def get_user_requests(username: str, active: bool = False) -> list:
                 config["DRAFT_STATUSES"] + config["FINAL_STATUSES"]
             )
         )
+    for filter in filters:
+        query = RequestModel.query.where(
+            getattr(RequestModel, filter).in_(filters[filter])
+        )
+
     return [r for r in (await query.gino.all())]
 
 
@@ -84,26 +97,39 @@ async def list_requests(
 @router.get("/request/user", status_code=HTTP_200_OK)
 async def list_user_requests(api_request: Request, auth=Depends(Auth)) -> dict:
     """
-    List the current user's requests.
+    List current user's requests.
 
-    Use the "active" query parameter to get only those requests
+    Use "active" query parameter to get only those requests
     created by the user that are not in DRAFT or FINAL statuses.
     """
     # no authz checks because we assume the current user can read
     # their own requests.
     active = False
-    if "active" in api_request.query_params:
-        if api_request.query_params["active"]:
+    filter_dict = {}
+    flat_params = flatten_query_params(api_request.query_params)
+    for param in flat_params:
+        if param == "active":
+            if flat_params["active"]:
+                raise HTTPException(
+                    HTTP_400_BAD_REQUEST,
+                    f"The 'active' parameter should not be assigned a value. Received '{flat_params['active']}'",
+                )
+            active = True
+        elif not hasattr(RequestModel, param):
             raise HTTPException(
                 HTTP_400_BAD_REQUEST,
-                f"The 'active' parameter should not be assigned a value. Received '{api_request.query_params['active']}'",
+                f"The '{param}' parameter is invalid.",
             )
-        active = True
+        else:
+            filter_dict[param] = flat_params[param]
+
     token_claims = await auth.get_token_claims()
     username = token_claims["context"]["user"]["name"]
     logger.debug(f"Getting requests for user '{username}' with active = '{active}'")
 
-    user_requests = await get_user_requests(username, active=active)
+    user_requests = await get_user_requests(
+        username, active=active, filters=filter_dict
+    )
     return [r.to_dict() for r in user_requests]
 
 
