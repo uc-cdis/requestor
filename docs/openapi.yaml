@@ -165,7 +165,12 @@ paths:
       - Maintain
   /request/user:
     get:
-      description: List the current user's requests.
+      description: 'List current user''s requests.
+
+
+        Use "active" query parameter to get only those requests
+
+        created by the user that are not in DRAFT or FINAL statuses.'
       operationId: list_user_requests_request_user_get
       responses:
         '200':
