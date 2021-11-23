@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from starlette.requests import Request
 from starlette.status import (
     HTTP_200_OK,
+    HTTP_400_BAD_REQUEST,
     HTTP_404_NOT_FOUND,
 )
 
@@ -18,13 +19,15 @@ from ..models import Request as RequestModel
 router = APIRouter()
 
 
-async def get_user_requests(username: str) -> list:
-    return [
-        r
-        for r in (
-            await RequestModel.query.where(RequestModel.username == username).gino.all()
+async def get_user_requests(username: str, active: bool = False) -> list:
+    query = RequestModel.query.where(RequestModel.username == username)
+    if active:
+        query = query.where(
+            RequestModel.status.notin_(
+                config["DRAFT_STATUSES"] + config["FINAL_STATUSES"]
+            )
         )
-    ]
+    return [r for r in (await query.gino.all())]
 
 
 @router.get("/request")
@@ -79,18 +82,28 @@ async def list_requests(
 
 
 @router.get("/request/user", status_code=HTTP_200_OK)
-async def list_user_requests(auth=Depends(Auth)) -> dict:
+async def list_user_requests(api_request: Request, auth=Depends(Auth)) -> dict:
     """
     List the current user's requests.
+
+    Use the "active" query parameter to get only those requests
+    created by the user that are not in DRAFT or FINAL statuses.
     """
     # no authz checks because we assume the current user can read
     # their own requests.
-
+    active = False
+    if "active" in api_request.query_params:
+        if api_request.query_params["active"]:
+            raise HTTPException(
+                HTTP_400_BAD_REQUEST,
+                f"The 'active' parameter should not be assigned a value. Received '{api_request.query_params['active']}'",
+            )
+        active = True
     token_claims = await auth.get_token_claims()
     username = token_claims["context"]["user"]["name"]
-    logger.debug(f"Getting requests for user '{username}'")
+    logger.debug(f"Getting requests for user '{username}' with active = '{active}'")
 
-    user_requests = await get_user_requests(username)
+    user_requests = await get_user_requests(username, active=active)
     return [r.to_dict() for r in user_requests]
 
 
