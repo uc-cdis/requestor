@@ -61,22 +61,21 @@ def list_policies_patcher(test_data):
         if "resource_paths" in test_data
         else [test_data["resource_path"]]
     )
-    permissions = (
+    expanded_permissions = (
         test_data["permissions"]
         if "permissions" in test_data
-        else ["reader", "storage-reader"]
+        else [
+            {
+                "id": permission,
+                "description": "",
+                "action": {
+                    "service": "*",
+                    "method": permission,
+                },
+            }
+            for permission in ["reader", "storage_reader"]
+        ]
     )
-    expanded_permissions = [
-        {
-            "id": permission,
-            "description": "",
-            "action": {
-                "service": "*",
-                "method": permission,
-            },
-        }
-        for permission in permissions
-    ]
     list_policies_mock = MagicMock()
     future = asyncio.Future()
     policy_id = (

@@ -204,43 +204,36 @@ def test_list_requests_with_access(client):
         {
             "policy_id": "test-policy",
             "resource_path": "/a",
-            "permissions": ["temp", "temp-reader"],
             "should_match": True,
         },
         {
             "policy_id": "test-policy",
             "resource_path": "/a/b",
-            "permissions": ["temp", "temp-reader"],
             "should_match": True,
         },
         {
             "policy_id": "test-policy",
             "resource_path": "/a/b/",
-            "permissions": ["temp", "temp-reader"],
             "should_match": True,
         },
         {
             "policy_id": "test-policy",
             "resource_path": "/a/b/d",
-            "permissions": ["temp", "temp-reader"],
             "should_match": False,
         },
         {
             "policy_id": "test-policy",
             "resource_path": "/a/bc",
-            "permissions": ["temp", "temp-reader"],
             "should_match": False,
         },
         {
             "policy_id": "test-policy",
             "resource_path": "/a/bc/d",
-            "permissions": ["temp", "temp-reader"],
             "should_match": False,
         },
         {
             "policy_id": "test-policy",
             "resource_path": "/e",
-            "permissions": ["temp", "temp-reader"],
             "should_match": False,
         },
     ],
@@ -268,10 +261,7 @@ def test_check_user_resource_paths_prefixes(client, list_policies_patcher, test_
     assert res.status_code == 201, res.text
 
     # check whether the resource path matches the request we created
-    data = {
-        "resource_paths": [resource_path_to_match],
-        "permissions": test_data["permissions"],
-    }
+    data = {"resource_paths": [resource_path_to_match]}
     res = client.post(
         "/request/user_resource_paths",
         json=data,
@@ -290,7 +280,6 @@ def test_check_user_resource_paths_prefixes(client, list_policies_patcher, test_
         {
             "policy_id": "test-policy",
             "resource_paths": ["/a/b", "/c"],
-            "permissions": ["temp", "temp-reader"],
         }
     ],
 )
@@ -317,10 +306,7 @@ def test_check_user_resource_paths_multiple(client, list_policies_patcher, test_
     assert res.status_code == 201, res.text
 
     # check whether the resource path matches the requests we created
-    data = {
-        "resource_paths": list(expected_matches.keys()),
-        "permissions": test_data["permissions"],
-    }
+    data = {"resource_paths": list(expected_matches.keys())}
     res = client.post(
         "/request/user_resource_paths",
         json=data,
@@ -350,10 +336,7 @@ def test_check_user_resource_paths_username(client):
     assert res.status_code == 201, res.text
 
     # check that the resource path does not match the request we created
-    data = {
-        "resource_paths": [resource_path_to_match],
-        "permissions": ["temp", "temp-reader"],
-    }
+    data = {"resource_paths": [resource_path_to_match]}
     res = client.post(
         "/request/user_resource_paths",
         json=data,
@@ -369,27 +352,24 @@ def test_check_user_resource_paths_username(client):
         {
             "policy_id": "test-policy",
             "resource_path": "/a",
-            "permissions": ["temp", "temp-reader"],
             "status": config["DRAFT_STATUSES"][0],
             "should_match": False,
         },
         {
             "policy_id": "test-policy",
             "resource_path": "/a",
-            "permissions": ["temp", "temp-reader"],
             "status": config["FINAL_STATUSES"][0],
             "should_match": False,
         },
         {
             "policy_id": "test-policy",
             "resource_path": "/a",
-            "permissions": ["temp", "temp-reader"],
             "status": "INTERMEDIATE_STATUS",
             "should_match": True,
         },
     ],
 )
-def test_check_user_resource_paths_status(client, list_policies_patcher, test_data):
+def test_check_permissions_mismatch(client, list_policies_patcher, test_data):
     fake_jwt = "1.2.3"
 
     # create a request with the status to test
@@ -406,10 +386,7 @@ def test_check_user_resource_paths_status(client, list_policies_patcher, test_da
 
     # check whether there is a match
     # (True if the access is re-requestable, False otherwise)
-    data = {
-        "resource_paths": [test_data["resource_path"]],
-        "permissions": test_data["permissions"],
-    }
+    data = {"resource_paths": [test_data["resource_path"]]}
     res = client.post(
         "/request/user_resource_paths",
         json=data,
@@ -417,3 +394,148 @@ def test_check_user_resource_paths_status(client, list_policies_patcher, test_da
     )
     assert res.status_code == 200, res.text
     assert res.json() == {test_data["resource_path"]: test_data["should_match"]}
+
+
+@pytest.mark.parametrize(
+    "test_data",
+    [
+        {
+            "policy_id": "test-policy",
+            "resource_path": "/a",
+            "permissions": [
+                {
+                    "id": "original-permissions-1",
+                    "description": "",
+                    "action": {
+                        "service": "*",
+                        "method": "write",
+                    },
+                },
+                {
+                    "id": "original-permissions-2",
+                    "description": "",
+                    "action": {
+                        "service": "*",
+                        "method": "delete",
+                    },
+                },
+            ],
+        },
+    ],
+)
+def test_check_permissions_mismatch(client, list_policies_patcher, test_data):
+    fake_jwt = "1.2.3"
+
+    # create a request with an active status
+    data = {
+        "policy_id": test_data["policy_id"],
+        "resource_id": "uniqid",
+        "resource_display_name": "My Resource",
+        "status": "APPROVED",
+    }
+    res = client.post(
+        "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+    )
+    assert res.status_code == 201, res.text
+
+    # * Permissions provided and matching
+    data = {
+        "resource_paths": [test_data["resource_path"]],
+        "permissions": [
+            {
+                "id": "original-permissions-1",
+                "description": "",
+                "action": {
+                    "service": "*",
+                    "method": "write",
+                },
+            },
+            {
+                "id": "original-permissions-2",
+                "description": "",
+                "action": {
+                    "service": "*",
+                    "method": "delete",
+                },
+            },
+        ],
+    }
+    res = client.post(
+        "/request/user_resource_paths",
+        json=data,
+        headers={"Authorization": f"bearer {fake_jwt}"},
+    )
+    assert res.status_code == 200, res.text
+    assert res.json() == {test_data["resource_path"]: True}
+
+    # * Permissions not provided and not matching -- verified against default permissions
+    data = {
+        "resource_paths": [test_data["resource_path"]],
+    }
+    res = client.post(
+        "/request/user_resource_paths",
+        json=data,
+        headers={"Authorization": f"bearer {fake_jwt}"},
+    )
+    assert res.status_code == 200, res.text
+    assert res.json() == {test_data["resource_path"]: False}
+
+    # * Permissions provided and not matching -- partial mismatch
+    data = {
+        "resource_paths": [test_data["resource_path"]],
+        "permissions": [
+            {
+                "id": "original-permissions-1",
+                "description": "",
+                "action": {
+                    "service": "*",
+                    "method": "write",
+                },
+            },
+            {
+                "id": "mismatched-permissions-2",
+                "description": "",
+                "action": {
+                    "service": "*",
+                    "method": "delete",
+                },
+            },
+        ],
+    }
+    res = client.post(
+        "/request/user_resource_paths",
+        json=data,
+        headers={"Authorization": f"bearer {fake_jwt}"},
+    )
+    assert res.status_code == 200, res.text
+    assert res.json() == {test_data["resource_path"]: False}
+
+    # * Permissions provided and not matching -- complete mismatch
+    data = {
+        "resource_paths": [test_data["resource_path"]],
+        "permissions": [
+            {
+                "id": "mismatched-permissions-1",
+                "description": "",
+                "action": {
+                    "service": "*",
+                    "method": "write",
+                },
+            },
+            {
+                "id": "mismatched-permissions-2",
+                "description": "",
+                "action": {
+                    "service": "*",
+                    "method": "delete",
+                },
+            },
+        ],
+    }
+    res = client.post(
+        "/request/user_resource_paths",
+        json=data,
+        headers={"Authorization": f"bearer {fake_jwt}"},
+    )
+    assert res.status_code == 200, res.text
+    assert res.json() == {test_data["resource_path"]: False}

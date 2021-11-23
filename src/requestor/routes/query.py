@@ -161,17 +161,16 @@ async def check_user_resource_paths(
     token_claims = await auth.get_token_claims()
     username = token_claims["context"]["user"]["name"]
     if not permissions:
-        permissions = ["reader", "storage-reader"]
+        permissions = [
+            {"id": "reader", "action": {"service": "*", "method": "read"}},
+            {
+                "id": "storage_reader",
+                "action": {"service": "*", "method": "read-storage"},
+            },
+        ]
     res = {}
-    # TODO: Call get_user_requests with active=True after {PXP-8831}
-    user_requests = await get_user_requests(username)
-    positive_requests = [
-        r
-        for r in user_requests
-        if not r.revoke
-        and r.status not in config["DRAFT_STATUSES"]
-        and r.status not in config["FINAL_STATUSES"]
-    ]
+    user_requests = await get_user_requests(username, active=True)
+    positive_requests = [r for r in user_requests if not r.revoke]
     existing_policies = await arborist.list_policies(
         api_request.app.arborist_client, expand=True
     )
@@ -189,7 +188,9 @@ async def check_user_resource_paths(
             for permission in role["permissions"]
         }
         # Continue to next request if all permissions in the request are not present in the policy
-        if not all(permission in policy_permission_ids for permission in permissions):
+        if not all(
+            permission["id"] in policy_permission_ids for permission in permissions
+        ):
             continue
         # find if a resource path matches
         for rp in policy["resource_paths"]:
