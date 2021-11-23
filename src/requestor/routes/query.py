@@ -1,8 +1,6 @@
 import uuid
-
 from datetime import datetime
 from fastapi import APIRouter, Body, Depends, FastAPI, HTTPException
-from pydantic import BaseModel
 from starlette.requests import Request
 from starlette.status import (
     HTTP_200_OK,
@@ -14,7 +12,6 @@ from .. import logger, arborist
 from ..auth import Auth
 from ..config import config
 from ..models import Request as RequestModel
-from ..request_utils import flatten_query_params
 
 
 router = APIRouter()
@@ -35,10 +32,8 @@ async def get_user_requests(
                 config["DRAFT_STATUSES"] + config["FINAL_STATUSES"]
             )
         )
-    for filter in filters:
-        query = RequestModel.query.where(
-            getattr(RequestModel, filter).in_(filters[filter])
-        )
+    for field, values in filters.items():
+        query = query.where(getattr(RequestModel, field).in_(values))
 
     return [r for r in (await query.gino.all())]
 
@@ -99,20 +94,19 @@ async def list_user_requests(api_request: Request, auth=Depends(Auth)) -> dict:
     """
     List current user's requests.
 
-    Use "active" query parameter to get only those requests
+    Use the "active" query parameter to get only those requests
     created by the user that are not in DRAFT or FINAL statuses.
     """
     # no authz checks because we assume the current user can read
     # their own requests.
     active = False
-    filter_dict = {}
-    flat_params = flatten_query_params(api_request.query_params)
-    for param in flat_params:
+    filter_dict = {k: [] for k in api_request.query_params if k != "active"}
+    for param, value in api_request.query_params.multi_items():
         if param == "active":
-            if flat_params["active"]:
+            if value:
                 raise HTTPException(
                     HTTP_400_BAD_REQUEST,
-                    f"The 'active' parameter should not be assigned a value. Received '{flat_params['active']}'",
+                    f"The 'active' parameter should not be assigned a value. Received '{value}'",
                 )
             active = True
         elif not hasattr(RequestModel, param):
@@ -120,8 +114,12 @@ async def list_user_requests(api_request: Request, auth=Depends(Auth)) -> dict:
                 HTTP_400_BAD_REQUEST,
                 f"The '{param}' parameter is invalid.",
             )
-        else:
-            filter_dict[param] = flat_params[param]
+        elif value:
+            if str(getattr(RequestModel, param).type) == "BOOLEAN":
+                value = value == "True"
+            elif str(getattr(RequestModel, param).type) == "DATETIME":
+                value = datetime.fromisoformat(value)
+            filter_dict[param].append(value)
 
     token_claims = await auth.get_token_claims()
     username = token_claims["context"]["user"]["name"]
@@ -186,14 +184,11 @@ async def check_user_resource_paths(
     username = token_claims["context"]["user"]["name"]
 
     res = {}
-    user_requests = await get_user_requests(username)
+    user_requests = await get_user_requests(username, active=True)
     for resource_path in resource_paths:
         requests = [
             r
             for r in user_requests
-            if r.status not in config["DRAFT_STATUSES"]
-            and r.status not in config["FINAL_STATUSES"]
-            # TODO update logic to handle `policy_id` (PXP-8829)
             and arborist.is_path_prefix_of_path(r.resource_path, resource_path)
         ]
         res[resource_path] = len(requests) > 0
