@@ -233,6 +233,20 @@ def test_get_filtered_user_requests(client):
     assert res.status_code == 200, res.text
     assert res.json() == filtered_requests[:1]
 
+    # Add a filter with an invalid key
+    res = client.get(
+        f"/request/user?name=dummy",
+        headers={"Authorization": f"bearer {fake_jwt}"},
+    )
+    assert res.status_code == 400, res.text
+
+    # Add a filter with an invalid value to the date key
+    res = client.get(
+        f"/request/user?created_time=23/05/2020",
+        headers={"Authorization": f"bearer {fake_jwt}"},
+    )
+    assert res.status_code == 400, res.text
+
 
 def test_list_requests_with_access(client):
     fake_jwt = "1.2.3"

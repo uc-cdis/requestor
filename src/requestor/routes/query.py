@@ -96,11 +96,15 @@ async def list_user_requests(api_request: Request, auth=Depends(Auth)) -> dict:
 
     Use the "active" query parameter to get only those requests
     created by the user that are not in DRAFT or FINAL statuses.
+
+    Add filter values as key=value pairs in the query string
+    to get filtered results.
+    Note: for filters based on Date, only follow `YYYY-MM-DD` format
     """
     # no authz checks because we assume the current user can read
     # their own requests.
     active = False
-    filter_dict = {k: [] for k in api_request.query_params if k != "active"}
+    filter_dict = {k: set() for k in api_request.query_params if k != "active"}
     for param, value in api_request.query_params.multi_items():
         if param == "active":
             if value:
@@ -115,11 +119,17 @@ async def list_user_requests(api_request: Request, auth=Depends(Auth)) -> dict:
                 f"The '{param}' parameter is invalid.",
             )
         elif value:
-            if str(getattr(RequestModel, param).type) == "BOOLEAN":
-                value = value == "True"
-            elif str(getattr(RequestModel, param).type) == "DATETIME":
-                value = datetime.fromisoformat(value)
-            filter_dict[param].append(value)
+            try:
+                if getattr(RequestModel, param).type.python_type == bool:
+                    value = value.lower() == "True"
+                elif getattr(RequestModel, param).type.python_type == datetime:
+                    value = datetime.fromisoformat(value)
+            except ValueError:
+                raise HTTPException(
+                    HTTP_400_BAD_REQUEST,
+                    f"The value - '{value}' for '{param}' parameter is invalid.",
+                )
+            filter_dict[param].add(value)
 
     token_claims = await auth.get_token_claims()
     username = token_claims["context"]["user"]["name"]

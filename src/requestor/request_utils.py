@@ -1,6 +1,4 @@
-from fastapi.responses import RedirectResponse
 from urllib.parse import urlparse, urlencode, parse_qsl
-from starlette.datastructures import QueryParams
 
 from . import logger
 from .arborist import is_path_prefix_of_path
