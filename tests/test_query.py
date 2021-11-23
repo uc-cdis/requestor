@@ -423,7 +423,7 @@ def test_check_permissions_mismatch(client, list_policies_patcher, test_data):
         },
     ],
 )
-def test_check_permissions_mismatch(client, list_policies_patcher, test_data):
+def test_check_user_resource_paths_status(client, list_policies_patcher, test_data):
     fake_jwt = "1.2.3"
 
     # create a request with an active status
@@ -441,24 +441,7 @@ def test_check_permissions_mismatch(client, list_policies_patcher, test_data):
     # * Permissions provided and matching
     data = {
         "resource_paths": [test_data["resource_path"]],
-        "permissions": [
-            {
-                "id": "original-permissions-1",
-                "description": "",
-                "action": {
-                    "service": "*",
-                    "method": "write",
-                },
-            },
-            {
-                "id": "original-permissions-2",
-                "description": "",
-                "action": {
-                    "service": "*",
-                    "method": "delete",
-                },
-            },
-        ],
+        "permissions": ["original-permissions-1", "original-permissions-2"],
     }
     res = client.post(
         "/request/user_resource_paths",
@@ -483,24 +466,7 @@ def test_check_permissions_mismatch(client, list_policies_patcher, test_data):
     # * Permissions provided and not matching -- partial mismatch
     data = {
         "resource_paths": [test_data["resource_path"]],
-        "permissions": [
-            {
-                "id": "original-permissions-1",
-                "description": "",
-                "action": {
-                    "service": "*",
-                    "method": "write",
-                },
-            },
-            {
-                "id": "mismatched-permissions-2",
-                "description": "",
-                "action": {
-                    "service": "*",
-                    "method": "delete",
-                },
-            },
-        ],
+        "permissions": ["original-permissions-1", "mismatched-permissions-2"],
     }
     res = client.post(
         "/request/user_resource_paths",
@@ -513,24 +479,7 @@ def test_check_permissions_mismatch(client, list_policies_patcher, test_data):
     # * Permissions provided and not matching -- complete mismatch
     data = {
         "resource_paths": [test_data["resource_path"]],
-        "permissions": [
-            {
-                "id": "mismatched-permissions-1",
-                "description": "",
-                "action": {
-                    "service": "*",
-                    "method": "write",
-                },
-            },
-            {
-                "id": "mismatched-permissions-2",
-                "description": "",
-                "action": {
-                    "service": "*",
-                    "method": "delete",
-                },
-            },
-        ],
+        "permissions": ["mismatched-permissions-1", "mismatched-permissions-2"],
     }
     res = client.post(
         "/request/user_resource_paths",
