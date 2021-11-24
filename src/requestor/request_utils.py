@@ -1,4 +1,3 @@
-from fastapi.responses import RedirectResponse
 from urllib.parse import urlparse, urlencode, parse_qsl
 
 from . import logger

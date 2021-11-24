@@ -1,8 +1,6 @@
 import uuid
-
 from datetime import datetime
 from fastapi import APIRouter, Body, Depends, FastAPI, HTTPException
-from pydantic import BaseModel
 from starlette.requests import Request
 from starlette.status import (
     HTTP_200_OK,
@@ -19,7 +17,14 @@ from ..models import Request as RequestModel
 router = APIRouter()
 
 
-async def get_user_requests(username: str, active: bool = False) -> list:
+async def get_user_requests(
+    username: str, active: bool = False, filters: dict = {}
+) -> list:
+    """
+    Get all the requests made by current user.
+    If only active requests are needed then set active=True
+    Add filters if neccessary as a dictionary of {param : <List of values>} to get filtered results
+    """
     query = RequestModel.query.where(RequestModel.username == username)
     if active:
         query = query.where(
@@ -27,6 +32,9 @@ async def get_user_requests(username: str, active: bool = False) -> list:
                 config["DRAFT_STATUSES"] + config["FINAL_STATUSES"]
             )
         )
+    for field, values in filters.items():
+        query = query.where(getattr(RequestModel, field).in_(values))
+
     return [r for r in (await query.gino.all())]
 
 
@@ -84,26 +92,64 @@ async def list_requests(
 @router.get("/request/user", status_code=HTTP_200_OK)
 async def list_user_requests(api_request: Request, auth=Depends(Auth)) -> dict:
     """
-    List the current user's requests.
+    List current user's requests.
 
     Use the "active" query parameter to get only those requests
     created by the user that are not in DRAFT or FINAL statuses.
+
+    Add filter values as key=value pairs in the query string
+    to get filtered results.
+    Note: for filters based on Date, only follow `YYYY-MM-DD` format
+
+    Providing the same key with more than one value filters records whose
+    value of the given key matches any of the given values. But values of
+    different keys must all match.
+    Example:
+        GET /requests/user
+        ?policy_id=foo&policy_id=bar
+        &revoke=False&status=APPROVED
+
+    “policy_id=foo&policy_id=bar” means “the policy is either foo or bar” (same field name).
+    “policy_id=foo&revoke=False” means “the policy is foo and revoke is false” (different field names).
+
     """
     # no authz checks because we assume the current user can read
     # their own requests.
     active = False
-    if "active" in api_request.query_params:
-        if api_request.query_params["active"]:
+    filter_dict = {k: set() for k in api_request.query_params if k != "active"}
+    for param, value in api_request.query_params.multi_items():
+        if param == "active":
+            if value:
+                raise HTTPException(
+                    HTTP_400_BAD_REQUEST,
+                    f"The 'active' parameter should not be assigned a value. Received '{value}'",
+                )
+            active = True
+        elif not hasattr(RequestModel, param):
             raise HTTPException(
                 HTTP_400_BAD_REQUEST,
-                f"The 'active' parameter should not be assigned a value. Received '{api_request.query_params['active']}'",
+                f"The '{param}' parameter is invalid.",
             )
-        active = True
+        elif value:
+            try:
+                if getattr(RequestModel, param).type.python_type == bool:
+                    value = value.lower() == "true"
+                elif getattr(RequestModel, param).type.python_type == datetime:
+                    value = datetime.fromisoformat(value)
+            except ValueError:
+                raise HTTPException(
+                    HTTP_400_BAD_REQUEST,
+                    f"The value - '{value}' for '{param}' parameter is invalid.",
+                )
+            filter_dict[param].add(value)
+
     token_claims = await auth.get_token_claims()
     username = token_claims["context"]["user"]["name"]
     logger.debug(f"Getting requests for user '{username}' with active = '{active}'")
 
-    user_requests = await get_user_requests(username, active=active)
+    user_requests = await get_user_requests(
+        username, active=active, filters=filter_dict
+    )
     return [r.to_dict() for r in user_requests]
 
 

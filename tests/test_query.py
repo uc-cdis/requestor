@@ -172,6 +172,81 @@ def test_get_active_user_requests(client):
     assert res.json() == [user_request]
 
 
+def test_get_filtered_user_requests(client):
+    fake_jwt = "1.2.3"
+    filtered_requests = []
+    # create a request with policy_id foo, status = APPROVED and revoke = False
+    data = {
+        "policy_id": "foo",
+        "resource_id": "draft_uniqid",
+        "revoke": "False",
+        "resource_display_name": "My Draft Resource",
+        "status": "APPROVED",
+    }
+    res = client.post(
+        "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+    )
+    assert res.status_code == 201, res.text
+    filtered_requests.append(res.json())
+    datetime = filtered_requests[0]["created_time"]
+    # create a request with policy_id bar, status = APPROVED and revoke = False
+    data = {
+        "policy_id": "bar",
+        "resource_id": "active_uniqid",
+        "revoke": "False",
+        "resource_display_name": "My Active Resource",
+        "status": "APPROVED",
+    }
+    res = client.post(
+        "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+    )
+    assert res.status_code == 201, res.text
+    filtered_requests.append(res.json())
+
+    # create a request with a different policy_id and status but with revoke=False
+    data = {
+        "policy_id": "random",
+        "resource_id": "final",
+        "resource_display_name": "My Final Resource",
+        "revoke": "False",
+        "status": "CANCELLED",
+    }
+    res = client.post(
+        "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+    )
+    assert res.status_code == 201, res.text
+
+    # check that only get those requests which match the filtered criteria
+    res = client.get(
+        "/request/user?active&revoke=False",
+        headers={"Authorization": f"bearer {fake_jwt}"},
+    )
+    assert res.status_code == 200, res.text
+    assert res.json() == filtered_requests
+
+    # Add mulitple values to a single key to test 'or' functionality alongside 'and'
+    res = client.get(
+        f"/request/user?policy_id=foo&policy_id=bar&status=APPROVED&created_time={datetime}",
+        headers={"Authorization": f"bearer {fake_jwt}"},
+    )
+    assert res.status_code == 200, res.text
+    assert res.json() == filtered_requests[:1]
+
+    # Add a filter with an invalid key
+    res = client.get(
+        f"/request/user?name=dummy",
+        headers={"Authorization": f"bearer {fake_jwt}"},
+    )
+    assert res.status_code == 400, res.text
+
+    # Add a filter with an invalid value to the date key
+    res = client.get(
+        f"/request/user?created_time=23/05/2020",
+        headers={"Authorization": f"bearer {fake_jwt}"},
+    )
+    assert res.status_code == 400, res.text
+
+
 def test_list_requests_with_access(client):
     fake_jwt = "1.2.3"
 
