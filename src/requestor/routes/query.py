@@ -100,6 +100,18 @@ async def list_user_requests(api_request: Request, auth=Depends(Auth)) -> dict:
     Add filter values as key=value pairs in the query string
     to get filtered results.
     Note: for filters based on Date, only follow `YYYY-MM-DD` format
+
+    Providing the same key with more than one value filters records whose
+    value of the given key matches any of the given values. But values of
+    different keys must all match.
+    Example:
+        GET /requests/user
+        ?policy_id=foo&policy_id=bar
+        &revoke=False&status=APPROVED
+
+    “policy_id=foo&policy_id=bar” means “the policy is either foo or bar” (same field name).
+    “policy_id=foo&revoke=False” means “the policy is foo and revoke is false” (different field names).
+
     """
     # no authz checks because we assume the current user can read
     # their own requests.
@@ -121,7 +133,7 @@ async def list_user_requests(api_request: Request, auth=Depends(Auth)) -> dict:
         elif value:
             try:
                 if getattr(RequestModel, param).type.python_type == bool:
-                    value = value.lower() == "True"
+                    value = value.lower() == "true"
                 elif getattr(RequestModel, param).type.python_type == datetime:
                     value = datetime.fromisoformat(value)
             except ValueError:
