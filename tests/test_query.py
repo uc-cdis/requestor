@@ -369,7 +369,7 @@ def test_check_user_resource_paths_username(client):
         },
     ],
 )
-def test_check_permissions_mismatch(client, list_policies_patcher, test_data):
+def test_check_user_resource_paths_status(client, list_policies_patcher, test_data):
     fake_jwt = "1.2.3"
 
     # create a request with the status to test
@@ -423,7 +423,7 @@ def test_check_permissions_mismatch(client, list_policies_patcher, test_data):
         },
     ],
 )
-def test_check_user_resource_paths_status(client, list_policies_patcher, test_data):
+def test_check_permissions_mismatch(client, list_policies_patcher, test_data):
     fake_jwt = "1.2.3"
 
     # create a request with an active status
