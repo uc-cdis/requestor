@@ -63,10 +63,17 @@ async def list_policies(arborist_client: ArboristClient, expand: bool = False) -
     return res
 
 
-def get_resource_paths_for_policy(expanded_policies: list, policy_id: str) -> list:
-    for p in expanded_policies:
+def get_policy_for_id(existing_policies: list, policy_id: str) -> dict:
+    for p in existing_policies:
         if p["id"] == policy_id:
-            return p["resource_paths"]
+            return p
+    return None
+
+
+def get_resource_paths_for_policy(expanded_policies: list, policy_id: str) -> list:
+    policy = get_policy_for_id(expanded_policies, policy_id)
+    if policy:
+        return policy["resource_paths"]
     return []
 
 

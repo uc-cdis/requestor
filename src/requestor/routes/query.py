@@ -190,7 +190,9 @@ async def get_request(
 
 @router.post("/request/user_resource_paths", status_code=HTTP_200_OK)
 async def check_user_resource_paths(
+    api_request: Request,
     resource_paths: list = Body(..., embed=True),
+    permissions: list = None,
     auth=Depends(Auth),
 ) -> dict:
     """
@@ -204,16 +206,40 @@ async def check_user_resource_paths(
 
     token_claims = await auth.get_token_claims()
     username = token_claims["context"]["user"]["name"]
-
+    if not permissions:
+        permissions = ["reader", "storage_reader"]
     res = {}
     user_requests = await get_user_requests(username, active=True)
-    for resource_path in resource_paths:
-        requests = [
-            r
-            for r in user_requests
-            and arborist.is_path_prefix_of_path(r.resource_path, resource_path)
-        ]
-        res[resource_path] = len(requests) > 0
+    positive_requests = [r for r in user_requests if not r.revoke]
+    existing_policies = await arborist.list_policies(
+        api_request.app.arborist_client, expand=True
+    )
+    # Initiate everything to False
+    res = {r: False for r in resource_paths}
+    for r in positive_requests:
+        # Get the policy
+        policy = arborist.get_policy_for_id(existing_policies["policies"], r.policy_id)
+        if policy is None:
+            continue
+        # Flatten permissions
+        policy_permission_ids = {
+            permission["id"]
+            for role in policy["roles"]
+            for permission in role["permissions"]
+        }
+        # Continue to next request if all permissions in the request are not present in the policy
+        if not all(permission in policy_permission_ids for permission in permissions):
+            continue
+        # find if a resource path matches
+        for rp in policy["resource_paths"]:
+            for resource_path in resource_paths:
+                if res[resource_path]:
+                    continue
+                if arborist.is_path_prefix_of_path(rp, resource_path):
+                    # update res dictionary
+                    res[resource_path] = True
+                    break
+
     return res
 
 

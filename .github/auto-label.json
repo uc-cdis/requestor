@@ -1,6 +1,5 @@
 {
   "rules": {
-    "test-portal-studyViewerTest": ["**"],
-    "jenkins-niaid": ["**"]
+    "test-portal-studyViewerTest": ["**"]
   }
 }
