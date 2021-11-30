@@ -14,6 +14,12 @@ from . import logger
 
 
 def maybe_sync(m):
+    """
+    Function calls in the API code are aynsc (FastAPI), but functions calls
+    in the DB migrations code are sync. Use the @maybe_sync decorator for
+    functions that are called by both.
+    """
+
     @wraps(m)
     def _wrapper(*args, **kwargs):
         coro = m(*args, **kwargs)
@@ -192,6 +198,8 @@ async def revoke_user_access_to_policy(
     username: str,
     policy_id: str,
 ) -> bool:
+    # TODO: this will fail if the authz_provider is not Requestor. How to
+    # handle it? Could we handle it earlier (during the request creation)?
     logger.debug(f"Attempting to revoke {username}'s access to {policy_id}")
     success = await arborist_client.revoke_user_policy(username, policy_id)
     return success == True

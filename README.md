@@ -2,13 +2,9 @@
 
 Requestor exposes an API to manage access requests.
 
+[An introduction to Requestor's functionality, as well as diagrams of example flows, can be found in the "Functionality and flow" documentation.](docs/functionality_and_flow.md)
+
 The server is built with [FastAPI](https://fastapi.tiangolo.com/) and packaged with [Poetry](https://poetry.eustace.io/).
-
-## Example flow
-
-Requestor can be configured to return a URL so users can be redirected to external pages, such as access request forms (see example below). However, at this time there is no Gen3 UI to interact with Requestor. Forms and UIs can be external, or calls can be made directly through the API.
-
-![Requestor example flow](docs/img/requestor_example_flow.png)
 
 ## Key documentation
 

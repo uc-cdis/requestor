@@ -94,7 +94,7 @@ async def list_user_requests(api_request: Request, auth=Depends(Auth)) -> dict:
     """
     List current user's requests.
 
-    Use the "active" query parameter to get only those requests
+    Use the "active" query parameter to get only the requests
     created by the user that are not in DRAFT or FINAL statuses.
 
     Add filter values as key=value pairs in the query string
@@ -104,14 +104,12 @@ async def list_user_requests(api_request: Request, auth=Depends(Auth)) -> dict:
     Providing the same key with more than one value filters records whose
     value of the given key matches any of the given values. But values of
     different keys must all match.
-    Example:
-        GET /requests/user
-        ?policy_id=foo&policy_id=bar
-        &revoke=False&status=APPROVED
 
-    “policy_id=foo&policy_id=bar” means “the policy is either foo or bar” (same field name).
-    “policy_id=foo&revoke=False” means “the policy is foo and revoke is false” (different field names).
+    Example: GET /requests/user?policy_id=foo&policy_id=bar&revoke=False&status=APPROVED
 
+    "policy_id=foo&policy_id=bar" means "the policy is either foo or bar" (same field name).
+
+    "policy_id=foo&revoke=False" means "the policy is foo and revoke is false" (different field names).
     """
     # no authz checks because we assume the current user can read
     # their own requests.
@@ -201,43 +199,48 @@ async def check_user_resource_paths(
     If the previous request was denied or is still in draft status, will
     return False.
     """
-    # no authz checks because we assume the current user can read
-    # their own requests.
-
-    token_claims = await auth.get_token_claims()
-    username = token_claims["context"]["user"]["name"]
     if not permissions:
         permissions = ["reader", "storage_reader"]
-    res = {}
+
+    # no authz checks because we assume the current user can read
+    # their own requests.
+    token_claims = await auth.get_token_claims()
+    username = token_claims["context"]["user"]["name"]
     user_requests = await get_user_requests(username, active=True)
     positive_requests = [r for r in user_requests if not r.revoke]
     existing_policies = await arborist.list_policies(
         api_request.app.arborist_client, expand=True
     )
+
     # Initiate everything to False
     res = {r: False for r in resource_paths}
+
     for r in positive_requests:
         # Get the policy
         policy = arborist.get_policy_for_id(existing_policies["policies"], r.policy_id)
+
         if policy is None:
             continue
+
         # Flatten permissions
         policy_permission_ids = {
             permission["id"]
             for role in policy["roles"]
             for permission in role["permissions"]
         }
-        # Continue to next request if all permissions in the request are not present in the policy
+
+        # Continue to next request if all permissions in the request are not
+        # present in the policy
         if not all(permission in policy_permission_ids for permission in permissions):
             continue
+
         # find if a resource path matches
         for rp in policy["resource_paths"]:
             for resource_path in resource_paths:
                 if res[resource_path]:
                     continue
                 if arborist.is_path_prefix_of_path(rp, resource_path):
-                    # update res dictionary
-                    res[resource_path] = True
+                    res[resource_path] = True  # update result dictionary
                     break
 
     return res

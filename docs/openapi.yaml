@@ -172,9 +172,34 @@ paths:
       description: 'List current user''s requests.
 
 
-        Use "active" query parameter to get only those requests
+        Use the "active" query parameter to get only the requests
 
-        created by the user that are not in DRAFT or FINAL statuses.'
+        created by the user that are not in DRAFT or FINAL statuses.
+
+
+        Add filter values as key=value pairs in the query string
+
+        to get filtered results.
+
+        Note: for filters based on Date, only follow `YYYY-MM-DD` format
+
+
+        Providing the same key with more than one value filters records whose
+
+        value of the given key matches any of the given values. But values of
+
+        different keys must all match.
+
+
+        Example: GET /requests/user?policy_id=foo&policy_id=bar&revoke=False&status=APPROVED
+
+
+        "policy_id=foo&policy_id=bar" means "the policy is either foo or bar" (same
+        field name).
+
+
+        "policy_id=foo&revoke=False" means "the policy is foo and revoke is false"
+        (different field names).'
       operationId: list_user_requests_request_user_get
       responses:
         '200':

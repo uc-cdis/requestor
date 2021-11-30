@@ -76,13 +76,13 @@ def list_policies_patcher(test_data):
             for permission in ["reader", "storage_reader"]
         ]
     )
-    list_policies_mock = MagicMock()
-    future = asyncio.Future()
     policy_id = (
         test_data["policy_id"]
         if "policy_id" in test_data
         else arborist.get_auto_policy_id_for_resource_path(resource_paths[0])
     )
+
+    future = asyncio.Future()
     future.set_result(
         {
             "policies": [
@@ -100,12 +100,16 @@ def list_policies_patcher(test_data):
             ]
         }
     )
+
+    list_policies_mock = MagicMock()
     list_policies_mock.return_value = future
     policy_expand_patch = patch(
         "requestor.routes.query.arborist.list_policies", list_policies_mock
     )
     policy_expand_patch.start()
+
     yield
+
     policy_expand_patch.stop()
 
 

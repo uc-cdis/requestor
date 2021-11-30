@@ -57,7 +57,8 @@ async def create_request(
     request for the user who provided the token.
     """
     data = body.dict()
-    # Raise Exception (if we have both resource_path and policy_id) OR (if we have neither). : Hence performing XNOR
+
+    # error (if we have both resource_path and policy_id) OR (if we have neither)
     if bool(data.get("resource_path")) == bool(data.get("policy_id")):
         msg = f"A Request can have either only a resource_path or only a policy_id. But not both."
         logger.error(
@@ -194,6 +195,7 @@ async def update_request(
     existing_policies = await arborist.list_policies(
         api_request.app.arborist_client, expand=True
     )
+
     # only allow 1 update request at a time on the same row
     async with db.transaction():
         request = (
@@ -203,6 +205,7 @@ async def update_request(
             .with_for_update()
             .gino.first_or_404()
         )
+
         resource_paths = arborist.get_resource_paths_for_policy(
             existing_policies["policies"], request.policy_id
         )
@@ -289,7 +292,7 @@ async def delete_request(
     Delete an access request.
     """
     logger.debug(f"Deleting request '{request_id}'")
-    exisiting_policies = await arborist.list_policies(
+    existing_policies = await arborist.list_policies(
         api_request.app.arborist_client, expand=True
     )
 
@@ -305,7 +308,7 @@ async def delete_request(
         await auth.authorize(
             "delete",
             arborist.get_resource_paths_for_policy(
-                exisiting_policies["policies"], request.policy_id
+                existing_policies["policies"], request.policy_id
             ),
         )
 

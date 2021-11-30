@@ -189,6 +189,7 @@ def test_get_filtered_user_requests(client):
     assert res.status_code == 201, res.text
     filtered_requests.append(res.json())
     datetime = filtered_requests[0]["created_time"]
+
     # create a request with policy_id bar, status = APPROVED and revoke = False
     data = {
         "policy_id": "bar",
@@ -216,7 +217,7 @@ def test_get_filtered_user_requests(client):
     )
     assert res.status_code == 201, res.text
 
-    # check that only get those requests which match the filtered criteria
+    # check that only we get the requests which match the filtered criteria
     res = client.get(
         "/request/user?active&revoke=False",
         headers={"Authorization": f"bearer {fake_jwt}"},
