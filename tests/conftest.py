@@ -172,7 +172,7 @@ def mock_arborist_requests(request):
                         "groups": [],
                         "policies": [{"policy": "test-policy"}],
                     },
-                    204 if authorized else 403,
+                    200 if authorized else 403,
                 )
             },
             "http://arborist-service/user/requestor_user/policy": {
