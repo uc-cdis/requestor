@@ -395,6 +395,42 @@ def test_revoke_request_success(client):
     assert request_data["status"] == status
 
 
+def test_revoke_request_after_creating(client):
+    """
+    Requestor should allow creating a "revoke" request for the same policy ID
+    and username that already have an active non-"revoke" request (even if we
+    do not expect this scenario to happen in real life).
+    """
+    fake_jwt = "1.2.3"
+    data = {
+        "username": "requestor_user",
+        "policy_id": "test-policy",
+        "resource_id": "uniqid",
+        "resource_display_name": "My Resource",
+    }
+
+    # create a request
+    res = client.post(
+        "/request",
+        json=data,
+        headers={"Authorization": f"bearer {fake_jwt}"},
+    )
+    assert res.status_code == 201, res.text
+    request_id = res.json()["request_id"]
+
+    # update the request status so it's not a draft anymore
+    status = "INTERMEDIATE_STATUS"
+    res = client.put(f"/request/{request_id}", json={"status": status})
+    assert res.status_code == 200, res.text
+
+    # create an identical request, but with the 'revoke' query parameter
+    res = client.post(
+        "/request?revoke", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+    )
+    assert res.status_code == 201, res.text
+    request_id = res.json()["request_id"]
+
+
 def test_revoke_request_failure(client):
     fake_jwt = "1.2.3"
     data = {

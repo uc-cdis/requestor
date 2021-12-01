@@ -135,6 +135,9 @@ async def create_request(
                 RequestModel.policy_id == data["policy_id"],
             )
             .where(
+                RequestModel.revoke == data.get("revoke", False),
+            )
+            .where(
                 RequestModel.status.notin_(config["FINAL_STATUSES"]),
             )
             .gino.all()

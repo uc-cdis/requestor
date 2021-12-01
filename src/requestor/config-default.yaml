@@ -74,6 +74,7 @@ UPDATE_ACCESS_STATUSES:
 # access requests cannot be updated anymore, but users are not blocked
 # from requesting access again. a new request ID would be generated.
 FINAL_STATUSES:
+  - SIGNED
   - REJECTED
 
 ############################
