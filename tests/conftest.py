@@ -221,22 +221,12 @@ def mock_arborist_requests(request):
                                 "roles": [],
                             },
                             {
-                                "id": "test-draft-policy",
+                                "id": "test-existing-policy",
                                 "resource_paths": [],
                                 "roles": [],
                             },
                             {
-                                "id": "test-active-policy",
-                                "resource_paths": [],
-                                "roles": [],
-                            },
-                            {
-                                "id": "test-final-policy",
-                                "resource_paths": [],
-                                "roles": [],
-                            },
-                            {
-                                "id": "random",
+                                "id": "test-existing-policy-2",
                                 "resource_paths": [],
                                 "roles": [],
                             },

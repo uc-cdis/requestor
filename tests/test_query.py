@@ -129,7 +129,7 @@ def test_get_active_user_requests(client):
 
     # create a request with a DRAFT status
     data = {
-        "policy_id": "test-draft-policy",
+        "policy_id": "test-policy",
         "resource_id": "draft_uniqid",
         "resource_display_name": "My Draft Resource",
         "status": config["DRAFT_STATUSES"][0],
@@ -141,7 +141,7 @@ def test_get_active_user_requests(client):
 
     # create a request for the current user with an "Active status"
     data = {
-        "policy_id": "test-active-policy",
+        "policy_id": "test-existing-policy",
         "resource_id": "active_uniqid",
         "resource_display_name": "My Active Resource",
         "status": "APPROVED",
@@ -154,7 +154,7 @@ def test_get_active_user_requests(client):
 
     # create a request with a FINAL status
     data = {
-        "policy_id": "test-final-policy",
+        "policy_id": "test-existing-policy-2",
         "resource_id": "final",
         "resource_display_name": "My Final Resource",
         "status": config["FINAL_STATUSES"][0],
@@ -175,7 +175,8 @@ def test_get_active_user_requests(client):
 def test_get_filtered_user_requests(client):
     fake_jwt = "1.2.3"
     filtered_requests = []
-    # create a request with policy_id test-policy, status = APPROVED and revoke = False
+
+    # create a request with status = APPROVED and revoke = False
     data = {
         "policy_id": "test-policy",
         "resource_id": "draft_uniqid",
@@ -189,9 +190,10 @@ def test_get_filtered_user_requests(client):
     assert res.status_code == 201, res.text
     filtered_requests.append(res.json())
     datetime = filtered_requests[0]["created_time"]
-    # create a request with policy_id test-draft-policy, status = APPROVED and revoke = False
+
+    # create a request with a different policy_id, status = APPROVED and revoke = False
     data = {
-        "policy_id": "test-draft-policy",
+        "policy_id": "test-existing-policy",
         "resource_id": "active_uniqid",
         "revoke": "False",
         "resource_display_name": "My Active Resource",
@@ -205,7 +207,7 @@ def test_get_filtered_user_requests(client):
 
     # create a request with a different policy_id and status but with revoke=False
     data = {
-        "policy_id": "random",
+        "policy_id": "test-existing-policy-2",
         "resource_id": "final",
         "resource_display_name": "My Final Resource",
         "revoke": "False",
@@ -226,7 +228,7 @@ def test_get_filtered_user_requests(client):
 
     # Add mulitple values to a single key to test 'or' functionality alongside 'and'
     res = client.get(
-        f"/request/user?policy_id=test-policy&policy_id=test-draft-policy&status=APPROVED&created_time={datetime}",
+        f"/request/user?policy_id=test-policy&policy_id=test-existing-policy&status=APPROVED&created_time={datetime}",
         headers={"Authorization": f"bearer {fake_jwt}"},
     )
     assert res.status_code == 200, res.text
