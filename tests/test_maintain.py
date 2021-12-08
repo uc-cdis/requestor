@@ -13,7 +13,7 @@ def test_create_request_with_resource_path_and_policy(client):
     data = {
         "username": "requestor_user",
         "resource_path": "/test-resource-path/resource",
-        "policy_id": "test_policy",
+        "policy_id": "test-policy",
         "resource_id": "uniqid",
         "resource_display_name": "My Resource",
     }
@@ -198,6 +198,32 @@ def test_create_request_without_access(client, mock_arborist_requests):
     res = client.get("/request", headers={"Authorization": f"bearer {fake_jwt}"})
     assert res.status_code == 200, res.text
     assert res.json() == []
+
+
+def test_create_request_with_non_existent_policy(client):
+    fake_jwt = "1.2.3"
+
+    # attempt to create an access request with a policy that is not present in arborist
+    data = {
+        "username": "requestor_user",
+        "policy_id": "some-nonexistent-policy",
+    }
+    res = client.post(
+        "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+    )
+    assert res.status_code == 400, res.text
+    assert "does not exist" in res.text
+
+    # attempt to create a revoke request with a policy that is not present in arborist
+    data = {
+        "username": "requestor_user",
+        "policy_id": "some-nonexistent-policy",
+    }
+    res = client.post(
+        "/request?revoke", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+    )
+    assert res.status_code == 400, res.text
+    assert "does not exist" in res.text
 
 
 def test_update_request(client):
@@ -450,7 +476,7 @@ def test_revoke_request_failure(client):
     assert "should not be assigned a value" in res.json()["detail"]
 
     # attempt to revoke access to a policy the user doesn't have
-    data["policy_id"] = "super-access"
+    data["policy_id"] = "test-existing-policy"
     res = client.post(
         "/request?revoke", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
     )
