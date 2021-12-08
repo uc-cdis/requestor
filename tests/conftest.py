@@ -220,6 +220,26 @@ def mock_arborist_requests(request):
                                 "resource_paths": ["/my/resource"],
                                 "roles": [],
                             },
+                            {
+                                "id": "test-draft-policy",
+                                "resource_paths": [],
+                                "roles": [],
+                            },
+                            {
+                                "id": "test-active-policy",
+                                "resource_paths": [],
+                                "roles": [],
+                            },
+                            {
+                                "id": "test-final-policy",
+                                "resource_paths": [],
+                                "roles": [],
+                            },
+                            {
+                                "id": "random",
+                                "resource_paths": [],
+                                "roles": [],
+                            },
                         ]
                     },
                     204 if authorized else 403,

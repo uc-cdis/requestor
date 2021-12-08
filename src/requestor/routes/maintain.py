@@ -72,15 +72,24 @@ async def create_request(
 
     resource_paths = None
     client = api_request.app.arborist_client
+    existing_policies = await arborist.list_policies(client, expand=True)
+
     if not data["policy_id"]:
         # fallback to body `resource_path` for backwards compatibility
         data["policy_id"] = await arborist.create_arborist_policy(
             client, data["resource_path"]
         )
         resource_paths = [data["resource_path"]]
+    elif "revoke" not in api_request.query_params and not arborist.get_policy_for_id(
+        existing_policies["policies"], data["policy_id"]
+    ):
+        # Raise an exception if the policy does not exist in arborist
+        raise HTTPException(
+            HTTP_400_BAD_REQUEST,
+            f"Request creation failed. There is no 'policy_id' - '{data['policy_id']}' in arborist.",
+        )
 
     if not resource_paths:
-        existing_policies = await arborist.list_policies(client, expand=True)
         resource_paths = arborist.get_resource_paths_for_policy(
             existing_policies["policies"], data["policy_id"]
         )

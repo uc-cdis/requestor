@@ -200,6 +200,20 @@ def test_create_request_without_access(client, mock_arborist_requests):
     assert res.json() == []
 
 
+def test_create_request_with_invalid_policy(client):
+    fake_jwt = "1.2.3"
+
+    # attempt to create a request with a policy that is not present in arborist
+    data = {
+        "username": "requestor_user",
+        "policy_id": "some-nonexistent-policy",
+    }
+    res = client.post(
+        "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+    )
+    assert res.status_code == 400, res.text
+
+
 def test_update_request(client):
     """
     When updating the request with an UPDATE_ACCESS_STATUS, a call
