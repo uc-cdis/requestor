@@ -35,7 +35,7 @@ requests = "^2.24.0"
 
 [tool.poetry.plugins."requestor.modules"]
 "system" = "requestor.routes.system"
-"maintain" = "requestor.routes.maintain"
+"manage" = "requestor.routes.manage"
 "query" = "requestor.routes.query"
 
 [build-system]

@@ -166,7 +166,7 @@ paths:
       - HTTPBearer: []
       summary: Create Request
       tags:
-      - Maintain
+      - Manage
   /request/user:
     get:
       description: 'List current user''s requests.
@@ -274,7 +274,7 @@ paths:
       - HTTPBearer: []
       summary: Delete Request
       tags:
-      - Maintain
+      - Manage
     get:
       operationId: get_request_request__request_id__get
       parameters:
@@ -335,4 +335,4 @@ paths:
       - HTTPBearer: []
       summary: Update Request
       tags:
-      - Maintain
+      - Manage

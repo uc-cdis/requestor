@@ -331,4 +331,4 @@ async def delete_request(
 
 
 def init_app(app: FastAPI):
-    app.include_router(router, tags=["Maintain"])
+    app.include_router(router, tags=["Manage"])
