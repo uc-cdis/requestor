@@ -62,9 +62,10 @@ def app_init() -> FastAPI:
     get_logger("requestor", log_level="debug" if debug == True else "info")
 
     logger.info("Initializing Arborist client")
-    if config["ARBORIST_URL"]:
+    custom_arborist_url = os.environ.get("ARBORIST_URL", config["ARBORIST_URL"])
+    if custom_arborist_url:
         app.arborist_client = ArboristClient(
-            arborist_base_url=config["ARBORIST_URL"],
+            arborist_base_url=custom_arborist_url,
             authz_provider="requestor",
             logger=logger,
         )
