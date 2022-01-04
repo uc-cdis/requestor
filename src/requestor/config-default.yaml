@@ -6,6 +6,7 @@ DEBUG: true
 TEST_KEEP_DB: false
 DOCS_URL_PREFIX: /requestor
 
+# ignored if already set as an environment variable
 ARBORIST_URL:
 
 ####################
