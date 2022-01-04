@@ -31,9 +31,10 @@ depends_on = None
 
 logger = get_logger("requestor-migrate", log_level="debug")
 
-if config["ARBORIST_URL"]:
+custom_arborist_url = os.environ.get("ARBORIST_URL", config["ARBORIST_URL"])
+if custom_arborist_url:
     arborist_client = ArboristClient(
-        arborist_base_url=config["ARBORIST_URL"],
+        arborist_base_url=custom_arborist_url,
         authz_provider="requestor",
         logger=logger,
     )
