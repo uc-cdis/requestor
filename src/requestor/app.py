@@ -36,7 +36,7 @@ def load_modules(app: FastAPI = None) -> None:
     # FIXME: Identify the cause for duplicate entry points (PXP-8443)
     # Added a set on entry points to dodge the intermittent duplicate modules issue
     for ep in set(entry_points()["requestor.modules"]):
-        logger.info("Loading module: %s", ep.name)
+        logger.info(f"Loading module: {ep.name}")
         mod = ep.load()
         if app:
             init_app = getattr(mod, "init_app", None)
