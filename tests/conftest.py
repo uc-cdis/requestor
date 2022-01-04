@@ -7,7 +7,8 @@ import requests
 from starlette.config import environ
 from starlette.testclient import TestClient
 from unittest.mock import MagicMock, patch
-from requestor import arborist
+
+from requestor.arborist import get_auto_policy_id_for_resource_path
 
 
 # Set REQUESTOR_CONFIG_PATH *before* loading the configuration
@@ -79,7 +80,7 @@ def list_policies_patcher(test_data):
     policy_id = (
         test_data["policy_id"]
         if "policy_id" in test_data
-        else arborist.get_auto_policy_id_for_resource_path(resource_paths[0])
+        else get_auto_policy_id_for_resource_path(resource_paths[0])
     )
 
     future = asyncio.Future()

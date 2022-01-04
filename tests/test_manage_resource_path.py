@@ -4,7 +4,7 @@ This set of tests ensures backwards compatibility.
 """
 
 
-from requestor import arborist
+from requestor.arborist import get_auto_policy_id_for_resource_path
 from requestor.config import config
 
 
@@ -33,9 +33,7 @@ def test_create_request_with_redirect(client):
     assert request_data == {
         "request_id": request_id,
         "username": data["username"],
-        "policy_id": arborist.get_auto_policy_id_for_resource_path(
-            data["resource_path"]
-        ),
+        "policy_id": get_auto_policy_id_for_resource_path(data["resource_path"]),
         "resource_id": data["resource_id"],
         "resource_display_name": data["resource_display_name"],
         "status": config["DEFAULT_INITIAL_STATUS"],
@@ -71,9 +69,7 @@ def test_create_request_without_username(client):
     assert request_data == {
         "request_id": request_id,
         "username": "requestor_user",  # username from access_token_patcher
-        "policy_id": arborist.get_auto_policy_id_for_resource_path(
-            data["resource_path"]
-        ),
+        "policy_id": get_auto_policy_id_for_resource_path(data["resource_path"]),
         "resource_id": data["resource_id"],
         "resource_display_name": data["resource_display_name"],
         "status": config["DEFAULT_INITIAL_STATUS"],
@@ -109,9 +105,7 @@ def test_create_duplicate_request(client):
     assert request_data == {
         "request_id": request_id,
         "username": data["username"],
-        "policy_id": arborist.get_auto_policy_id_for_resource_path(
-            data["resource_path"]
-        ),
+        "policy_id": get_auto_policy_id_for_resource_path(data["resource_path"]),
         "resource_id": data["resource_id"],
         "resource_display_name": data["resource_display_name"],
         "status": config["DEFAULT_INITIAL_STATUS"],
