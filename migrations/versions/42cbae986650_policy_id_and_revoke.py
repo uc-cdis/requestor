@@ -31,14 +31,20 @@ depends_on = None
 
 logger = get_logger("requestor-migrate", log_level="debug")
 
-if config["ARBORIST_URL"]:
+custom_arborist_url = os.environ.get("ARBORIST_URL", config["ARBORIST_URL"])
+if custom_arborist_url:
     arborist_client = ArboristClient(
-        arborist_base_url=config["ARBORIST_URL"],
+        arborist_base_url=custom_arborist_url,
         authz_provider="requestor",
         logger=logger,
     )
 else:
     arborist_client = ArboristClient(authz_provider="requestor", logger=logger)
+
+
+def escape(str):
+    # escape single quotes for SQL statement
+    return str.replace("'", "''")
 
 
 def upgrade():
@@ -62,7 +68,7 @@ def upgrade():
         if not config["LOCAL_MIGRATION"] and policy_id not in existing_policies:
             create_arborist_policy(arborist_client, resource_path)
         connection.execute(
-            f"UPDATE requests SET policy_id='{policy_id}', revoke=False WHERE resource_path='{resource_path}'"
+            f"UPDATE requests SET policy_id='{escape(policy_id)}', revoke=False WHERE resource_path='{escape(resource_path)}'"
         )
 
     # now that there are no null values, make the columns non-nullable
@@ -93,11 +99,12 @@ def downgrade():
             )
             assert len(resource_paths) > 0, f"No resource_paths for policy {policy_id}"
         else:
+            # hardcoded to avoid querying Arborist
             resource_paths = ["/test/resource/path"]
         # use the first item in the policy’s list of resources, because this
         # schema only allows 1 resource_path
         connection.execute(
-            f"UPDATE requests SET resource_path='{resource_paths[0]}' WHERE policy_id='{policy_id}'"
+            f"UPDATE requests SET resource_path='{escape(resource_paths[0])}' WHERE policy_id='{escape(policy_id)}'"
         )
 
     # now that there are no null values, make the column non-nullable
