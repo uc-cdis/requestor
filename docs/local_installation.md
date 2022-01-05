@@ -12,6 +12,7 @@ Then use `poetry install` to install the dependencies. Before that,
 a [virtualenv](https://virtualenv.pypa.io/) is recommended.
 If you don't manage your own, Poetry will create one for you
 during `poetry install`, and you must activate it with `poetry shell`.
+You may also need to upgrade `pip` to the latest version.
 
 ## Create configuration file
 

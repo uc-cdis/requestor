@@ -2,7 +2,7 @@
 
 Requestor exposes an API to manage access requests.
 
-[An introduction to Requestor's functionality, as well as diagrams of example flows, can be found in the "Functionality and flow" documentation.](docs/functionality_and_flow.md)
+An introduction to Requestor's functionality, as well as diagrams of example flows, can be found in the ["Functionality and flow" documentation](docs/functionality_and_flow.md).
 
 The server is built with [FastAPI](https://fastapi.tiangolo.com/) and packaged with [Poetry](https://poetry.eustace.io/).
 

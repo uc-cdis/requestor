@@ -191,7 +191,7 @@ paths:
         different keys must all match.
 
 
-        Example: GET /requests/user?policy_id=foo&policy_id=bar&revoke=False&status=APPROVED
+        Example: `GET /requests/user?policy_id=foo&policy_id=bar&revoke=False&status=APPROVED`
 
 
         "policy_id=foo&policy_id=bar" means "the policy is either foo or bar" (same

@@ -105,7 +105,7 @@ async def list_user_requests(api_request: Request, auth=Depends(Auth)) -> dict:
     value of the given key matches any of the given values. But values of
     different keys must all match.
 
-    Example: GET /requests/user?policy_id=foo&policy_id=bar&revoke=False&status=APPROVED
+    Example: `GET /requests/user?policy_id=foo&policy_id=bar&revoke=False&status=APPROVED`
 
     "policy_id=foo&policy_id=bar" means "the policy is either foo or bar" (same field name).
 
