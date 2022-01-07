@@ -18,20 +18,19 @@ router = APIRouter()
 
 
 async def get_user_requests(
-    username: str, active: bool = False, filters: dict = {}
+    username: str, draft: bool = True, final: bool = True, filters: dict = {}
 ) -> list:
     """
     Get all the requests made by current user.
-    If only active requests are needed then set active=True
+    If only non-draft requests are needed then set draft=False.
+    If only non-final requests are needed then set final=False.
     Add filters if neccessary as a dictionary of {param : <List of values>} to get filtered results
     """
     query = RequestModel.query.where(RequestModel.username == username)
-    if active:
-        query = query.where(
-            RequestModel.status.notin_(
-                config["DRAFT_STATUSES"] + config["FINAL_STATUSES"]
-            )
-        )
+    if not draft:
+        query = query.where(RequestModel.status.notin_(config["DRAFT_STATUSES"]))
+    if not final:
+        query = query.where(RequestModel.status.notin_(config["FINAL_STATUSES"]))
     for field, values in filters.items():
         query = query.where(getattr(RequestModel, field).in_(values))
 
@@ -146,7 +145,10 @@ async def list_user_requests(api_request: Request, auth=Depends(Auth)) -> dict:
     logger.debug(f"Getting requests for user '{username}' with active = '{active}'")
 
     user_requests = await get_user_requests(
-        username, active=active, filters=filter_dict
+        # if we only want active requests, filter out requests in a final status
+        username,
+        final=(not active),
+        filters=filter_dict,
     )
     return [r.to_dict() for r in user_requests]
 
@@ -206,7 +208,7 @@ async def check_user_resource_paths(
     # their own requests.
     token_claims = await auth.get_token_claims()
     username = token_claims["context"]["user"]["name"]
-    user_requests = await get_user_requests(username, active=True)
+    user_requests = await get_user_requests(username, draft=False, final=False)
     positive_requests = [r for r in user_requests if not r.revoke]
     existing_policies = await arborist.list_policies(
         api_request.app.arborist_client, expand=True

@@ -138,6 +138,7 @@ def test_get_active_user_requests(client):
         "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
     )
     assert res.status_code == 201, res.text
+    active_request1 = res.json()
 
     # create a request for the current user with an "Active status"
     data = {
@@ -150,7 +151,7 @@ def test_get_active_user_requests(client):
         "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
     )
     assert res.status_code == 201, res.text
-    user_request = res.json()
+    active_request2 = res.json()
 
     # create a request with a FINAL status
     data = {
@@ -163,13 +164,19 @@ def test_get_active_user_requests(client):
         "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
     )
     assert res.status_code == 201, res.text
+    final_request = res.json()
 
-    # check that only the request with an "Active Status" is listed
+    # active=False - check that all the requests are listed
+    res = client.get("/request/user", headers={"Authorization": f"bearer {fake_jwt}"})
+    assert res.status_code == 200, res.text
+    assert res.json() == [active_request1, active_request2, final_request]
+
+    # active=True - check that only the active requests are listed
     res = client.get(
         "/request/user?active", headers={"Authorization": f"bearer {fake_jwt}"}
     )
     assert res.status_code == 200, res.text
-    assert res.json() == [user_request]
+    assert res.json() == [active_request1, active_request2]
 
 
 def test_get_filtered_user_requests(client):
