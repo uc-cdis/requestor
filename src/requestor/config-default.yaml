@@ -6,6 +6,9 @@ DEBUG: true
 TEST_KEEP_DB: false
 DOCS_URL_PREFIX: /requestor
 
+# ignored if already set as an environment variable
+ARBORIST_URL:
+
 ####################
 # DATABASE         #
 ####################
@@ -24,6 +27,10 @@ DB_SSL:
 DB_USE_CONNECTION_FOR_REQUEST: true
 DB_RETRY_LIMIT: 1
 DB_RETRY_INTERVAL: 1
+
+# set to true to disable requests to Arborist during database migrations;
+# useful when migrating a local database or running unit tests
+LOCAL_MIGRATION: false
 
 ####################
 # REQUEST STATUSES #
@@ -68,6 +75,7 @@ UPDATE_ACCESS_STATUSES:
 # access requests cannot be updated anymore, but users are not blocked
 # from requesting access again. a new request ID would be generated.
 FINAL_STATUSES:
+  - SIGNED
   - REJECTED
 
 ############################
@@ -100,6 +108,8 @@ EMAIL_CONFIGS: {}
 
 # configure actions to trigger when the status of an access
 # request for the specified resource path is updated
+# /!\ If there are multiple resource_paths in a request's policy,
+# only the first "redirect_configs" match is considered
 ACTION_ON_UPDATE: {}
   # /resource/with/redirect:
   #   DRAFT:

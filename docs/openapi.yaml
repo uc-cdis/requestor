@@ -2,6 +2,10 @@ components:
   schemas:
     Body_check_user_resource_paths_request_user_resource_paths_post:
       properties:
+        permissions:
+          items: {}
+          title: Permissions
+          type: array
         resource_paths:
           items: {}
           title: Resource Paths
@@ -22,6 +26,9 @@ components:
     CreateRequestInput:
       description: Create an access request.
       properties:
+        policy_id:
+          title: Policy Id
+          type: string
         resource_display_name:
           title: Resource Display Name
           type: string
@@ -37,8 +44,6 @@ components:
         username:
           title: Username
           type: string
-      required:
-      - resource_path
       title: CreateRequestInput
       type: object
     HTTPValidationError:
@@ -121,13 +126,18 @@ paths:
       description: 'Create a new access request.
 
 
+        Use the "revoke" query parameter to create a request to revoke access
+
+        instead of a request to grant access.
+
+
         If no "status" is specified in the request body, will use the configured
 
         DEFAULT_INITIAL_STATUS. Because users can only request access to a
 
-        resource once, (username, resource_path) must be unique unless past
+        policy once, each ("username", "policy_id") combination must be
 
-        requests'' statuses are in FINAL_STATUSES.
+        unique unless past requests'' statuses are in FINAL_STATUSES.
 
 
         If no "username" is specified in the request body, will create an access
@@ -156,10 +166,40 @@ paths:
       - HTTPBearer: []
       summary: Create Request
       tags:
-      - Maintain
+      - Manage
   /request/user:
     get:
-      description: List the current user's requests.
+      description: 'List current user''s requests.
+
+
+        Use the "active" query parameter to get only the requests
+
+        created by the user that are not in DRAFT or FINAL statuses.
+
+
+        Add filter values as key=value pairs in the query string
+
+        to get filtered results.
+
+        Note: for filters based on Date, only follow `YYYY-MM-DD` format
+
+
+        Providing the same key with more than one value filters records whose
+
+        value of the given key matches any of the given values. But values of
+
+        different keys must all match.
+
+
+        Example: `GET /requests/user?policy_id=foo&policy_id=bar&revoke=False&status=APPROVED`
+
+
+        "policy_id=foo&policy_id=bar" means "the policy is either foo or bar" (same
+        field name).
+
+
+        "policy_id=foo&revoke=False" means "the policy is foo and revoke is false"
+        (different field names).'
       operationId: list_user_requests_request_user_get
       responses:
         '200':
@@ -174,11 +214,14 @@ paths:
       - Query
   /request/user_resource_paths:
     post:
-      description: "Return whether the current user has already requested access to\
-        \ the\nspecified resource path(s), including prefixes of the resource path(s).\n\
-        If the previous request was denied or is still in draft status, will\nreturn\
-        \ False.\n\nArgs:\n    resource_paths (list): list of resource paths\n\nReturn:\
-        \ (dict) { resource_path1: true, resource_path2: false, ... }"
+      description: 'Return whether the current user has already requested access to
+        the
+
+        specified resource path(s), including prefixes of the resource path(s).
+
+        If the previous request was denied or is still in draft status, will
+
+        return False.'
       operationId: check_user_resource_paths_request_user_resource_paths_post
       requestBody:
         content:
@@ -231,7 +274,7 @@ paths:
       - HTTPBearer: []
       summary: Delete Request
       tags:
-      - Maintain
+      - Manage
     get:
       operationId: get_request_request__request_id__get
       parameters:
@@ -292,4 +335,4 @@ paths:
       - HTTPBearer: []
       summary: Update Request
       tags:
-      - Maintain
+      - Manage

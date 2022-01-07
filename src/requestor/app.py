@@ -36,7 +36,7 @@ def load_modules(app: FastAPI = None) -> None:
     # FIXME: Identify the cause for duplicate entry points (PXP-8443)
     # Added a set on entry points to dodge the intermittent duplicate modules issue
     for ep in set(entry_points()["requestor.modules"]):
-        logger.info("Loading module: %s", ep.name)
+        logger.info(f"Loading module: {ep.name}")
         mod = ep.load()
         if app:
             init_app = getattr(mod, "init_app", None)
@@ -62,9 +62,10 @@ def app_init() -> FastAPI:
     get_logger("requestor", log_level="debug" if debug == True else "info")
 
     logger.info("Initializing Arborist client")
-    if os.environ.get("ARBORIST_URL"):
+    custom_arborist_url = os.environ.get("ARBORIST_URL", config["ARBORIST_URL"])
+    if custom_arborist_url:
         app.arborist_client = ArboristClient(
-            arborist_base_url=os.environ["ARBORIST_URL"],
+            arborist_base_url=custom_arborist_url,
             authz_provider="requestor",
             logger=logger,
         )

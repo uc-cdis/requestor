@@ -9,7 +9,6 @@ from starlette.status import (
     HTTP_200_OK,
     HTTP_201_CREATED,
     HTTP_400_BAD_REQUEST,
-    HTTP_403_FORBIDDEN,
     HTTP_409_CONFLICT,
     HTTP_500_INTERNAL_SERVER_ERROR,
 )
@@ -30,33 +29,78 @@ class CreateRequestInput(BaseModel):
     """
 
     username: str = None
-    resource_path: str
+    resource_path: str = None
     resource_id: str = None
     resource_display_name: str = None
     status: str = None
+    policy_id: str = None
 
 
 @router.post("/request", status_code=HTTP_201_CREATED)
 async def create_request(
+    api_request: Request,
     body: CreateRequestInput,
     auth=Depends(Auth),
 ) -> dict:
     """
     Create a new access request.
 
+    Use the "revoke" query parameter to create a request to revoke access
+    instead of a request to grant access.
+
     If no "status" is specified in the request body, will use the configured
     DEFAULT_INITIAL_STATUS. Because users can only request access to a
-    resource once, (username, resource_path) must be unique unless past
-    requests' statuses are in FINAL_STATUSES.
+    policy once, each ("username", "policy_id") combination must be
+    unique unless past requests' statuses are in FINAL_STATUSES.
 
     If no "username" is specified in the request body, will create an access
     request for the user who provided the token.
     """
     data = body.dict()
-    await auth.authorize("create", [data["resource_path"]])
+
+    # error (if we have both resource_path and policy_id) OR (if we have neither)
+    if bool(data.get("resource_path")) == bool(data.get("policy_id")):
+        msg = f"A Request can have either only a resource_path or only a policy_id. But not both."
+        logger.error(
+            msg + f" body: {body}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            HTTP_400_BAD_REQUEST,
+            msg,
+        )
+
+    resource_paths = None
+    client = api_request.app.arborist_client
+
+    if not data["policy_id"]:
+        # fallback to body `resource_path` for backwards compatibility
+        data["policy_id"] = await arborist.create_arborist_policy(
+            client, data["resource_path"]
+        )
+        resource_paths = [data["resource_path"]]
+    else:
+        existing_policies = await arborist.list_policies(client, expand=True)
+
+        if not arborist.get_policy_for_id(
+            existing_policies["policies"], data["policy_id"]
+        ):
+            # Raise an exception if the policy does not exist in arborist
+            raise HTTPException(
+                HTTP_400_BAD_REQUEST,
+                f"Request creation failed. The policy '{data['policy_id']}' does not exist.",
+            )
+
+        resource_paths = arborist.get_resource_paths_for_policy(
+            existing_policies["policies"], data["policy_id"]
+        )
+
+    await auth.authorize("create", resource_paths)
 
     request_id = str(uuid.uuid4())
-    logger.debug(f"Creating request. request_id: {request_id}. Received body: {data}")
+    logger.debug(
+        f"Creating request. request_id: {request_id}. Received body: {data}. Revoke: {'revoke' in api_request.query_params}"
+    )
 
     if not data.get("status"):
         data["status"] = config["DEFAULT_INITIAL_STATUS"]
@@ -68,7 +112,30 @@ async def create_request(
         logger.debug(f"Got username from token: {token_username}")
         data["username"] = token_username
 
-    # get requests for this (username, resource_path) for which the status is
+    if "revoke" in api_request.query_params:
+        if api_request.query_params["revoke"]:
+            raise HTTPException(
+                HTTP_400_BAD_REQUEST,
+                f"The 'revoke' parameter should not be assigned a value. Received '{api_request.query_params['revoke']}'",
+            )
+        if data.get("resource_path"):
+            # no technical reason for this; it's just not implemented/tested
+            raise HTTPException(
+                HTTP_400_BAD_REQUEST,
+                f"The 'revoke' parameter is not compatible with the 'resource_path' body field",
+            )
+        data["revoke"] = True
+
+        # check if the user has the policy we want to revoke
+        if not await arborist.user_has_policy(
+            client, data["username"], data["policy_id"]
+        ):
+            raise HTTPException(
+                HTTP_400_BAD_REQUEST,
+                f"Unable to revoke access: '{data['username']}' does not have access to policy '{data['policy_id']}'",
+            )
+
+    # get requests for this (username, policy_id) for which the status is
     # not in FINAL_STATUSES. users can only request access to a resource once.
     previous_requests = [
         r
@@ -77,7 +144,10 @@ async def create_request(
                 RequestModel.username == data["username"],
             )
             .where(
-                RequestModel.resource_path == data["resource_path"],
+                RequestModel.policy_id == data["policy_id"],
+            )
+            .where(
+                RequestModel.revoke == data.get("revoke", False),
             )
             .where(
                 RequestModel.status.notin_(config["FINAL_STATUSES"]),
@@ -91,7 +161,7 @@ async def create_request(
 
     if previous_requests and not draft_previous_requests:
         # a request for this (username, resource_path) already exists
-        msg = f'An open access request for username \'{data["username"]}\' and resource_path \'{data["resource_path"]}\' already exists. Users can only request access to a resource once.'
+        msg = f'An open access request for username \'{data["username"]}\' and policy_id \'{data["policy_id"]}\' already exists. Users can only request access to a resource once.'
         logger.error(
             msg
             + f" body: {body}. existing requests: {[r.request_id for r in previous_requests]}",
@@ -101,6 +171,9 @@ async def create_request(
             HTTP_409_CONFLICT,
             msg,
         )
+
+    # we don't store `resource_path` in the database, so get rid of it
+    del data["resource_path"]
 
     if draft_previous_requests:
         # reuse the draft request
@@ -117,7 +190,7 @@ async def create_request(
         res = request.to_dict()
 
     # CORS limits redirections, so we redirect on the client side
-    redirect_url = post_status_update(data["status"], res)
+    redirect_url = post_status_update(data["status"], res, resource_paths)
     if redirect_url:
         res["redirect_url"] = redirect_url
 
@@ -134,6 +207,10 @@ async def update_request(
     """
     Update an access request with a new "status".
     """
+    existing_policies = await arborist.list_policies(
+        api_request.app.arborist_client, expand=True
+    )
+
     # only allow 1 update request at a time on the same row
     async with db.transaction():
         request = (
@@ -144,9 +221,12 @@ async def update_request(
             .gino.first_or_404()
         )
 
+        resource_paths = arborist.get_resource_paths_for_policy(
+            existing_policies["policies"], request.policy_id
+        )
         await auth.authorize(
             "update",
-            [request.resource_path],
+            resource_paths,
         )
 
         if request.status == status:
@@ -164,27 +244,36 @@ async def update_request(
 
         # the access request is approved: grant access
         if status in config["UPDATE_ACCESS_STATUSES"]:
+            action = "revoke" if request.revoke else "grant"
             logger.debug(
-                f"Status is one of '{config['UPDATE_ACCESS_STATUSES']}', attempting to grant access in Arborist"
+                f"Status is one of '{config['UPDATE_ACCESS_STATUSES']}', attempting to {action} access in Arborist"
             )
 
             # assume we are always granting a user access to a resource.
             # in the future we may want to handle more use cases
             logger.debug(
-                f"username: {request.username}, resource: {request.resource_path}"
+                f"username: {request.username}, policy_id: {request.policy_id}"
             )
-            success = await arborist.grant_user_access_to_resource(
-                api_request.app.arborist_client,
-                request.username,
-                request.resource_path,
-                request.resource_display_name,
-            )
+            if request.revoke:
+                success = await arborist.revoke_user_access_to_policy(
+                    api_request.app.arborist_client,
+                    request.username,
+                    request.policy_id,
+                )
+            else:
+                success = await arborist.grant_user_access_to_policy(
+                    api_request.app.arborist_client,
+                    request.username,
+                    request.policy_id,
+                )
 
             if not success:
-                logger.error(f"Unable to grant access. Check previous logs for errors")
+                logger.error(
+                    f"Unable to {action} access. Check previous logs for errors"
+                )
                 raise HTTPException(
                     HTTP_500_INTERNAL_SERVER_ERROR,
-                    "Something went wrong, unable to grant access",
+                    f"Something went wrong, unable to {action} access",
                 )
 
         request = await (
@@ -201,7 +290,7 @@ async def update_request(
     res = request.to_dict()
 
     # CORS limits redirections, so we redirect on the client side
-    redirect_url = post_status_update(status, res)
+    redirect_url = post_status_update(status, res, resource_paths)
     if redirect_url:
         res["redirect_url"] = redirect_url
 
@@ -210,6 +299,7 @@ async def update_request(
 
 @router.delete("/request/{request_id}", status_code=HTTP_200_OK)
 async def delete_request(
+    api_request: Request,
     request_id: uuid.UUID,
     auth=Depends(Auth),
 ) -> dict:
@@ -217,6 +307,10 @@ async def delete_request(
     Delete an access request.
     """
     logger.debug(f"Deleting request '{request_id}'")
+    existing_policies = await arborist.list_policies(
+        api_request.app.arborist_client, expand=True
+    )
+
     async with db.transaction():
         request = (
             await RequestModel.delete.where(RequestModel.request_id == request_id)
@@ -226,10 +320,15 @@ async def delete_request(
 
         # if not authorized, the exception raised by `auth.authorize`
         # triggers a transaction rollback, so we don't delete
-        await auth.authorize("delete", [request.resource_path])
+        await auth.authorize(
+            "delete",
+            arborist.get_resource_paths_for_policy(
+                existing_policies["policies"], request.policy_id
+            ),
+        )
 
     return {"request_id": request_id}
 
 
 def init_app(app: FastAPI):
-    app.include_router(router, tags=["Maintain"])
+    app.include_router(router, tags=["Manage"])

@@ -1,16 +1,14 @@
 import uuid
-
 from datetime import datetime
 from fastapi import APIRouter, Body, Depends, FastAPI, HTTPException
-from pydantic import BaseModel
 from starlette.requests import Request
 from starlette.status import (
     HTTP_200_OK,
+    HTTP_400_BAD_REQUEST,
     HTTP_404_NOT_FOUND,
 )
 
 from .. import logger, arborist
-from ..arborist import is_path_prefix_of_path
 from ..auth import Auth
 from ..config import config
 from ..models import Request as RequestModel
@@ -19,13 +17,24 @@ from ..models import Request as RequestModel
 router = APIRouter()
 
 
-async def get_user_requests(username: str) -> list:
-    return [
-        r
-        for r in (
-            await RequestModel.query.where(RequestModel.username == username).gino.all()
-        )
-    ]
+async def get_user_requests(
+    username: str, draft: bool = True, final: bool = True, filters: dict = {}
+) -> list:
+    """
+    Get all the requests made by current user.
+    If only non-draft requests are needed then set draft=False.
+    If only non-final requests are needed then set final=False.
+    Add filters if neccessary as a dictionary of {param : <List of values>} to get filtered results
+    """
+    query = RequestModel.query.where(RequestModel.username == username)
+    if not draft:
+        query = query.where(RequestModel.status.notin_(config["DRAFT_STATUSES"]))
+    if not final:
+        query = query.where(RequestModel.status.notin_(config["FINAL_STATUSES"]))
+    for field, values in filters.items():
+        query = query.where(getattr(RequestModel, field).in_(values))
+
+    return [r for r in (await query.gino.all())]
 
 
 @router.get("/request")
@@ -51,37 +60,102 @@ async def list_requests(
 
     # filter requests with read access
     requests = await RequestModel.query.gino.all()
-    authorized_requests = [
-        r
-        for r in requests
-        if any(
-            is_path_prefix_of_path(authorized_resource_path, r.resource_path)
-            for authorized_resource_path in authorized_resource_paths
+    existing_policies = await arborist.list_policies(
+        api_request.app.arborist_client, expand=True
+    )
+    authorized_requests = []
+    for r in requests:
+        resource_paths = arborist.get_resource_paths_for_policy(
+            existing_policies["policies"], r.policy_id
         )
-    ]
+        if not resource_paths:
+            # Note that GETting a request with no resource paths would require
+            # admin access - not implemented
+            continue
+        # A request is authorized if all the resource_paths in the request's
+        # policy are authorized.
+        if all(
+            # A resource_path is authorized if authorized_resource_paths
+            # contains the path or any of its prefixes
+            any(
+                arborist.is_path_prefix_of_path(authorized_resource_path, resource_path)
+                for authorized_resource_path in authorized_resource_paths
+            )
+            for resource_path in resource_paths
+        ):
+            authorized_requests.append(r)
+
     return [r.to_dict() for r in authorized_requests]
 
 
 @router.get("/request/user", status_code=HTTP_200_OK)
-async def list_user_requests(
-    auth=Depends(Auth),
-) -> dict:
+async def list_user_requests(api_request: Request, auth=Depends(Auth)) -> dict:
     """
-    List the current user's requests.
+    List current user's requests.
+
+    Use the "active" query parameter to get only the requests
+    created by the user that are not in DRAFT or FINAL statuses.
+
+    Add filter values as key=value pairs in the query string
+    to get filtered results.
+    Note: for filters based on Date, only follow `YYYY-MM-DD` format
+
+    Providing the same key with more than one value filters records whose
+    value of the given key matches any of the given values. But values of
+    different keys must all match.
+
+    Example: `GET /requests/user?policy_id=foo&policy_id=bar&revoke=False&status=APPROVED`
+
+    "policy_id=foo&policy_id=bar" means "the policy is either foo or bar" (same field name).
+
+    "policy_id=foo&revoke=False" means "the policy is foo and revoke is false" (different field names).
     """
     # no authz checks because we assume the current user can read
     # their own requests.
+    active = False
+    filter_dict = {k: set() for k in api_request.query_params if k != "active"}
+    for param, value in api_request.query_params.multi_items():
+        if param == "active":
+            if value:
+                raise HTTPException(
+                    HTTP_400_BAD_REQUEST,
+                    f"The 'active' parameter should not be assigned a value. Received '{value}'",
+                )
+            active = True
+        elif not hasattr(RequestModel, param):
+            raise HTTPException(
+                HTTP_400_BAD_REQUEST,
+                f"The '{param}' parameter is invalid.",
+            )
+        elif value:
+            try:
+                if getattr(RequestModel, param).type.python_type == bool:
+                    value = value.lower() == "true"
+                elif getattr(RequestModel, param).type.python_type == datetime:
+                    value = datetime.fromisoformat(value)
+            except ValueError:
+                raise HTTPException(
+                    HTTP_400_BAD_REQUEST,
+                    f"The value - '{value}' for '{param}' parameter is invalid.",
+                )
+            filter_dict[param].add(value)
 
     token_claims = await auth.get_token_claims()
     username = token_claims["context"]["user"]["name"]
-    logger.debug(f"Getting requests for user '{username}'")
+    logger.debug(f"Getting requests for user '{username}' with active = '{active}'")
 
-    user_requests = await get_user_requests(username)
+    user_requests = await get_user_requests(
+        # if we only want active requests, filter out requests in a final status
+        username,
+        final=(not active),
+        filters=filter_dict,
+    )
     return [r.to_dict() for r in user_requests]
 
 
 @router.get("/request/{request_id}", status_code=HTTP_200_OK)
 async def get_request(
+    api_request: Request,
     request_id: uuid.UUID,
     auth=Depends(Auth),
 ) -> dict:
@@ -90,11 +164,17 @@ async def get_request(
     request = await RequestModel.query.where(
         RequestModel.request_id == request_id
     ).gino.first()
-
+    existing_policies = await arborist.list_policies(
+        api_request.app.arborist_client, expand=True
+    )
     if request:
         authorized = await auth.authorize(
             "read",
-            [request.resource_path],
+            # Note that GETting a request with no resource paths would require
+            # admin access - not implemented
+            arborist.get_resource_paths_for_policy(
+                existing_policies["policies"], request.policy_id
+            ),
             throw=False,
         )
 
@@ -110,7 +190,9 @@ async def get_request(
 
 @router.post("/request/user_resource_paths", status_code=HTTP_200_OK)
 async def check_user_resource_paths(
+    api_request: Request,
     resource_paths: list = Body(..., embed=True),
+    permissions: list = None,
     auth=Depends(Auth),
 ) -> dict:
     """
@@ -118,29 +200,51 @@ async def check_user_resource_paths(
     specified resource path(s), including prefixes of the resource path(s).
     If the previous request was denied or is still in draft status, will
     return False.
-
-    Args:
-        resource_paths (list): list of resource paths
-
-    Return: (dict) { resource_path1: true, resource_path2: false, ... }
     """
+    if not permissions:
+        permissions = ["reader", "storage_reader"]
+
     # no authz checks because we assume the current user can read
     # their own requests.
-
     token_claims = await auth.get_token_claims()
     username = token_claims["context"]["user"]["name"]
+    user_requests = await get_user_requests(username, draft=False, final=False)
+    positive_requests = [r for r in user_requests if not r.revoke]
+    existing_policies = await arborist.list_policies(
+        api_request.app.arborist_client, expand=True
+    )
 
-    res = {}
-    user_requests = await get_user_requests(username)
-    for resource_path in resource_paths:
-        requests = [
-            r
-            for r in user_requests
-            if r.status not in config["DRAFT_STATUSES"]
-            and r.status not in config["FINAL_STATUSES"]
-            and is_path_prefix_of_path(r.resource_path, resource_path)
-        ]
-        res[resource_path] = len(requests) > 0
+    # Initiate everything to False
+    res = {r: False for r in resource_paths}
+
+    for r in positive_requests:
+        # Get the policy
+        policy = arborist.get_policy_for_id(existing_policies["policies"], r.policy_id)
+
+        if policy is None:
+            continue
+
+        # Flatten permissions
+        policy_permission_ids = {
+            permission["id"]
+            for role in policy["roles"]
+            for permission in role["permissions"]
+        }
+
+        # Continue to next request if all permissions in the request are not
+        # present in the policy
+        if not all(permission in policy_permission_ids for permission in permissions):
+            continue
+
+        # find if a resource path matches
+        for rp in policy["resource_paths"]:
+            for resource_path in resource_paths:
+                if res[resource_path]:
+                    continue
+                if arborist.is_path_prefix_of_path(rp, resource_path):
+                    res[resource_path] = True  # update result dictionary
+                    break
+
     return res
 
 

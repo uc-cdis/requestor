@@ -1,6 +1,6 @@
+import asyncio
 from alembic.config import main as alembic_main
 import copy
-import importlib
 import os
 import pytest
 import requests
@@ -8,14 +8,16 @@ from starlette.config import environ
 from starlette.testclient import TestClient
 from unittest.mock import MagicMock, patch
 
+from requestor.arborist import get_auto_policy_id_for_resource_path
+
 
 # Set REQUESTOR_CONFIG_PATH *before* loading the configuration
 CURRENT_DIR = os.path.dirname(os.path.realpath(__file__))
 environ["REQUESTOR_CONFIG_PATH"] = os.path.join(
     CURRENT_DIR, "test-requestor-config.yaml"
 )
-from requestor.config import config
 from requestor.app import app_init
+from requestor.config import config
 
 
 @pytest.fixture(scope="session")
@@ -48,10 +50,74 @@ def client():
         yield client
 
 
+@pytest.fixture(scope="function")
+def list_policies_patcher(test_data):
+    """
+    This fixture patches the list_policies method with a mock implementation based on
+    the test_data provided which is a dictionary consisting of resource_path(s) and
+    policy_id wherever appropriate
+    """
+    resource_paths = (
+        test_data["resource_paths"]
+        if "resource_paths" in test_data
+        else [test_data["resource_path"]]
+    )
+    expanded_permissions = (
+        test_data["permissions"]
+        if "permissions" in test_data
+        else [
+            {
+                "id": permission,
+                "description": "",
+                "action": {
+                    "service": "*",
+                    "method": permission,
+                },
+            }
+            for permission in ["reader", "storage_reader"]
+        ]
+    )
+    policy_id = (
+        test_data["policy_id"]
+        if "policy_id" in test_data
+        else get_auto_policy_id_for_resource_path(resource_paths[0])
+    )
+
+    future = asyncio.Future()
+    future.set_result(
+        {
+            "policies": [
+                {
+                    "id": policy_id,
+                    "resource_paths": resource_paths,
+                    "roles": [
+                        {
+                            "id": "reader",
+                            "description": "",
+                            "permissions": expanded_permissions,
+                        }
+                    ],
+                },
+            ]
+        }
+    )
+
+    list_policies_mock = MagicMock()
+    list_policies_mock.return_value = future
+    policy_expand_patch = patch(
+        "requestor.routes.query.arborist.list_policies", list_policies_mock
+    )
+    policy_expand_patch.start()
+
+    yield
+
+    policy_expand_patch.stop()
+
+
 @pytest.fixture(autouse=True, scope="function")
 def access_token_patcher(client, request):
     async def get_access_token(*args, **kwargs):
-        return {"sub": "1", "context": {"user": {"name": "requestor-user"}}}
+        return {"sub": "1", "context": {"user": {"name": "requestor_user"}}}
 
     access_token_mock = MagicMock()
     access_token_mock.return_value = get_access_token
@@ -65,16 +131,22 @@ def access_token_patcher(client, request):
 
 
 @pytest.fixture(autouse=True)
-def clean_db(client):
-    # before each test, delete all existing requests from the DB
-    fake_jwt = "1.2.3"
-    res = client.get("/request", headers={"Authorization": f"bearer {fake_jwt}"})
-    assert res.status_code == 200
-    for r in res.json():
-        res = client.delete(
-            "/request/" + r["request_id"],
-            headers={"Authorization": f"bearer {fake_jwt}"},
-        )
+def clean_db():
+    """
+    Before each test, delete all existing requests from the DB
+    """
+    # The code below doesn't work because of this issue
+    # https://github.com/encode/starlette/issues/440, so for now reset
+    # using alembic.
+    # pytest-asyncio = "^0.14.0"
+    # from requestor.models import Request as RequestModel
+    # @pytest.mark.asyncio
+    # async def clean_db():
+    #     await RequestModel.delete.gino.all()
+    #     yield
+
+    alembic_main(["--raiseerr", "downgrade", "base"])
+    alembic_main(["--raiseerr", "upgrade", "head"])
 
     yield
 
@@ -94,8 +166,75 @@ def mock_arborist_requests(request):
             "http://arborist-service/auth/request": {
                 "POST": ({"auth": authorized}, 200)
             },
+            "http://arborist-service/user/requestor_user": {
+                "GET": (
+                    {
+                        "name": "pauline",
+                        "groups": [],
+                        "policies": [{"policy": "test-policy"}],
+                    },
+                    200 if authorized else 403,
+                )
+            },
             "http://arborist-service/user/requestor_user/policy": {
                 "POST": ({}, 204 if authorized else 403)
+            },
+            "http://arborist-service/user/requestor_user/policy/test-policy": {
+                "DELETE": ({}, 204 if authorized else 403)
+            },
+            "http://arborist-service/policy/?expand": {
+                "GET": (
+                    {
+                        "policies": [
+                            {
+                                "id": "test-policy",
+                                "resource_paths": ["/my/resource"],
+                                "roles": [
+                                    {
+                                        "id": "reader",
+                                        "description": "",
+                                        "permissions": [
+                                            {
+                                                "id": "read",
+                                                "description": "",
+                                                "action": {
+                                                    "service": "*",
+                                                    "method": "read",
+                                                },
+                                            }
+                                        ],
+                                    }
+                                ],
+                            },
+                            {
+                                "id": "test-policy-with-redirect",
+                                "resource_paths": ["/resource-with-redirect/resource"],
+                                "roles": [],
+                            },
+                            {
+                                "id": "test-policy-i-cant-access",
+                                "resource_paths": ["something-i-cant-access"],
+                                "roles": [],
+                            },
+                            {
+                                "id": "my.resource_reader",
+                                "resource_paths": ["/my/resource"],
+                                "roles": [],
+                            },
+                            {
+                                "id": "test-existing-policy",
+                                "resource_paths": [],
+                                "roles": [],
+                            },
+                            {
+                                "id": "test-existing-policy-2",
+                                "resource_paths": [],
+                                "roles": [],
+                            },
+                        ]
+                    },
+                    204 if authorized else 403,
+                )
             },
             "http://arborist-service/auth/mapping": {
                 "POST": (

@@ -1,7 +1,8 @@
 from datetime import datetime
 from gino.ext.starlette import Gino
-from sqlalchemy import Column, DateTime, String, UniqueConstraint
+from sqlalchemy import Column, DateTime, String
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.sql.sqltypes import Boolean
 
 from .config import config
 
@@ -22,9 +23,12 @@ class Request(db.Model):
 
     request_id = Column(UUID, primary_key=True)
     username = Column(String, nullable=False)
-    resource_path = Column(String, nullable=False)
-    resource_id = Column(String)
-    resource_display_name = Column(String)
+    policy_id = Column(String, nullable=False)
+    revoke = Column(Boolean, default=False, nullable=False)
     status = Column(String, nullable=False)
     created_time = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_time = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # keep for backwards compatibility:
+    resource_id = Column(String)
+    resource_display_name = Column(String)
