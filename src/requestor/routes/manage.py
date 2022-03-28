@@ -145,7 +145,7 @@ async def create_request(
         token_username = token_claims["context"]["user"]["name"]
         logger.debug(f"Got username from token: {token_username}")
         data["username"] = token_username
-
+    data["revoke"] = False
     if "revoke" in api_request.query_params:
         if api_request.query_params["revoke"]:
             raise HTTPException(
@@ -225,10 +225,10 @@ async def create_request(
 
     await grant_or_revoke_arborist_policy(
         api_request.app.arborist_client,
-        data["policy_id"],
-        data["username"],
-        data["revoke"],
-        data["status"],
+        data.get("policy_id"),
+        data.get("username"),
+        data.get("revoke"),
+        data.get("status"),
     )
 
     # CORS limits redirections, so we redirect on the client side
