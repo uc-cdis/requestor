@@ -235,7 +235,7 @@ def test_update_request(client):
     should be made to Arborist to grant the user access.
     """
     fake_jwt = "1.2.3"
-
+    mock_arborist_return_value = 200
     # create a request
     res = client.post(
         "/request",
@@ -261,6 +261,16 @@ def test_update_request(client):
     assert res.status_code == 400, res.text
     assert "not an allowed request status" in res.json()["detail"]
 
+    future = asyncio.Future()
+    future.set_result(mock_arborist_return_value)
+    mock_arborist_call = MagicMock(return_value=future)
+    # Patching arborist method to see if arborist is being called when an update status is used.
+    arborist_patch = patch(
+        "requestor.routes.manage.arborist.grant_user_access_to_policy",
+        mock_arborist_call,
+    )
+    arborist_patch.start()
+
     # update the request status
     status = config["ALLOWED_REQUEST_STATUSES"][1]
     res = client.put(f"/request/{request_id}", json={"status": status})
@@ -275,16 +285,19 @@ def test_update_request(client):
     res = client.put(f"/request/{request_id}", json={"status": status})
     assert res.status_code == 200, res.text
     request_data = res.json()
+    assert mock_arborist_call.called
+    arborist_patch.stop()
     assert request_data["status"] == status
 
 
 def test_create_request_with_granting_access(client):
     fake_jwt = "1.2.3"
+    mock_arborist_return_value = 200
     # Set status of a request to one of the "update" statuses to see if arborist is being called.
     status = config["UPDATE_ACCESS_STATUSES"][0]
     future = asyncio.Future()
-    mock_arborist_call = MagicMock()
-    mock_arborist_call.return_value = future
+    future.set_result(mock_arborist_return_value)
+    mock_arborist_call = MagicMock(return_value=future)
     # Patching arborist method to see if arborist is being called when an update status is used.
     arborist_patch = patch(
         "requestor.routes.manage.arborist.grant_user_access_to_policy",

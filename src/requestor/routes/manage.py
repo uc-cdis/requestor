@@ -39,10 +39,10 @@ class CreateRequestInput(BaseModel):
 async def grant_or_revoke_arborist_policy(
     arborist_client, policy_id, username, revoke, status
 ):
-    # the access request is approved: grant access
+    # the access request is approved: grant/revoke access
     action = "revoke" if revoke else "grant"
     logger.debug(
-        f"Status is one of '{config['UPDATE_ACCESS_STATUSES']}', attempting to {action} access in Arborist"
+        f"Status is {status} that is one of '{config['UPDATE_ACCESS_STATUSES']}', attempting to {action} access in Arborist"
     )
 
     # assume we are always granting a user access to a resource.
@@ -225,10 +225,10 @@ async def create_request(
     if data.get("status") in config["UPDATE_ACCESS_STATUSES"]:
         await grant_or_revoke_arborist_policy(
             api_request.app.arborist_client,
-            data.get("policy_id"),
-            data.get("username"),
+            data["policy_id"],
+            data["username"],
             data.get("revoke", False),
-            data.get("status"),
+            data["status"],
         )
 
     # CORS limits redirections, so we redirect on the client side
