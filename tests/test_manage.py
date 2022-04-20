@@ -1,5 +1,4 @@
-from unittest.mock import AsyncMock, Mock
-
+import asyncio
 from pydantic import PathNotADirectoryError
 from requestor import arborist
 from requestor.config import config
@@ -283,7 +282,9 @@ def test_create_request_with_granting_access(client):
     fake_jwt = "1.2.3"
     # Set status of a request to one of the "update" statuses to see if arborist is being called.
     status = config["UPDATE_ACCESS_STATUSES"][0]
-    mock_arborist_call = AsyncMock()
+    future = asyncio.Future()
+    mock_arborist_call = MagicMock()
+    mock_arborist_call.return_value = future
     # Patching arborist method to see if arborist is being called when an update status is used.
     arborist_patch = patch(
         "requestor.routes.manage.arborist.grant_user_access_to_policy",
