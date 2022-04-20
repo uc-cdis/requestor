@@ -1,5 +1,9 @@
+from unittest.mock import AsyncMock, Mock
+
+from pydantic import PathNotADirectoryError
 from requestor import arborist
 from requestor.config import config
+from unittest.mock import MagicMock, patch
 
 
 def test_create_request_with_resource_path_and_policy(client):
@@ -270,10 +274,38 @@ def test_update_request(client):
     # update the request status and grant access
     status = config["UPDATE_ACCESS_STATUSES"][0]
     res = client.put(f"/request/{request_id}", json={"status": status})
-
     assert res.status_code == 200, res.text
     request_data = res.json()
     assert request_data["status"] == status
+
+
+def test_create_request_with_granting_access(client):
+    fake_jwt = "1.2.3"
+    # Set status of a request to one of the "update" statuses to see if arborist is being called.
+    status = config["UPDATE_ACCESS_STATUSES"][0]
+    mock_arborist_call = AsyncMock()
+    # Patching arborist method to see if arborist is being called when an update status is used.
+    arborist_patch = patch(
+        "requestor.routes.manage.arborist.grant_user_access_to_policy",
+        mock_arborist_call,
+    )
+    arborist_patch.start()
+    res = client.post(
+        "/request",
+        json={
+            "username": "requestor_user",
+            "policy_id": "test-policy",
+            "resource_id": "uniqid",
+            "resource_display_name": "My Resource",
+            "status": status,
+        },
+        headers={"Authorization": f"bearer {fake_jwt}"},
+    )
+    assert (
+        mock_arborist_call.called
+    ), "Arborist not called when creating a request with an 'update' status"
+    arborist_patch.stop()
+    assert res.status_code == 201, res.text
 
 
 def test_update_request_without_access(client, mock_arborist_requests):

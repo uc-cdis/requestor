@@ -40,34 +40,33 @@ async def grant_or_revoke_arborist_policy(
     arborist_client, policy_id, username, revoke, status
 ):
     # the access request is approved: grant access
-    if status in config["UPDATE_ACCESS_STATUSES"]:
-        action = "revoke" if revoke else "grant"
-        logger.debug(
-            f"Status is one of '{config['UPDATE_ACCESS_STATUSES']}', attempting to {action} access in Arborist"
+    action = "revoke" if revoke else "grant"
+    logger.debug(
+        f"Status is one of '{config['UPDATE_ACCESS_STATUSES']}', attempting to {action} access in Arborist"
+    )
+
+    # assume we are always granting a user access to a resource.
+    # in the future we may want to handle more use cases
+    logger.debug(f"username: {username}, policy_id: {policy_id}")
+    if revoke:
+        success = await arborist.revoke_user_access_to_policy(
+            arborist_client,
+            username,
+            policy_id,
+        )
+    else:
+        success = await arborist.grant_user_access_to_policy(
+            arborist_client,
+            username,
+            policy_id,
         )
 
-        # assume we are always granting a user access to a resource.
-        # in the future we may want to handle more use cases
-        logger.debug(f"username: {username}, policy_id: {policy_id}")
-        if revoke:
-            success = await arborist.revoke_user_access_to_policy(
-                arborist_client,
-                username,
-                policy_id,
-            )
-        else:
-            success = await arborist.grant_user_access_to_policy(
-                arborist_client,
-                username,
-                policy_id,
-            )
-
-        if not success:
-            logger.error(f"Unable to {action} access. Check previous logs for errors")
-            raise HTTPException(
-                HTTP_500_INTERNAL_SERVER_ERROR,
-                f"Something went wrong, unable to {action} access",
-            )
+    if not success:
+        logger.error(f"Unable to {action} access. Check previous logs for errors")
+        raise HTTPException(
+            HTTP_500_INTERNAL_SERVER_ERROR,
+            f"Something went wrong, unable to {action} access",
+        )
 
 
 @router.post("/request", status_code=HTTP_201_CREATED)
@@ -145,7 +144,7 @@ async def create_request(
         token_username = token_claims["context"]["user"]["name"]
         logger.debug(f"Got username from token: {token_username}")
         data["username"] = token_username
-    data["revoke"] = False
+
     if "revoke" in api_request.query_params:
         if api_request.query_params["revoke"]:
             raise HTTPException(
@@ -223,13 +222,14 @@ async def create_request(
             )
         res = request.to_dict()
 
-    await grant_or_revoke_arborist_policy(
-        api_request.app.arborist_client,
-        data.get("policy_id"),
-        data.get("username"),
-        data.get("revoke"),
-        data.get("status"),
-    )
+    if data.get("status") in config["UPDATE_ACCESS_STATUSES"]:
+        await grant_or_revoke_arborist_policy(
+            api_request.app.arborist_client,
+            data.get("policy_id"),
+            data.get("username"),
+            data.get("revoke", False),
+            data.get("status"),
+        )
 
     # CORS limits redirections, so we redirect on the client side
     redirect_url = post_status_update(data["status"], res, resource_paths)
@@ -284,13 +284,14 @@ async def update_request(
                 f"Status '{status}' is not an allowed request status ({allowed_statuses})",
             )
 
-        await grant_or_revoke_arborist_policy(
-            api_request.app.arborist_client,
-            request.policy_id,
-            request.username,
-            request.revoke,
-            status,
-        )
+        if status in config["UPDATE_ACCESS_STATUSES"]:
+            await grant_or_revoke_arborist_policy(
+                api_request.app.arborist_client,
+                request.policy_id,
+                request.username,
+                request.revoke,
+                status,
+            )
 
         request = await (
             RequestModel.update.where(RequestModel.request_id == request_id)
