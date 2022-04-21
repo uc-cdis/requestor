@@ -285,7 +285,9 @@ def test_update_request(client):
     res = client.put(f"/request/{request_id}", json={"status": status})
     assert res.status_code == 200, res.text
     request_data = res.json()
-    assert mock_arborist_call.called
+    assert (
+        mock_arborist_call.called
+    ), "Arborist not called when updating a request with an 'update' status"
     arborist_patch.stop()
     assert request_data["status"] == status
 
