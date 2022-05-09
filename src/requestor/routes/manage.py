@@ -90,6 +90,10 @@ async def create_request(
     request for the user who provided the token.
     """
     data = body.dict()
+    request_id = str(uuid.uuid4())
+    logger.info(
+        f"Creating request. request_id: {request_id}. Received body: {data}. Revoke: {'revoke' in api_request.query_params}"
+    )
 
     # error (if we have both resource_path and policy_id) OR (if we have neither)
     if bool(data.get("resource_path")) == bool(data.get("policy_id")):
@@ -129,11 +133,6 @@ async def create_request(
         )
 
     await auth.authorize("create", resource_paths)
-
-    request_id = str(uuid.uuid4())
-    logger.debug(
-        f"Creating request. request_id: {request_id}. Received body: {data}. Revoke: {'revoke' in api_request.query_params}"
-    )
 
     if not data.get("status"):
         data["status"] = config["DEFAULT_INITIAL_STATUS"]
@@ -210,6 +209,9 @@ async def create_request(
 
     if draft_previous_requests:
         # reuse the draft request
+        logger.debug(
+            f"Found a draft request with request_id: {draft_previous_requests[0].request_id}"
+        )
         res = draft_previous_requests[0].to_dict()
     else:
         # create a new request
@@ -249,6 +251,8 @@ async def update_request(
     """
     Update an access request with a new "status".
     """
+    logger.info(f"Updating request '{request_id}' with status '{status}'")
+
     existing_policies = await arborist.list_policies(
         api_request.app.arborist_client, expand=True
     )
@@ -274,8 +278,6 @@ async def update_request(
         if request.status == status:
             logger.debug(f"Request '{request_id}' already has status '{status}'")
             return request.to_dict()
-
-        logger.debug(f"Updating request '{request_id}' with status '{status}'")
 
         allowed_statuses = config["ALLOWED_REQUEST_STATUSES"]
         if status not in allowed_statuses:
@@ -323,7 +325,7 @@ async def delete_request(
     """
     Delete an access request.
     """
-    logger.debug(f"Deleting request '{request_id}'")
+    logger.info(f"Deleting request '{request_id}'")
     existing_policies = await arborist.list_policies(
         api_request.app.arborist_client, expand=True
     )
