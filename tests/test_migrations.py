@@ -41,7 +41,8 @@ async def test_42cbae986650_upgrade(resource_path):
 
     # check that the migration updated the request data correctly
     data = await db.all(db.text("SELECT * FROM requests"))
-    request = {k: v for row in data for k, v in row.items()}
+    assert len(data) == 1
+    request = {k: v for k, v in data[0].items()}
     assert resource_path not in request
     assert request["policy_id"] == get_auto_policy_id_for_resource_path(resource_path)
     assert request["revoke"] == False
@@ -84,7 +85,8 @@ async def test_42cbae986650_downgrade(resource_path):
 
     # check that the migration updated the request data correctly
     data = await db.all(db.text("SELECT * FROM requests"))
-    request = {k: v for row in data for k, v in row.items()}
+    assert len(data) == 1
+    request = {k: v for k, v in data[0].items()}
     assert "policy_id" not in request
     assert "revoke" not in request
     assert request["resource_path"] == "/test/resource/path"  # hardcoded in migration
