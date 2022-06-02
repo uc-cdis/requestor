@@ -7,7 +7,7 @@ from functools import wraps
 import inspect
 import sniffio
 
-from gen3authz.client.arborist.client import ArboristClient
+from gen3authz.client.arborist.async_client import ArboristClient
 from gen3authz.client.arborist.errors import ArboristError
 
 from . import logger
@@ -63,7 +63,7 @@ async def list_policies(arborist_client: ArboristClient, expand: bool = False) -
     invalidate the cache whenever Arborist changes a policy.
     For now, just make a call to Arborist every time we need this information.
     """
-    res = arborist_client.list_policies(expand=expand)
+    res = await arborist_client.list_policies(expand=expand)
     if inspect.isawaitable(res):
         res = await res
     return res
@@ -119,7 +119,9 @@ async def create_arborist_policy(
         "name": resource_name,
         "description": resource_description,
     }
-    res = arborist_client.create_resource(parent_path, resource, create_parents=True)
+    res = await arborist_client.create_resource(
+        parent_path, resource, create_parents=True
+    )
     if inspect.isawaitable(res):
         await res
 
@@ -145,7 +147,7 @@ async def create_arborist_policy(
 
     for role in roles:
         try:
-            res = arborist_client.update_role(role["id"], role)
+            res = await arborist_client.update_role(role["id"], role)
             if inspect.isawaitable(res):
                 await res
         except ArboristError as e:
@@ -168,7 +170,7 @@ async def create_arborist_policy(
         "role_ids": ["reader", "storage_reader"],
         "resource_paths": [resource_path],
     }
-    res = arborist_client.create_policy(policy, skip_if_exists=True)
+    res = await arborist_client.create_policy(policy, skip_if_exists=True)
     if inspect.isawaitable(res):
         await res
 
