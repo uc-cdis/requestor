@@ -6,7 +6,7 @@ import pytest
 import requests
 from starlette.config import environ
 from starlette.testclient import TestClient
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from requestor.arborist import get_auto_policy_id_for_resource_path
 
