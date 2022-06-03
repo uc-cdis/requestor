@@ -46,6 +46,17 @@ async def list_requests(
     List all the requests the current user has access to see.
     """
     filter_dict = {k: set() for k in api_request.query_params}
+    for param, value in api_request.query_params.multi_items():
+        try:
+            if getattr(RequestModel, param).type.python_type == bool:
+                value = value.lower() == "true"
+            elif getattr(RequestModel, param).type.python_type == datetime:
+                value = datetime.fromisoformat(value)
+        except ValueError:
+            raise HTTPException(
+                HTTP_400_BAD_REQUEST,
+                f"The value - '{value}' for '{param}' parameter is invalid.",
+            )
     # get the resources the current user has access to see
     token_claims = await auth.get_token_claims()
     username = token_claims["context"]["user"]["name"]
