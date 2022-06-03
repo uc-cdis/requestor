@@ -37,16 +37,13 @@ async def get_user_requests(
     return [r for r in (await query.gino.all())]
 
 
-@router.get("/request")
-async def list_requests(
-    api_request: Request,
-    auth=Depends(Auth),
-) -> list:
-    """
-    List all the requests the current user has access to see.
-    """
-    filter_dict = {k: set() for k in api_request.query_params}
-    for param, value in api_request.query_params.multi_items():
+def update_filter_dict(filter_dict, param, value):
+    if not hasattr(RequestModel, param):
+        raise HTTPException(
+            HTTP_400_BAD_REQUEST,
+            f"The '{param}' parameter is invalid.",
+        )
+    else:
         try:
             if getattr(RequestModel, param).type.python_type == bool:
                 value = value.lower() == "true"
@@ -58,6 +55,19 @@ async def list_requests(
                 f"The value - '{value}' for '{param}' parameter is invalid.",
             )
         filter_dict[param].add(value)
+
+
+@router.get("/request")
+async def list_requests(
+    api_request: Request,
+    auth=Depends(Auth),
+) -> list:
+    """
+    List all the requests the current user has access to see.
+    """
+    filter_dict = {k: set() for k in api_request.query_params}
+    for param, value in api_request.query_params.multi_items():
+        update_filter_dict(filter_dict, param, value)
 
     # get the resources the current user has access to see
     token_claims = await auth.get_token_claims()
@@ -140,23 +150,8 @@ async def list_user_requests(api_request: Request, auth=Depends(Auth)) -> dict:
                     f"The 'active' parameter should not be assigned a value. Received '{value}'",
                 )
             active = True
-        elif not hasattr(RequestModel, param):
-            raise HTTPException(
-                HTTP_400_BAD_REQUEST,
-                f"The '{param}' parameter is invalid.",
-            )
-        elif value:
-            try:
-                if getattr(RequestModel, param).type.python_type == bool:
-                    value = value.lower() == "true"
-                elif getattr(RequestModel, param).type.python_type == datetime:
-                    value = datetime.fromisoformat(value)
-            except ValueError:
-                raise HTTPException(
-                    HTTP_400_BAD_REQUEST,
-                    f"The value - '{value}' for '{param}' parameter is invalid.",
-                )
-            filter_dict[param].add(value)
+        else:
+            update_filter_dict(filter_dict, param, value)
 
     token_claims = await auth.get_token_claims()
     username = token_claims["context"]["user"]["name"]
