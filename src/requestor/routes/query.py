@@ -45,6 +45,7 @@ async def list_requests(
     """
     List all the requests the current user has access to see.
     """
+    filter_dict = {k: set() for k in api_request.query_params}
     # get the resources the current user has access to see
     token_claims = await auth.get_token_claims()
     username = token_claims["context"]["user"]["name"]
@@ -59,7 +60,10 @@ async def list_requests(
     ]
 
     # filter requests with read access
-    requests = await RequestModel.query.gino.all()
+    request_query = RequestModel.query
+    for field, values in filter_dict.items():
+        request_query = request_query.where(getattr(RequestModel, field).in_(values))
+    requests = await request_query.gino.all()
     existing_policies = await arborist.list_policies(
         api_request.app.arborist_client, expand=True
     )
