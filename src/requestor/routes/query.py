@@ -57,6 +57,8 @@ async def list_requests(
                 HTTP_400_BAD_REQUEST,
                 f"The value - '{value}' for '{param}' parameter is invalid.",
             )
+        filter_dict[param].add(value)
+
     # get the resources the current user has access to see
     token_claims = await auth.get_token_claims()
     username = token_claims["context"]["user"]["name"]
