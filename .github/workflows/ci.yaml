@@ -31,10 +31,10 @@ jobs:
     - name: Install dependencies
       run: |
         curl -sSL https://install.python-poetry.org | python -
-        $HOME/.poetry/bin/poetry install
+        $HOME/.local/bin/poetry install
     - name: Test with pytest
       run: |
-        $HOME/.poetry/bin/poetry run pytest -vv tests --cov=src --cov=migrations/versions --cov-report xml
+        $HOME/.local/bin/poetry run pytest -vv tests --cov=src --cov=migrations/versions --cov-report xml
     # - name: Submit coverage report
     #   if: github.ref == 'refs/heads/master'
     #   env:
