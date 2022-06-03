@@ -62,6 +62,7 @@ async def list_requests(
     # filter requests with read access
     request_query = RequestModel.query
     for field, values in filter_dict.items():
+        logger.debug(f"Getting filters '{field}' -- '{values}'")
         request_query = request_query.where(getattr(RequestModel, field).in_(values))
     requests = await request_query.gino.all()
     existing_policies = await arborist.list_policies(
