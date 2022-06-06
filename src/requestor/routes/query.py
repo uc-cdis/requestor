@@ -64,6 +64,20 @@ async def list_requests(
 ) -> list:
     """
     List all the requests the current user has access to see.
+
+    Add filter values as key=value pairs in the query string
+    to get filtered results.
+    Note: for filters based on Date, only follow `YYYY-MM-DD` format
+
+    Providing the same key with more than one value filters records whose
+    value of the given key matches any of the given values. But values of
+    different keys must all match.
+
+    Example: `GET /requests/request?policy_id=foo&policy_id=bar&revoke=False&status=APPROVED`
+
+    "policy_id=foo&policy_id=bar" means "the policy is either foo or bar" (same field name).
+
+    "policy_id=foo&revoke=False" means "the policy is foo and revoke is false" (different field names).
     """
     filter_dict = {k: set() for k in api_request.query_params}
     for param, value in api_request.query_params.multi_items():
