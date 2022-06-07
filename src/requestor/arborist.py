@@ -145,7 +145,7 @@ async def create_arborist_policy(
 
     for role in roles:
         try:
-            res = await arborist_client.update_role(role["id"], role)
+            res = arborist_client.update_role(role["id"], role)
             if inspect.isawaitable(res):
                 await res
         except ArboristError as e:
