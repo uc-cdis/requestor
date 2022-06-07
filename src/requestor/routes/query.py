@@ -17,16 +17,18 @@ from ..models import Request as RequestModel
 router = APIRouter()
 
 
-async def get_user_requests(
-    username: str, draft: bool = True, final: bool = True, filters: dict = {}
+async def get_filtered_requests(
+    username: str = None, draft: bool = True, final: bool = True, filters: dict = {}
 ) -> list:
     """
-    Get all the requests made by current user.
+    If not None, gets all the requests made by user with given username.
     If only non-draft requests are needed then set draft=False.
     If only non-final requests are needed then set final=False.
     Add filters if neccessary as a dictionary of {param : <List of values>} to get filtered results
     """
-    query = RequestModel.query.where(RequestModel.username == username)
+    query = RequestModel.query
+    if username:
+        query = query.where(RequestModel.username == username)
     if not draft:
         query = query.where(RequestModel.status.notin_(config["DRAFT_STATUSES"]))
     if not final:
@@ -37,24 +39,35 @@ async def get_user_requests(
     return [r for r in (await query.gino.all())]
 
 
-def update_filter_dict(filter_dict, param, value):
-    if not hasattr(RequestModel, param):
-        raise HTTPException(
-            HTTP_400_BAD_REQUEST,
-            f"The '{param}' parameter is invalid.",
-        )
-    else:
-        try:
-            if getattr(RequestModel, param).type.python_type == bool:
-                value = value.lower() == "true"
-            elif getattr(RequestModel, param).type.python_type == datetime:
-                value = datetime.fromisoformat(value)
-        except ValueError:
+def populate_filters_from_request(api_request):
+    active = False
+    filter_dict = {k: set() for k in api_request.query_params if k != "active"}
+    for param, value in api_request.query_params.multi_items():
+        if param == "active":
+            if value:
+                raise HTTPException(
+                    HTTP_400_BAD_REQUEST,
+                    f"The 'active' parameter should not be assigned a value. Received '{value}'",
+                )
+            active = True
+        elif not hasattr(RequestModel, param):
             raise HTTPException(
                 HTTP_400_BAD_REQUEST,
-                f"The value - '{value}' for '{param}' parameter is invalid.",
+                f"The '{param}' parameter is invalid.",
             )
-        filter_dict[param].add(value)
+        else:
+            try:
+                if getattr(RequestModel, param).type.python_type == bool:
+                    value = value.lower() == "true"
+                elif getattr(RequestModel, param).type.python_type == datetime:
+                    value = datetime.fromisoformat(value)
+            except ValueError:
+                raise HTTPException(
+                    HTTP_400_BAD_REQUEST,
+                    f"The value - '{value}' for '{param}' parameter is invalid.",
+                )
+            filter_dict[param].add(value)
+    return filter_dict, active
 
 
 @router.get("/request")
@@ -79,9 +92,8 @@ async def list_requests(
 
     "policy_id=foo&revoke=False" means "the policy is foo and revoke is false" (different field names).
     """
-    filter_dict = {k: set() for k in api_request.query_params}
-    for param, value in api_request.query_params.multi_items():
-        update_filter_dict(filter_dict, param, value)
+    filter_dict, active = populate_filters_from_request(api_request)
+    requests = await get_filtered_requests(final=(not active), filters=filter_dict)
 
     # get the resources the current user has access to see
     token_claims = await auth.get_token_claims()
@@ -97,11 +109,6 @@ async def list_requests(
     ]
 
     # filter requests with read access
-    request_query = RequestModel.query
-    for field, values in filter_dict.items():
-        logger.debug(f"Getting filters '{field}' -- '{values}'")
-        request_query = request_query.where(getattr(RequestModel, field).in_(values))
-    requests = await request_query.gino.all()
     existing_policies = await arborist.list_policies(
         api_request.app.arborist_client, expand=True
     )
@@ -154,24 +161,11 @@ async def list_user_requests(api_request: Request, auth=Depends(Auth)) -> dict:
     """
     # no authz checks because we assume the current user can read
     # their own requests.
-    active = False
-    filter_dict = {k: set() for k in api_request.query_params if k != "active"}
-    for param, value in api_request.query_params.multi_items():
-        if param == "active":
-            if value:
-                raise HTTPException(
-                    HTTP_400_BAD_REQUEST,
-                    f"The 'active' parameter should not be assigned a value. Received '{value}'",
-                )
-            active = True
-        else:
-            update_filter_dict(filter_dict, param, value)
-
+    filter_dict, active = populate_filters_from_request(api_request)
     token_claims = await auth.get_token_claims()
     username = token_claims["context"]["user"]["name"]
     logger.debug(f"Getting requests for user '{username}' with active = '{active}'")
-
-    user_requests = await get_user_requests(
+    user_requests = await get_filtered_requests(
         # if we only want active requests, filter out requests in a final status
         username,
         final=(not active),
@@ -235,7 +229,7 @@ async def check_user_resource_paths(
     # their own requests.
     token_claims = await auth.get_token_claims()
     username = token_claims["context"]["user"]["name"]
-    user_requests = await get_user_requests(username, draft=False, final=False)
+    user_requests = await get_filtered_requests(username, draft=False, final=False)
     positive_requests = [r for r in user_requests if not r.revoke]
     existing_policies = await arborist.list_policies(
         api_request.app.arborist_client, expand=True
