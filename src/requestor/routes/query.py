@@ -78,6 +78,9 @@ async def list_requests(
     """
     List all the requests the current user has access to see.
 
+    Use the "active" query parameter to get only the requests
+    created by the user that are not in DRAFT or FINAL statuses.
+
     Add filter values as key=value pairs in the query string
     to get filtered results.
     Note: for filters based on Date, only follow `YYYY-MM-DD` format
