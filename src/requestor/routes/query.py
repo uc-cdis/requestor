@@ -39,10 +39,10 @@ async def get_filtered_requests(
     return [r for r in (await query.gino.all())]
 
 
-def populate_filters_from_request(api_request):
+def populate_filters_from_query_params(query_params):
     active = False
-    filter_dict = {k: set() for k in api_request.query_params if k != "active"}
-    for param, value in api_request.query_params.multi_items():
+    filter_dict = {k: set() for k in query_params if k != "active"}
+    for param, value in query_params.multi_items():
         if param == "active":
             if value:
                 raise HTTPException(
@@ -50,10 +50,10 @@ def populate_filters_from_request(api_request):
                     f"The 'active' parameter should not be assigned a value. Received '{value}'",
                 )
             active = True
-        elif not hasattr(RequestModel, param):
+        elif not hasattr(RequestModel, param) or not value:
             raise HTTPException(
                 HTTP_400_BAD_REQUEST,
-                f"The '{param}' parameter is invalid.",
+                f"The parameter - '{param}', value - '{value}' is invalid.",
             )
         else:
             try:
@@ -95,7 +95,7 @@ async def list_requests(
 
     "policy_id=foo&revoke=False" means "the policy is foo and revoke is false" (different field names).
     """
-    filter_dict, active = populate_filters_from_request(api_request)
+    filter_dict, active = populate_filters_from_query_params(api_request.query_params)
     requests = await get_filtered_requests(final=(not active), filters=filter_dict)
 
     # get the resources the current user has access to see
@@ -164,7 +164,7 @@ async def list_user_requests(api_request: Request, auth=Depends(Auth)) -> dict:
     """
     # no authz checks because we assume the current user can read
     # their own requests.
-    filter_dict, active = populate_filters_from_request(api_request)
+    filter_dict, active = populate_filters_from_query_params(api_request.query_params)
     token_claims = await auth.get_token_claims()
     username = token_claims["context"]["user"]["name"]
     logger.debug(f"Getting requests for user '{username}' with active = '{active}'")

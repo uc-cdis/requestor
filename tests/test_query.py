@@ -99,6 +99,7 @@ def test_get_filtered_requests(client):
 
     # create a request with status = APPROVED and revoke = False
     data = {
+        "username": "requestor_test_user",
         "policy_id": "test-policy",
         "resource_id": "draft_uniqid",
         "revoke": "False",
@@ -114,6 +115,7 @@ def test_get_filtered_requests(client):
 
     # create a request with a different policy_id, status = APPROVED and revoke = False
     data = {
+        "username": "requestor_test_user",
         "policy_id": "my.resource_reader",
         "resource_id": "active_uniqid",
         "revoke": "False",
@@ -128,6 +130,7 @@ def test_get_filtered_requests(client):
 
     # create a request with a different policy_id and status but with revoke=False
     data = {
+        "username": "requestor_test_user",
         "policy_id": "test-policy-with-redirect",
         "resource_id": "final",
         "resource_display_name": "My Final Resource",
@@ -147,7 +150,7 @@ def test_get_filtered_requests(client):
     assert res.status_code == 200, res.text
     assert res.json() == filtered_requests
 
-    # Add mulitple values to a single key to test 'or' functionality alongside 'and'
+    # Add multiple values to a single key to test 'or' functionality alongside 'and'
     res = client.get(
         f"/request?policy_id=test-policy&policy_id=test-policy-with-redirect&status=APPROVED&created_time={datetime}",
         headers={"Authorization": f"bearer {fake_jwt}"},
@@ -311,7 +314,7 @@ def test_get_filtered_user_requests(client):
     assert res.status_code == 200, res.text
     assert res.json() == filtered_requests
 
-    # Add mulitple values to a single key to test 'or' functionality alongside 'and'
+    # Add multiple values to a single key to test 'or' functionality alongside 'and'
     res = client.get(
         f"/request/user?policy_id=test-policy&policy_id=test-existing-policy&status=APPROVED&created_time={datetime}",
         headers={"Authorization": f"bearer {fake_jwt}"},
