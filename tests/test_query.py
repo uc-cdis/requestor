@@ -99,7 +99,7 @@ def test_get_filtered_requests(client):
 
     # create a request with status = APPROVED and revoke = False
     data = {
-        "username": "requestor_test_user",
+        "username": "other_user",
         "policy_id": "test-policy",
         "resource_id": "draft_uniqid",
         "revoke": "False",
@@ -115,7 +115,7 @@ def test_get_filtered_requests(client):
 
     # create a request with a different policy_id, status = APPROVED and revoke = False
     data = {
-        "username": "requestor_test_user",
+        "username": "other_user",
         "policy_id": "my.resource_reader",
         "resource_id": "active_uniqid",
         "revoke": "False",
@@ -130,7 +130,7 @@ def test_get_filtered_requests(client):
 
     # create a request with a different policy_id and status but with revoke=False
     data = {
-        "username": "requestor_test_user",
+        "username": "other_user",
         "policy_id": "test-policy-with-redirect",
         "resource_id": "final",
         "resource_display_name": "My Final Resource",
