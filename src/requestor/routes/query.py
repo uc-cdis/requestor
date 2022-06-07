@@ -50,10 +50,15 @@ def populate_filters_from_query_params(query_params):
                     f"The 'active' parameter should not be assigned a value. Received '{value}'",
                 )
             active = True
-        elif not hasattr(RequestModel, param) or not value:
+        elif not hasattr(RequestModel, param):
             raise HTTPException(
                 HTTP_400_BAD_REQUEST,
-                f"The parameter - '{param}', value - '{value}' is invalid.",
+                f"The parameter - '{param}' is invalid.",
+            )
+        elif not value:
+            raise HTTPException(
+                HTTP_400_BAD_REQUEST,
+                f"The param '{param}' must have a non-empty value.",
             )
         else:
             try:
