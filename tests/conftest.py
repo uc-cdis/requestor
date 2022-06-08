@@ -169,7 +169,7 @@ def mock_arborist_requests(request):
             "http://arborist-service/user/requestor_user": {
                 "GET": (
                     {
-                        "name": "pauline",
+                        "name": "requestor_user",
                         "groups": [],
                         "policies": [{"policy": "test-policy"}],
                     },
