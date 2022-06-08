@@ -179,6 +179,9 @@ def mock_arborist_requests(request):
             "http://arborist-service/user/requestor_user/policy": {
                 "POST": ({}, 204 if authorized else 403)
             },
+            "http://arborist-service/user/other_user/policy": {
+                "POST": ({}, 204 if authorized else 403)
+            },
             "http://arborist-service/user/requestor_user/policy/test-policy": {
                 "DELETE": ({}, 204 if authorized else 403)
             },

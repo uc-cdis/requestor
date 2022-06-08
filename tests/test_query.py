@@ -92,6 +92,87 @@ def test_get_request_without_access(client, mock_arborist_requests):
     assert not_found_err == unauthorized_err
 
 
+def test_get_filtered_requests(client):
+
+    fake_jwt = "1.2.3"
+    filtered_requests = []
+
+    # create a request with status = APPROVED and revoke = False
+    data = {
+        "username": "other_user",
+        "policy_id": "test-policy",
+        "resource_id": "draft_uniqid",
+        "revoke": "False",
+        "resource_display_name": "My Draft Resource",
+        "status": "APPROVED",
+    }
+    res = client.post(
+        "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+    )
+    assert res.status_code == 201, res.text
+    filtered_requests.append(res.json())
+    datetime = filtered_requests[0]["created_time"]
+
+    # create a request with a different policy_id, status = APPROVED and revoke = False
+    data = {
+        "username": "other_user",
+        "policy_id": "my.resource_reader",
+        "resource_id": "active_uniqid",
+        "revoke": "False",
+        "resource_display_name": "My Active Resource",
+        "status": "APPROVED",
+    }
+    res = client.post(
+        "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+    )
+    assert res.status_code == 201, res.text
+    filtered_requests.append(res.json())
+
+    # create a request with a different policy_id and status but with revoke=False
+    data = {
+        "username": "other_user",
+        "policy_id": "test-policy-with-redirect",
+        "resource_id": "final",
+        "resource_display_name": "My Final Resource",
+        "revoke": "False",
+        "status": "CANCELLED",
+    }
+    res = client.post(
+        "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+    )
+    assert res.status_code == 201, res.text
+
+    # check that only we get the requests which match the filtered criteria
+    res = client.get(
+        "/request?active&revoke=False",
+        headers={"Authorization": f"bearer {fake_jwt}"},
+    )
+    assert res.status_code == 200, res.text
+    assert res.json() == filtered_requests
+
+    # Add multiple values to a single key to test 'or' functionality alongside 'and'
+    res = client.get(
+        f"/request?policy_id=test-policy&policy_id=test-policy-with-redirect&status=APPROVED&created_time={datetime}",
+        headers={"Authorization": f"bearer {fake_jwt}"},
+    )
+    assert res.status_code == 200, res.text
+    assert res.json() == filtered_requests[:1]
+
+    # Add a filter with an invalid key
+    res = client.get(
+        f"/request?name=dummy",
+        headers={"Authorization": f"bearer {fake_jwt}"},
+    )
+    assert res.status_code == 400, res.text
+
+    # Add a filter with an invalid value to the date key
+    res = client.get(
+        f"/request?created_time=23/05/2020",
+        headers={"Authorization": f"bearer {fake_jwt}"},
+    )
+    assert res.status_code == 400, res.text
+
+
 def test_get_user_requests(client):
     fake_jwt = "1.2.3"
 
@@ -233,7 +314,7 @@ def test_get_filtered_user_requests(client):
     assert res.status_code == 200, res.text
     assert res.json() == filtered_requests
 
-    # Add mulitple values to a single key to test 'or' functionality alongside 'and'
+    # Add multiple values to a single key to test 'or' functionality alongside 'and'
     res = client.get(
         f"/request/user?policy_id=test-policy&policy_id=test-existing-policy&status=APPROVED&created_time={datetime}",
         headers={"Authorization": f"bearer {fake_jwt}"},
