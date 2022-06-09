@@ -56,7 +56,7 @@ def is_path_prefix_of_path(resource_prefix: str, resource_path: str) -> bool:
 
 
 @maybe_sync
-async def list_policies(arborist_client: ArboristClient, expand: bool = False) -> list:
+async def list_policies(arborist_client: ArboristClient, expand: bool = False) -> dict:
     """
     We can cache this data later if needed, but it's tricky - the length
     we can cache depends on the source of the information, so this MUST

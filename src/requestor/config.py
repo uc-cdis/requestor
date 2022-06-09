@@ -31,6 +31,8 @@ class RequestorConfig(Config):
         """
         self.validate_statuses()
         self.validate_actions()
+        # TODO validate REDIRECT_CONFIGS and EXTERNAL_CALL_CONFIGS
+        # method should be attr of `requests` lib. And only "form"
 
     def validate_statuses(self) -> None:
         msg = "'{}' is not one of {}"
@@ -56,13 +58,9 @@ class RequestorConfig(Config):
             assert s in allowed_statuses, msg.format(s, allowed_statuses)
 
     def validate_actions(self) -> None:
-        msg = "'{}' is not one of {}"
+        msg = "Configuration validation - '{}' is not one of {}"
         allowed_statuses = self["ALLOWED_REQUEST_STATUSES"]
-        allowed_actions = [
-            "redirect_configs",
-            "external_call_configs",
-            "email_configs",
-        ]
+        allowed_actions = ["redirect_configs", "external_call_configs"]
 
         for action in self["ACTION_ON_UPDATE"].values():
             for (status, rules) in action.items():
@@ -72,21 +70,11 @@ class RequestorConfig(Config):
                     for rule in rule_list:
                         if key == "redirect_configs":
                             assert rule in self["REDIRECT_CONFIGS"], msg.format(
-                                rule, self["REDIRECT_CONFIGS"]
+                                rule, self["REDIRECT_CONFIGS"].keys()
                             )
                         elif key == "external_call_configs":
-                            raise NotImplementedError(
-                                "external_call_configs is not available yet"
-                            )
                             assert rule in self["EXTERNAL_CALL_CONFIGS"], msg.format(
-                                rule, self["EXTERNAL_CALL_CONFIGS"]
-                            )
-                        elif key == "email_configs":
-                            raise NotImplementedError(
-                                "email_configs is not available yet"
-                            )
-                            assert rule in self["EMAIL_CONFIGS"], msg.format(
-                                rule, self["EMAIL_CONFIGS"]
+                                rule, self["EXTERNAL_CALL_CONFIGS"].keys()
                             )
 
                 redirects = rules.get("redirect_configs", [])

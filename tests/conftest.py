@@ -215,6 +215,20 @@ def mock_arborist_requests(request):
                                 "roles": [],
                             },
                             {
+                                "id": "test-policy-with-external-calls",
+                                "resource_paths": [
+                                    "/resource-with-external-calls/resource"
+                                ],
+                                "roles": [],
+                            },
+                            {
+                                "id": "test-policy-with-redirect-and-external-call",
+                                "resource_paths": [
+                                    "/resource-with-redirect-and-external-call"
+                                ],
+                                "roles": [],
+                            },
+                            {
                                 "id": "test-policy-i-cant-access",
                                 "resource_paths": ["something-i-cant-access"],
                                 "roles": [],
