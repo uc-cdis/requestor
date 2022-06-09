@@ -1,5 +1,7 @@
 # Requestor
 
+![version](https://img.shields.io/github/release/uc-cdis/requestor.svg) [![Apache license](http://img.shields.io/badge/license-Apache-blue.svg?style=flat)](LICENSE) [![Coverage Status](https://coveralls.io/repos/github/uc-cdis/requestor/badge.svg?branch=master)](https://coveralls.io/github/uc-cdis/requestor?branch=master)
+
 Requestor exposes an API to manage access requests.
 
 An introduction to Requestor's functionality, as well as diagrams of example flows, can be found in the ["Functionality and flow" documentation](docs/functionality_and_flow.md).
