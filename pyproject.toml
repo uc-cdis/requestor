@@ -17,12 +17,7 @@ authutils = "^5.0.4"
 cdislogging = "^=1.0.0"
 fastapi = "^0.65.0"
 gen3authz = "^1.5.1"
-# markupsafe is a jinja dependency. Jinja is used by gen3config.
-# The current version of jinja imports the ‘soft_unicode’ method from markupsafe.
-# soft_unicode has been deprecated from markupsafe versions > 2.0.1.
-# Pin to <=2.0.1 for compatibility with jinja.
-markupsafe = "<=2.0.1"
-gen3config = "^0.1.8"
+gen3config = "^1.0.0"
 httpx = ">=0.20.0,<1.0.0"
 psycopg2-binary = "^2.8.5"
 pydantic = "^1.8.2"

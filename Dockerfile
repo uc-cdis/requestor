@@ -11,7 +11,6 @@ WORKDIR /src
 RUN python -m venv /env && . /env/bin/activate && pip install --upgrade pip && poetry install --no-dev --no-interaction
 
 FROM base
-RUN apt-get install curl
 COPY --from=builder /env /env
 COPY --from=builder /src /src
 WORKDIR /src
