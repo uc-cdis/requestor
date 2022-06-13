@@ -18,10 +18,10 @@ jobs:
         options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
     steps:
     - uses: actions/checkout@v1
-    - name: Set up Python 3.7
+    - name: Set up Python 3.9
       uses: actions/setup-python@v1
       with:
-        python-version: 3.7
+        python-version: 3.9
     - uses: actions/cache@preview
       with:
         path: ~/.cache/pypoetry/virtualenvs
@@ -30,11 +30,11 @@ jobs:
           ${{ runner.os }}-poetry-
     - name: Install dependencies
       run: |
-        curl -sSL https://raw.githubusercontent.com/sdispater/poetry/master/get-poetry.py | python
-        $HOME/.poetry/bin/poetry install
+        curl -sSL https://install.python-poetry.org | python -
+        $HOME/.local/bin/poetry install
     - name: Test with pytest
       run: |
-        $HOME/.poetry/bin/poetry run pytest -vv tests --cov=src --cov=migrations/versions --cov-report xml
+        $HOME/.local/bin/poetry run pytest -vv tests --cov=src --cov=migrations/versions --cov-report xml
     - name: Submit coverage report
       env:
         COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_TOKEN }}

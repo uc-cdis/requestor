@@ -6,7 +6,7 @@ import pytest
 import requests
 from starlette.config import environ
 from starlette.testclient import TestClient
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from requestor.arborist import get_auto_policy_id_for_resource_path
 
@@ -267,9 +267,10 @@ def mock_arborist_requests(request):
 
             return mocked_response
 
-        mocked_method = MagicMock(side_effect=make_mock_response)
+        mocked_method = AsyncMock(side_effect=make_mock_response)
         patch_method = patch(
-            "gen3authz.client.arborist.client.httpx.Client.request", mocked_method
+            "gen3authz.client.arborist.async_client.httpx.AsyncClient.request",
+            mocked_method,
         )
 
         patch_method.start()

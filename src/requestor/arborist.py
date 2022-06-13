@@ -7,7 +7,7 @@ from functools import wraps
 import inspect
 import sniffio
 
-from gen3authz.client.arborist.client import ArboristClient
+from gen3authz.client.arborist.async_client import ArboristClient
 from gen3authz.client.arborist.errors import ArboristError
 
 from . import logger
