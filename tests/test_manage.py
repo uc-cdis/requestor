@@ -24,7 +24,7 @@ def test_create_request_with_resource_path_and_policy(client):
     )
 
     assert res.status_code == 400, res.text
-    assert "not both" in res.json()["detail"]
+    assert "must have either" in res.json()["detail"]
 
     # create a request which has neither resource_path nor policy_id
     data = {
@@ -37,7 +37,7 @@ def test_create_request_with_resource_path_and_policy(client):
     )
 
     assert res.status_code == 400, res.text
-    assert "can have either" in res.json()["detail"]
+    assert "must have either" in res.json()["detail"]
 
 
 def test_create_request_without_username(client):

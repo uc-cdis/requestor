@@ -37,8 +37,6 @@ def test_create_request_with_redirect_policy(client):
         "updated_time": request_data["updated_time"],
     }
 
-    # TODO assert external call not called
-
 
 def test_create_request_with_redirect_resource_paths(client):
     """
@@ -72,8 +70,6 @@ def test_create_request_with_redirect_resource_paths(client):
         "created_time": request_data["created_time"],
         "updated_time": request_data["updated_time"],
     }
-
-    # TODO assert external call not called
 
 
 def test_create_request_with_external_calls(client):

@@ -42,7 +42,7 @@ def get_redirect_url(action_id: str, data: dict) -> str:
     redirect_url = conf["redirect_url"]
     base_query_params = parse_qsl(urlparse(redirect_url).query, keep_blank_values=True)
     redirect_query_params = [
-        (key, str(data[key])) for key in conf["params"] if data.get(key)
+        (key, str(data[key])) for key in conf.get("params", []) if data.get(key)
     ]
     final_query_params = urlencode(base_query_params + redirect_query_params)
     final_redirect_url = redirect_url.split("?")[0] + "?" + final_query_params
@@ -59,13 +59,13 @@ def make_external_call(external_call_id: str, data: dict) -> None:
         for e in conf.get("form", [])
         if data.get(e["param"])
     } or None
-    headers = {}  # TODO implement authorization here
+    # headers = {}  # TODO implement authorization here
 
     logger.info(f"Making call to '{conf['url']}' with data: {form_data}")
     response = requests_func(
         conf["url"],
         data=form_data,
-        headers=headers,
+        # headers=headers,
     )
 
     try:
