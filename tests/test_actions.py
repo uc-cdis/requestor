@@ -4,6 +4,20 @@ from requestor.arborist import get_auto_policy_id_for_resource_path
 from requestor.config import config
 
 
+def test_backoff_retry(client):
+    data = {
+        "username": "requestor_user",
+        "policy_id": "test-policy-with-redirect-and-external-call",
+        "resource_id": "uniqid",
+        "resource_display_name": "My Resource",
+        "status": "CREATED",
+    }
+    with mock.patch("requestor.request_utils.requests") as mock_requests:
+        mock_requests.post.return_value = "this will cause an exception"
+        client.post("/request", json=data)
+        assert mock_requests.post.call_count == 5  # backoff logic `max_retries`
+
+
 def test_create_request_with_redirect_policy(client):
     """
     When a redirect is configured for the requested resource, a
