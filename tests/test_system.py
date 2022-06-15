@@ -9,3 +9,10 @@ def test_version_endpoint(client):
 
     version = res.json().get("version")
     assert version
+
+
+def test_asgi_py():
+    """
+    Run code in asgi.py for coverage purposes
+    """
+    import requestor.asgi
