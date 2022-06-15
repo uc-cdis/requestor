@@ -1,9 +1,31 @@
 import requests
+import time
 from urllib.parse import urlparse, urlencode, parse_qsl
 
 from . import logger
 from .arborist import is_path_prefix_of_path
 from .config import config
+
+
+def retry_wrapper(func):
+    def retry_logic(*args, **kwargs):
+        max_retries = kwargs.get("max_retries", 5)
+        retries = 0
+        sleep_sec = 0.1
+        while retries < max_retries:
+            if retries != 0:
+                time.sleep(sleep_sec)
+                sleep_sec *= 2
+            try:
+                res = func(*args, **kwargs)
+                return res
+            except Exception as e:
+                logger.error(f"  Exception {e}. Retrying...")
+                retries += 1
+                if retries == max_retries:
+                    raise
+
+    return retry_logic
 
 
 def post_status_update(status: str, data: dict, resource_paths: list) -> str:
@@ -50,7 +72,7 @@ def get_redirect_url(action_id: str, data: dict) -> str:
     return final_redirect_url
 
 
-# TODO exponential backoff logic
+@retry_wrapper
 def make_external_call(external_call_id: str, data: dict) -> None:
     conf = config["EXTERNAL_CALL_CONFIGS"][external_call_id]
     requests_func = getattr(requests, conf["method"].lower())

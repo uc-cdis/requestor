@@ -90,6 +90,8 @@ REDIRECT_CONFIGS: {}
   #     - resource_id
   #     - resource_display_name
 
+# only form parameters are supported at the moment. Query, path,
+# body, etc parameters could be supported as well in the future
 EXTERNAL_CALL_CONFIGS: {}
   # let_someone_know:
   #   method: POST
@@ -99,10 +101,6 @@ EXTERNAL_CALL_CONFIGS: {}
   #       param: resource_id  # internal parameter name (a field from the DB)
   #     - name: username
   #       param: username
-  #   ====== not implemented yet:
-  #   query: []  # Configure query parameters here
-  #   path: []  # Configure query parameters here
-  #   body: []  # Configure query parameters here
 
 # configure actions to trigger when the status of an access
 # request for the specified resource path is updated
