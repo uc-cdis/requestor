@@ -234,7 +234,13 @@ async def create_request(
     try:
         redirect_url = post_status_update(request.status, res, resource_paths)
     except Exception:  # if external calls or other actions fail: revert
+        logger.error("Something went wrong during post-status-update actions")
+        logger.warning(f"Deleting the request that was just created ({request_id})")
+        await RequestModel.delete.where(
+            RequestModel.request_id == request_id
+        ).gino.status()
         if request.status in config["UPDATE_ACCESS_STATUSES"]:
+            logger.warning(f"Reverting the previous access {action} action")
             await grant_or_revoke_arborist_policy(
                 api_request.app.arborist_client,
                 request.policy_id,
@@ -329,6 +335,8 @@ async def update_request(
     try:
         redirect_url = post_status_update(status, res, resource_paths)
     except Exception:  # if external calls or other actions fail: revert
+        logger.error("Something went wrong during post-status-update actions")
+        logger.warning(f"Reverting to the previous status: {old_status}")
         request = await (
             RequestModel.update.where(RequestModel.request_id == request_id)
             .values(status=old_status, updated_time=datetime.utcnow())
@@ -336,6 +344,7 @@ async def update_request(
             .gino.first()
         )
         if status in config["UPDATE_ACCESS_STATUSES"]:
+            logger.warning(f"Reverting the previous access {action} action")
             await grant_or_revoke_arborist_policy(
                 api_request.app.arborist_client,
                 request.policy_id,
