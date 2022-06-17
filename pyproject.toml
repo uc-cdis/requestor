@@ -22,6 +22,7 @@ httpx = ">=0.20.0,<1.0.0"
 jsonschema = "^4.6.0"
 psycopg2-binary = "^2.8.5"
 pydantic = "^1.8.2"
+requests = "^2.24.0"
 sniffio = "^1.2.0"
 uvicorn = ">=0.11.8,<1.0.0"
 gino = {version = "^1.0.1", extras = ["starlette"]}
@@ -33,7 +34,6 @@ mock = "^4.0.3"
 pytest = "^6.0.1"
 pytest-asyncio = "^0.16.0"
 pytest-cov = "^2.8"
-requests = "^2.24.0"
 
 [tool.poetry.plugins."requestor.modules"]
 "system" = "requestor.routes.system"
