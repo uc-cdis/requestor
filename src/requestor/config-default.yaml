@@ -43,20 +43,6 @@ ALLOWED_REQUEST_STATUSES:
   - SIGNED
   - REJECTED
 
-# TODO maybe?
-# display_name is optional
-# ALLOWED_REQUEST_STATUSES:
-#   DRAFT:
-#     display_name: Draft
-#   SUBMITTED:
-#     display_name: Submitted
-#   APPROVED:
-#     display_name: Approved
-#   SIGNED:
-#     display_name: Signed
-#   REJECTED:
-#     display_name: Rejected
-
 # status of new requests when no status is specified by
 # the user
 DEFAULT_INITIAL_STATUS: DRAFT
@@ -82,6 +68,9 @@ FINAL_STATUSES:
 # ACTIONS ON STATUS UPDATE #
 ############################
 
+# max number of times to retry external calls before giving up
+DEFAULT_MAX_RETRIES: 5
+
 REDIRECT_CONFIGS: {}
   # my_redirect:
   #   redirect_url: http://localhost?something
@@ -101,11 +90,12 @@ EXTERNAL_CALL_CONFIGS: {}
   #       param: resource_id  # internal parameter name (a field from the DB)
   #     - name: username
   #       param: username
+  #   creds: ""               # optional - a key from the CREDENTIALS section
 
-# configure actions to trigger when the status of an access
-# request for the specified resource path is updated
-# /!\ If there are multiple resource_paths in a request's policy,
-# only the first "redirect_configs" match is considered
+# configure actions to trigger when the status of an access request for the
+# specified resource path is updated. Multiple actions can be triggered by a
+# single event, except redirect actions: if multiple "redirect_configs" match
+# the event, only the first one is considered
 ACTION_ON_UPDATE: {}
   # /resource/with/redirect:
   #   DRAFT:
@@ -113,3 +103,13 @@ ACTION_ON_UPDATE: {}
   #       - my_redirect
   #     external_call_configs:
   #       - let_someone_know
+
+# only the "client_credentials" type is supported at the moment
+CREDENTIALS: {}
+  # unique_creds_id:
+  #   type: client_credentials
+  #   config:
+  #     client_id: ""
+  #     client_secret: ""
+  #     url: "" # token endpoint
+  #     scope: "space separated list of scopes"
