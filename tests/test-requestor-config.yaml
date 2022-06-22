@@ -1,6 +1,14 @@
+####################
+# SERVER           #
+####################
+
 DEBUG: true
 TEST_KEEP_DB: false
 DOCS_URL_PREFIX: /
+
+####################
+# DATABASE         #
+####################
 
 # These are required for automated testing (see .github/workflows/ci.yaml)
 DB_DRIVER: postgresql
@@ -11,6 +19,10 @@ DB_PASSWORD: postgres
 DB_DATABASE: requestor_test
 
 LOCAL_MIGRATION: true
+
+####################
+# REQUEST STATUSES #
+####################
 
 ALLOWED_REQUEST_STATUSES:
   - CREATED
@@ -24,6 +36,12 @@ UPDATE_ACCESS_STATUSES:
   - APPROVED
 FINAL_STATUSES:
   - CANCELLED
+
+############################
+# ACTIONS ON STATUS UPDATE #
+############################
+
+DEFAULT_MAX_RETRIES: 2
 
 REDIRECT_CONFIGS:
   my_redirect:
@@ -45,6 +63,10 @@ EXTERNAL_CALL_CONFIGS:
   let_xyz_system_know:
     method: GET
     url: https://xyz_system/access
+  let_xyz_system_know_with_creds:
+    method: GET
+    url: https://xyz_system/access
+    creds: client_creds_for_external_call
 
 ACTION_ON_UPDATE:
   /resource-with-redirect:
@@ -56,9 +78,22 @@ ACTION_ON_UPDATE:
       external_call_configs:
         - let_abc_system_know
         - let_xyz_system_know
+  /resource-with-authed-external-call:
+    CREATED:
+      external_call_configs:
+        - let_xyz_system_know_with_creds
   /resource-with-redirect-and-external-call:
     CREATED:
       redirect_configs:
         - my_redirect
       external_call_configs:
         - let_abc_system_know
+
+CREDENTIALS:
+  client_creds_for_external_call:
+    type: client_credentials
+    config:
+      client_id: abc
+      client_secret: xyz
+      url: https://xyz_system/oauth2/token
+      scope: "scope1 scope2"

@@ -1,5 +1,6 @@
 import requests
 import time
+from typing import Tuple
 from urllib.parse import urlparse, urlencode, parse_qsl
 
 from . import logger
@@ -9,7 +10,7 @@ from .config import config
 
 def retry_wrapper(func):
     def retry_logic(*args, **kwargs):
-        max_retries = kwargs.get("max_retries", 5)
+        max_retries = kwargs.get("max_retries", config["DEFAULT_MAX_RETRIES"])
         retries = 0
         sleep_sec = 0.1
         while retries < max_retries:
@@ -72,6 +73,30 @@ def get_redirect_url(action_id: str, data: dict) -> str:
     return final_redirect_url
 
 
+def get_credentials(creds_id: str) -> Tuple[str, str]:
+    # the config validation ensures the credentials exists
+    creds = config["CREDENTIALS"][creds_id]
+    if creds["type"] == "client_credentials":
+        # TODO we get a fresh access token every time. A potential improvement
+        # would be to cache/store the access tokens
+        logger.debug(
+            f"Attempting to get an access token from '{creds['config']['url']}'"
+        )
+        response = requests.post(
+            creds["config"]["url"],
+            data={
+                "grant_type": "client_credentials",
+                "scope": creds["config"]["scope"],
+            },
+            auth=(creds["config"]["client_id"], creds["config"]["client_secret"]),
+        )
+        response.raise_for_status()
+        assert (
+            "access_token" in response.json()
+        ), f"Did not receive an access token from {creds['config']['url']}"
+        return creds["type"], response.json()["access_token"]
+
+
 @retry_wrapper
 def make_external_call(external_call_id: str, data: dict) -> None:
     conf = config["EXTERNAL_CALL_CONFIGS"][external_call_id]
@@ -81,13 +106,18 @@ def make_external_call(external_call_id: str, data: dict) -> None:
         for e in conf.get("form", [])
         if data.get(e["param"])
     } or None
-    # headers = {}  # TODO implement authorization here
+
+    headers = {}
+    if "creds" in conf:
+        creds_type, creds = get_credentials(conf["creds"])
+        if creds_type == "client_credentials":
+            headers["authorization"] = f"bearer {creds}"
 
     logger.info(f"Making call to '{conf['url']}' with data: {form_data}")
     response = requests_func(
         conf["url"],
         data=form_data,
-        # headers=headers,
+        headers=headers,
     )
 
     try:
