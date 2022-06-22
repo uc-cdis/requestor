@@ -17,7 +17,6 @@ NON_EMPTY_STRING_SCHEMA = {"type": "string", "minLength": 1}
 class RequestorConfig(Config):
     def __init__(self, *args, **kwargs):
         super(RequestorConfig, self).__init__(*args, **kwargs)
-        self.logger = logger
 
     def post_process(self) -> None:
         # generate DB_URL from DB configs
@@ -36,7 +35,7 @@ class RequestorConfig(Config):
         """
         Perform a series of sanity checks on a loaded config.
         """
-        self.logger.info("Validating configuration")
+        logger.info("Validating configuration")
 
         from .models import Request as RequestModel
 
@@ -49,7 +48,7 @@ class RequestorConfig(Config):
         self.validate_actions()
 
     def validate_statuses(self) -> None:
-        self.logger.info("Validating configuration: statuses")
+        logger.info("Validating configuration: statuses")
         allowed_statuses = self["ALLOWED_REQUEST_STATUSES"]
         assert isinstance(
             allowed_statuses, list
@@ -75,7 +74,7 @@ class RequestorConfig(Config):
                         external_call_configs:
                             - def
         """
-        self.logger.info("Validating configuration: actions")
+        logger.info("Validating configuration: actions")
         self.validate_redirect_configs()
         self.validate_external_call_configs()
 
@@ -203,7 +202,7 @@ class RequestorConfig(Config):
                         url: http://url.com/oauth2/token
                         scope: "space separated list of scopes"
         """
-        self.logger.info("Validating configuration: credentials")
+        logger.info("Validating configuration: credentials")
         schema = {
             "type": "object",
             "patternProperties": {
