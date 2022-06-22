@@ -33,8 +33,32 @@ REDIRECT_CONFIGS:
       - resource_id
       - resource_display_name
 
+EXTERNAL_CALL_CONFIGS:
+  let_abc_system_know:
+    method: POST
+    url: https://abc_system/access
+    form:
+      - name: dataset
+        param: resource_id
+      - name: username
+        param: username
+  let_xyz_system_know:
+    method: GET
+    url: https://xyz_system/access
+
 ACTION_ON_UPDATE:
   /resource-with-redirect:
     CREATED:
       redirect_configs:
         - my_redirect
+  /resource-with-external-calls:
+    APPROVED:
+      external_call_configs:
+        - let_abc_system_know
+        - let_xyz_system_know
+  /resource-with-redirect-and-external-call:
+    CREATED:
+      redirect_configs:
+        - my_redirect
+      external_call_configs:
+        - let_abc_system_know

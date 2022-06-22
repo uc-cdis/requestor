@@ -1,8 +1,7 @@
 import asyncio
-from pydantic import PathNotADirectoryError
-from requestor import arborist
-from requestor.config import config
 from unittest.mock import MagicMock, patch
+
+from requestor.config import config
 
 
 def test_create_request_with_resource_path_and_policy(client):
@@ -25,7 +24,7 @@ def test_create_request_with_resource_path_and_policy(client):
     )
 
     assert res.status_code == 400, res.text
-    assert "not both" in res.json()["detail"]
+    assert "must have either" in res.json()["detail"]
 
     # create a request which has neither resource_path nor policy_id
     data = {
@@ -38,44 +37,7 @@ def test_create_request_with_resource_path_and_policy(client):
     )
 
     assert res.status_code == 400, res.text
-    assert "can have either" in res.json()["detail"]
-
-
-def test_create_request_with_redirect(client):
-    """
-    When a redirect is configured for the requested resource, a
-    redirect URL should be returned to the client.
-    """
-    fake_jwt = "1.2.3"
-
-    # create a request
-    data = {
-        "username": "requestor_user",
-        "policy_id": "test-policy-with-redirect",
-        "resource_id": "uniqid",
-        "resource_display_name": "My Resource",
-    }
-    res = client.post(
-        "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
-    )
-
-    assert res.status_code == 201, res.text
-    request_data = res.json()
-    request_id = request_data.get("request_id")
-    assert request_id, "POST /request did not return a request_id"
-    assert request_data == {
-        "request_id": request_id,
-        "username": data["username"],
-        "policy_id": data["policy_id"],
-        "resource_id": data["resource_id"],
-        "resource_display_name": data["resource_display_name"],
-        "status": config["DEFAULT_INITIAL_STATUS"],
-        "redirect_url": f"http://localhost?something=&request_id={request_id}&resource_id={data['resource_id']}&resource_display_name=My+Resource",
-        # just ensure revoke, created_time and updated_time are there:
-        "revoke": False,
-        "created_time": request_data["created_time"],
-        "updated_time": request_data["updated_time"],
-    }
+    assert "must have either" in res.json()["detail"]
 
 
 def test_create_request_without_username(client):

@@ -19,8 +19,10 @@ fastapi = "^0.65.0"
 gen3authz = "^1.5.1"
 gen3config = "^1.0.0"
 httpx = ">=0.20.0,<1.0.0"
+jsonschema = "^4.6.0"
 psycopg2-binary = "^2.8.5"
 pydantic = "^1.8.2"
+requests = "^2.24.0"
 sniffio = "^1.2.0"
 uvicorn = ">=0.11.8,<1.0.0"
 gino = {version = "^1.0.1", extras = ["starlette"]}
@@ -28,10 +30,10 @@ importlib-metadata = {version = "^1.7.0", python = "<3.8"}
 gunicorn = "^20.0.4"
 
 [tool.poetry.dev-dependencies]
+mock = "^4.0.3"
 pytest = "^6.0.1"
 pytest-asyncio = "^0.16.0"
 pytest-cov = "^2.8"
-requests = "^2.24.0"
 
 [tool.poetry.plugins."requestor.modules"]
 "system" = "requestor.routes.system"

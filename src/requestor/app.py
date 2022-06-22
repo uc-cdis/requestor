@@ -1,13 +1,9 @@
 import asyncio
+from fastapi import FastAPI
 from fastapi.routing import APIRoute
 import httpx
+from importlib.metadata import entry_points, version
 import os
-from fastapi import FastAPI
-
-try:
-    from importlib.metadata import entry_points, version
-except ImportError:
-    from importlib_metadata import entry_points, version
 
 from cdislogging import get_logger
 from gen3authz.client.arborist.async_client import ArboristClient
@@ -46,7 +42,7 @@ def load_modules(app: FastAPI = None) -> None:
 
 def app_init() -> FastAPI:
     logger.info("Initializing app")
-    config.validate()
+    config.validate(logger)
 
     debug = config["DEBUG"]
     app = FastAPI(

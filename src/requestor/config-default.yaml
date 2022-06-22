@@ -90,21 +90,17 @@ REDIRECT_CONFIGS: {}
   #     - resource_id
   #     - resource_display_name
 
-# ====== not implemented yet
+# only form parameters are supported at the moment. Query, path,
+# body, etc parameters could be supported as well in the future
 EXTERNAL_CALL_CONFIGS: {}
   # let_someone_know:
-  #   method: ""
-  #   url: ""
-  #   params:
-  #     - request_id
-  #     - resource_display_name
-  #   body:
-  #     - request_id
-  #     - resource_display_name
-
-# ====== not implemented yet
-EMAIL_CONFIGS: {}
-  # email_from_gen3: "TBD"
+  #   method: POST
+  #   url: https://abc_system/approve
+  #   form:
+  #     - name: dataset       # parameter name in the external call
+  #       param: resource_id  # internal parameter name (a field from the DB)
+  #     - name: username
+  #       param: username
 
 # configure actions to trigger when the status of an access
 # request for the specified resource path is updated
@@ -117,5 +113,3 @@ ACTION_ON_UPDATE: {}
   #       - my_redirect
   #     external_call_configs:
   #       - let_someone_know
-  #     email_configs:
-  #       - email_from_gen3

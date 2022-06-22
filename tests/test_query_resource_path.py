@@ -5,8 +5,8 @@ This set of tests ensures backwards compatibility.
 
 
 import pytest
-from requestor.arborist import get_auto_policy_id_for_resource_path
 
+from requestor.arborist import get_auto_policy_id_for_resource_path
 from requestor.config import config
 
 

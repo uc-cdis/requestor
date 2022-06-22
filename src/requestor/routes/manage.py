@@ -12,6 +12,7 @@ from starlette.status import (
     HTTP_409_CONFLICT,
     HTTP_500_INTERNAL_SERVER_ERROR,
 )
+import traceback
 
 from .. import logger, arborist
 from ..auth import Auth
@@ -36,15 +37,7 @@ class CreateRequestInput(BaseModel):
     policy_id: str = None
 
 
-async def grant_or_revoke_arborist_policy(
-    arborist_client, policy_id, username, revoke, status
-):
-    # the access request is approved: grant/revoke access
-    action = "revoke" if revoke else "grant"
-    logger.debug(
-        f"Status is {status} that is one of '{config['UPDATE_ACCESS_STATUSES']}', attempting to {action} access in Arborist"
-    )
-
+async def grant_or_revoke_arborist_policy(arborist_client, policy_id, username, revoke):
     # assume we are always granting a user access to a resource.
     # in the future we may want to handle more use cases
     logger.debug(f"username: {username}, policy_id: {policy_id}")
@@ -62,6 +55,7 @@ async def grant_or_revoke_arborist_policy(
         )
 
     if not success:
+        action = "revoke" if revoke else "grant"
         logger.error(f"Unable to {action} access. Check previous logs for errors")
         raise HTTPException(
             HTTP_500_INTERNAL_SERVER_ERROR,
@@ -97,7 +91,7 @@ async def create_request(
 
     # error (if we have both resource_path and policy_id) OR (if we have neither)
     if bool(data.get("resource_path")) == bool(data.get("policy_id")):
-        msg = f"A Request can have either only a resource_path or only a policy_id. But not both."
+        msg = f"The request must have either a resource_path or a policy_id."
         logger.error(
             msg + f" body: {body}",
             exc_info=True,
@@ -212,7 +206,7 @@ async def create_request(
         logger.debug(
             f"Found a draft request with request_id: {draft_previous_requests[0].request_id}"
         )
-        res = draft_previous_requests[0].to_dict()
+        request = draft_previous_requests[0]
     else:
         # create a new request
         try:
@@ -222,19 +216,45 @@ async def create_request(
                 HTTP_409_CONFLICT,
                 "request_id already exists. Please try again",
             )
-        res = request.to_dict()
+    res = request.to_dict()
 
-    if data.get("status") in config["UPDATE_ACCESS_STATUSES"]:
+    if request.status in config["UPDATE_ACCESS_STATUSES"]:
+        # the access request is approved: grant/revoke access
+        action = "revoke" if request.revoke else "grant"
+        logger.debug(
+            f"Status is {request.status} that is one of '{config['UPDATE_ACCESS_STATUSES']}', attempting to {action} access in Arborist"
+        )
         await grant_or_revoke_arborist_policy(
             api_request.app.arborist_client,
-            data["policy_id"],
-            data["username"],
-            data.get("revoke", False),
-            data["status"],
+            request.policy_id,
+            request.username,
+            request.revoke,
+        )
+
+    try:
+        redirect_url = post_status_update(request.status, res, resource_paths)
+    except Exception:  # if external calls or other actions fail: revert
+        logger.error("Something went wrong during post-status-update actions")
+        if not draft_previous_requests:
+            logger.warning(f"Deleting the request that was just created ({request_id})")
+            await RequestModel.delete.where(
+                RequestModel.request_id == request_id
+            ).gino.status()
+        if request.status in config["UPDATE_ACCESS_STATUSES"]:
+            logger.warning(f"Reverting the previous access {action} action")
+            await grant_or_revoke_arborist_policy(
+                api_request.app.arborist_client,
+                request.policy_id,
+                request.username,
+                not request.revoke,  # revert the access we just granted or revoked
+            )
+        traceback.print_exc()
+        raise HTTPException(
+            HTTP_500_INTERNAL_SERVER_ERROR,
+            "Something went wrong during post-status-update actions",
         )
 
     # CORS limits redirections, so we redirect on the client side
-    redirect_url = post_status_update(data["status"], res, resource_paths)
     if redirect_url:
         res["redirect_url"] = redirect_url
 
@@ -287,14 +307,19 @@ async def update_request(
             )
 
         if status in config["UPDATE_ACCESS_STATUSES"]:
+            # the access request is approved: grant/revoke access
+            action = "revoke" if request.revoke else "grant"
+            logger.debug(
+                f"Status is {status} that is one of '{config['UPDATE_ACCESS_STATUSES']}', attempting to {action} access in Arborist"
+            )
             await grant_or_revoke_arborist_policy(
                 api_request.app.arborist_client,
                 request.policy_id,
                 request.username,
                 request.revoke,
-                status,
             )
 
+        old_status = request.status
         request = await (
             RequestModel.update.where(RequestModel.request_id == request_id)
             .values(status=status, updated_time=datetime.utcnow())
@@ -308,8 +333,32 @@ async def update_request(
 
     res = request.to_dict()
 
+    try:
+        redirect_url = post_status_update(status, res, resource_paths)
+    except Exception:  # if external calls or other actions fail: revert
+        logger.error("Something went wrong during post-status-update actions")
+        logger.warning(f"Reverting to the previous status: {old_status}")
+        request = await (
+            RequestModel.update.where(RequestModel.request_id == request_id)
+            .values(status=old_status, updated_time=datetime.utcnow())
+            .returning(*RequestModel)
+            .gino.first()
+        )
+        if status in config["UPDATE_ACCESS_STATUSES"]:
+            logger.warning(f"Reverting the previous access {action} action")
+            await grant_or_revoke_arborist_policy(
+                api_request.app.arborist_client,
+                request.policy_id,
+                request.username,
+                not request.revoke,  # revert the access we just granted or revoked
+            )
+        traceback.print_exc()
+        raise HTTPException(
+            HTTP_500_INTERNAL_SERVER_ERROR,
+            "Something went wrong during post-status-update actions",
+        )
+
     # CORS limits redirections, so we redirect on the client side
-    redirect_url = post_status_update(status, res, resource_paths)
     if redirect_url:
         res["redirect_url"] = redirect_url
 
