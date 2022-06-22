@@ -14,7 +14,7 @@ include = [
 python = "^3.9"
 alembic = "^1.4.2"
 authutils = "^5.0.4"
-cdislogging = "^=1.0.0"
+cdislogging = "^1.0.0"
 fastapi = "^0.65.0"
 gen3authz = "^1.5.1"
 gen3config = "^1.0.0"

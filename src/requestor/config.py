@@ -1,3 +1,4 @@
+from itertools import chain
 from jsonschema import validate
 import os
 from sqlalchemy.engine.url import make_url, URL
@@ -49,24 +50,19 @@ class RequestorConfig(Config):
 
     def validate_statuses(self) -> None:
         self.logger.info("Validating configuration: statuses")
-        msg = "'{}' is not one of ALLOWED_REQUEST_STATUSES {}"
         allowed_statuses = self["ALLOWED_REQUEST_STATUSES"]
         assert isinstance(
             allowed_statuses, list
         ), "ALLOWED_REQUEST_STATUSES should be a list"
 
-        assert self["DEFAULT_INITIAL_STATUS"] in allowed_statuses, msg.format(
-            self["DEFAULT_INITIAL_STATUS"], allowed_statuses
-        )
-
-        for s in self["DRAFT_STATUSES"]:
-            assert s in allowed_statuses, msg.format(s, allowed_statuses)
-
-        for s in self["UPDATE_ACCESS_STATUSES"]:
-            assert s in allowed_statuses, msg.format(s, allowed_statuses)
-
-        for s in self["FINAL_STATUSES"]:
-            assert s in allowed_statuses, msg.format(s, allowed_statuses)
+        msg = "'{}' is not one of ALLOWED_REQUEST_STATUSES {}"
+        for status in chain(
+            [self["DEFAULT_INITIAL_STATUS"]],
+            self["DRAFT_STATUSES"],
+            self["UPDATE_ACCESS_STATUSES"],
+            self["FINAL_STATUSES"],
+        ):
+            assert status in allowed_statuses, msg.format(status, allowed_statuses)
 
     def validate_actions(self) -> None:
         """
