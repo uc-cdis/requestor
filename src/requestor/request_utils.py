@@ -95,6 +95,7 @@ def get_credentials(creds_id: str) -> Tuple[str, str]:
             "access_token" in response.json()
         ), f"Did not receive an access token from {creds['config']['url']}"
         return creds["type"], response.json()["access_token"]
+    return "", ""  # this should never happen; the config validation checks `type`
 
 
 @retry_wrapper

@@ -154,6 +154,7 @@ class RequestorConfig(Config):
                     form:
                         - name: dataset
                           param: resource_id
+                    creds: ""
         """
         schema = {
             "type": "object",
