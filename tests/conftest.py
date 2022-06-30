@@ -241,7 +241,7 @@ def mock_arborist_requests(request):
                                 "roles": [],
                             },
                             {
-                                "id": "my.resource_reader",
+                                "id": "my.resource_accessor",
                                 "resource_paths": ["/my/resource"],
                                 "roles": [],
                             },

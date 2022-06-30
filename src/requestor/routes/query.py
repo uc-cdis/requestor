@@ -230,6 +230,7 @@ async def check_user_resource_paths(
     If the previous request was denied or is still in draft status, will
     return False.
     """
+    # TODO add the ability to specify the service
     if not permissions:
         permissions = ["reader", "storage_reader"]
 
