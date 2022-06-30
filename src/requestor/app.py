@@ -42,7 +42,7 @@ def load_modules(app: FastAPI = None) -> None:
 
 def app_init() -> FastAPI:
     logger.info("Initializing app")
-    config.validate(logger)
+    config.validate()
 
     debug = config["DEBUG"]
     app = FastAPI(
@@ -63,10 +63,13 @@ def app_init() -> FastAPI:
         app.arborist_client = ArboristClient(
             arborist_base_url=custom_arborist_url,
             authz_provider="requestor",
-            logger=logger,
+            logger=get_logger("requestor.gen3authz", log_level="debug"),
         )
     else:
-        app.arborist_client = ArboristClient(authz_provider="requestor", logger=logger)
+        app.arborist_client = ArboristClient(
+            authz_provider="requestor",
+            logger=get_logger("requestor.gen3authz", log_level="debug"),
+        )
 
     db.init_app(app)
     load_modules(app)

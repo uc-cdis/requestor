@@ -86,9 +86,10 @@ def test_create_request_with_external_calls(client):
         mock_requests.post.assert_called_once_with(
             "https://abc_system/access",
             data={"dataset": data["resource_id"], "username": data["username"]},
+            headers={},
         )
         mock_requests.get.assert_called_once_with(
-            "https://xyz_system/access", data=None
+            "https://xyz_system/access", data=None, headers={}
         )
 
     assert res.status_code == 201, res.text
@@ -128,14 +129,52 @@ def test_update_request_with_external_calls(client):
         mock_requests.post.assert_called_once_with(
             "https://abc_system/access",
             data={"dataset": data["resource_id"], "username": data["username"]},
+            headers={},
         )
         mock_requests.get.assert_called_once_with(
-            "https://xyz_system/access", data=None
+            "https://xyz_system/access", data=None, headers={}
         )
 
     assert res.status_code == 200, res.text
     request_data = res.json()
     assert request_data["status"] == "APPROVED"
+
+
+def test_create_request_with_authed_external_call(client):
+    # create a request
+    data = {
+        "username": "requestor_user",
+        "policy_id": "test-policy-with-authed-external-call",
+        "resource_id": "uniqid",
+        "resource_display_name": "My Resource",
+        "status": "CREATED",
+    }
+    mock_access_token = "a.b.c"
+    conf = config["CREDENTIALS"]["client_creds_for_external_call"]["config"]
+    with mock.patch("requestor.request_utils.requests") as mock_requests:
+        mock_requests.post.return_value.json = lambda: {
+            "access_token": mock_access_token
+        }
+        res = client.post("/request", json=data)
+
+        # call to get credentials
+        mock_requests.post.assert_called_once_with(
+            conf["url"],
+            data={"grant_type": "client_credentials", "scope": conf["scope"]},
+            auth=(conf["client_id"], conf["client_secret"]),
+        )
+
+        # external call with credentials
+        mock_requests.get.assert_called_once_with(
+            "https://xyz_system/access",
+            data=None,
+            headers={"authorization": f"bearer {mock_access_token}"},
+        )
+
+    assert res.status_code == 201, res.text
+    request_data = res.json()
+    request_id = request_data.get("request_id")
+    assert request_id, "POST /request did not return a request_id"
 
 
 def test_create_request_with_redirect_and_external_call(client):
@@ -152,6 +191,7 @@ def test_create_request_with_redirect_and_external_call(client):
         mock_requests.post.assert_called_once_with(
             "https://abc_system/access",
             data={"dataset": data["resource_id"], "username": data["username"]},
+            headers={},
         )
 
     assert res.status_code == 201, res.text
@@ -184,7 +224,7 @@ def test_backoff_retry(client):
     with mock.patch("requestor.request_utils.requests") as mock_requests:
         mock_requests.post.return_value = "this will cause an exception"
         client.post("/request", json=data)
-        assert mock_requests.post.call_count == 5  # backoff logic `max_retries`
+        assert mock_requests.post.call_count == config["DEFAULT_MAX_RETRIES"]
 
 
 def test_create_request_failure_revert(client):

@@ -90,7 +90,7 @@ def get_auto_policy_id_for_resource_path(resource_path: str) -> str:
     `read-storage` access to the provided `resource_path`.
     """
     resources = resource_path.split("/")
-    policy_id = ".".join(resources[1:]) + "_reader"
+    policy_id = ".".join(resources[1:]) + "_accessor"
     return policy_id
 
 

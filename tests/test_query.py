@@ -116,7 +116,7 @@ def test_get_filtered_requests(client):
     # create a request with a different policy_id, status = APPROVED and revoke = False
     data = {
         "username": "other_user",
-        "policy_id": "my.resource_reader",
+        "policy_id": "my.resource_accessor",
         "resource_id": "active_uniqid",
         "revoke": "False",
         "resource_display_name": "My Active Resource",

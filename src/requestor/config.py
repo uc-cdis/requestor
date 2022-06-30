@@ -1,8 +1,11 @@
+from itertools import chain
 from jsonschema import validate
 import os
 from sqlalchemy.engine.url import make_url, URL
 
 from gen3config import Config
+
+from . import logger
 
 DEFAULT_CFG_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "config-default.yaml"
@@ -28,7 +31,7 @@ class RequestorConfig(Config):
             ),
         )
 
-    def validate(self, logger) -> None:
+    def validate(self) -> None:
         """
         Perform a series of sanity checks on a loaded config.
         """
@@ -41,27 +44,24 @@ class RequestorConfig(Config):
         ]
 
         self.validate_statuses()
+        self.validate_credentials()
         self.validate_actions()
 
     def validate_statuses(self) -> None:
-        msg = "'{}' is not one of ALLOWED_REQUEST_STATUSES {}"
+        logger.info("Validating configuration: statuses")
         allowed_statuses = self["ALLOWED_REQUEST_STATUSES"]
         assert isinstance(
             allowed_statuses, list
         ), "ALLOWED_REQUEST_STATUSES should be a list"
 
-        assert self["DEFAULT_INITIAL_STATUS"] in allowed_statuses, msg.format(
-            self["DEFAULT_INITIAL_STATUS"], allowed_statuses
-        )
-
-        for s in self["DRAFT_STATUSES"]:
-            assert s in allowed_statuses, msg.format(s, allowed_statuses)
-
-        for s in self["UPDATE_ACCESS_STATUSES"]:
-            assert s in allowed_statuses, msg.format(s, allowed_statuses)
-
-        for s in self["FINAL_STATUSES"]:
-            assert s in allowed_statuses, msg.format(s, allowed_statuses)
+        msg = "'{}' is not one of ALLOWED_REQUEST_STATUSES {}"
+        for status in chain(
+            [self["DEFAULT_INITIAL_STATUS"]],
+            self["DRAFT_STATUSES"],
+            self["UPDATE_ACCESS_STATUSES"],
+            self["FINAL_STATUSES"],
+        ):
+            assert status in allowed_statuses, msg.format(status, allowed_statuses)
 
     def validate_actions(self) -> None:
         """
@@ -74,6 +74,7 @@ class RequestorConfig(Config):
                         external_call_configs:
                             - def
         """
+        logger.info("Validating configuration: actions")
         self.validate_redirect_configs()
         self.validate_external_call_configs()
 
@@ -146,13 +147,14 @@ class RequestorConfig(Config):
     def validate_external_call_configs(self):
         """
         Example:
-            EXTERNAL_CALL_CONFIGS
+            EXTERNAL_CALL_CONFIGS:
                 let_someone_know:
                     method: POST
                     url: http://url.com
                     form:
                         - name: dataset
                           param: resource_id
+                    creds: ""
         """
         schema = {
             "type": "object",
@@ -164,6 +166,7 @@ class RequestorConfig(Config):
                     "properties": {
                         "method": NON_EMPTY_STRING_SCHEMA,
                         "url": NON_EMPTY_STRING_SCHEMA,
+                        "creds": {"enum": list(self["CREDENTIALS"].keys())},
                         "form": {
                             "type": "array",
                             "items": {
@@ -187,6 +190,50 @@ class RequestorConfig(Config):
             assert (
                 config["method"].lower() in supported_methods
             ), f"EXTERNAL_CALL_CONFIGS method {config['method']} is not one of {supported_methods}"
+
+    def validate_credentials(self):
+        """
+        Example:
+            CREDENTIALS:
+                unique_creds_id:
+                    type: client_credentials
+                    config:
+                        client_id: ""
+                        client_secret: ""
+                        url: http://url.com/oauth2/token
+                        scope: "space separated list of scopes"
+        """
+        logger.info("Validating configuration: credentials")
+        schema = {
+            "type": "object",
+            "patternProperties": {
+                ".*": {  # unique ID
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["type", "config"],
+                    "properties": {
+                        "type": {"enum": ["client_credentials"]},
+                        "config": {},
+                    },
+                }
+            },
+        }
+        validate(instance=self["CREDENTIALS"], schema=schema)
+
+        for credentials_config in self["CREDENTIALS"].values():
+            if credentials_config["type"] == "client_credentials":
+                schema = {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["client_id", "client_secret", "url", "scope"],
+                    "properties": {
+                        "client_id": NON_EMPTY_STRING_SCHEMA,
+                        "client_secret": NON_EMPTY_STRING_SCHEMA,
+                        "url": NON_EMPTY_STRING_SCHEMA,
+                        "scope": NON_EMPTY_STRING_SCHEMA,
+                    },
+                }
+                validate(instance=credentials_config["config"], schema=schema)
 
 
 config = RequestorConfig(DEFAULT_CFG_PATH)

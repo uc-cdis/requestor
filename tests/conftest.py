@@ -222,6 +222,13 @@ def mock_arborist_requests(request):
                                 "roles": [],
                             },
                             {
+                                "id": "test-policy-with-authed-external-call",
+                                "resource_paths": [
+                                    "/resource-with-authed-external-call/resource"
+                                ],
+                                "roles": [],
+                            },
+                            {
                                 "id": "test-policy-with-redirect-and-external-call",
                                 "resource_paths": [
                                     "/resource-with-redirect-and-external-call"
@@ -234,7 +241,7 @@ def mock_arborist_requests(request):
                                 "roles": [],
                             },
                             {
-                                "id": "my.resource_reader",
+                                "id": "my.resource_accessor",
                                 "resource_paths": ["/my/resource"],
                                 "roles": [],
                             },
