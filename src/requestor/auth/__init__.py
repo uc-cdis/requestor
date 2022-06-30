@@ -11,7 +11,7 @@ from .. import logger
 
 # auto_error=False prevents FastAPI from raising a 403 when the request
 # is missing an Authorization header. Instead, we want to return a 401
-# to signify that we did not recieve valid credentials
+# to signify that we did not receive valid credentials
 bearer = HTTPBearer(auto_error=False)
 
 
@@ -36,9 +36,9 @@ class Auth:
         try:
             # NOTE: token can be None if no Authorization header was provided, we
             # expect this to cause a downstream exception since it is invalid
-            token_claims = await access_token("user", "openid", purpose="access")(
-                self.bearer_token
-            )
+            token_claims = await access_token(
+                "user", "openid", audience="openid", purpose="access"
+            )(self.bearer_token)
         except Exception as e:
             logger.error(f"Could not get token claims:\n{e}", exc_info=True)
             raise HTTPException(

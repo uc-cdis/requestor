@@ -222,7 +222,7 @@ async def create_request(
         # the access request is approved: grant/revoke access
         action = "revoke" if request.revoke else "grant"
         logger.debug(
-            f"Status is {request.status} that is one of '{config['UPDATE_ACCESS_STATUSES']}', attempting to {action} access in Arborist"
+            f"Status '{request.status}' is one of UPDATE_ACCESS_STATUSES {config['UPDATE_ACCESS_STATUSES']}, attempting to {action} access in Arborist"
         )
         await grant_or_revoke_arborist_policy(
             api_request.app.arborist_client,
@@ -310,7 +310,7 @@ async def update_request(
             # the access request is approved: grant/revoke access
             action = "revoke" if request.revoke else "grant"
             logger.debug(
-                f"Status is {status} that is one of '{config['UPDATE_ACCESS_STATUSES']}', attempting to {action} access in Arborist"
+                f"Status '{status}' is one of UPDATE_ACCESS_STATUSES {config['UPDATE_ACCESS_STATUSES']}, attempting to {action} access in Arborist"
             )
             await grant_or_revoke_arborist_policy(
                 api_request.app.arborist_client,

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "requestor"
-version = "1.5.1"
+version = "1.6.0"
 description = "Gen3 Access Request Service"
 authors = ["CTDS UChicago <cdis@uchicago.edu>"]
 license = "Apache-2.0"
@@ -13,8 +13,8 @@ include = [
 [tool.poetry.dependencies]
 python = "^3.9"
 alembic = "^1.4.2"
-authutils = "^5.0.4"
-cdislogging = "^=1.0.0"
+authutils = "^6.2.1"
+cdislogging = "^1.0.0"
 fastapi = "^0.65.0"
 gen3authz = "^1.5.1"
 gen3config = "^1.0.0"
