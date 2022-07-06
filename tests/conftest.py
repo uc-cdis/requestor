@@ -114,6 +114,48 @@ def list_policies_patcher(test_data):
     policy_expand_patch.stop()
 
 
+@pytest.fixture(scope="function")
+def list_roles_patcher():
+    """
+    This fixture patches the list_roles method with a mock implementation based on
+    the test_data provided which is a dictionary consisting of the
+    role_id and the associated permissions.
+    """
+
+    future = asyncio.Future()
+    future.set_result(
+        {
+            "roles": [
+                {
+                    "id": "study_registrant",
+                    "permissions": [
+                        {
+                            "id": "study_registration",
+                            "action": {
+                                "service": "study_registration",
+                                "method": "access",
+                            },
+                        },
+                        {
+                            "id": "mds_access",
+                            "action": {"service": "mds_gateway", "method": "access"},
+                        },
+                    ],
+                },
+            ]
+        }
+    )
+
+    list_roles_mock = MagicMock()
+    list_roles_mock.return_value = future
+    role_patch = patch("requestor.routes.query.arborist.list_roles", list_roles_mock)
+    role_patch.start()
+
+    yield
+
+    role_patch.stop()
+
+
 @pytest.fixture(autouse=True, scope="function")
 def access_token_patcher(client, request):
     async def get_access_token(*args, **kwargs):

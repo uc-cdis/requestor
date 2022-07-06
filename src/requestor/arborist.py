@@ -181,6 +181,80 @@ async def create_arborist_policy(
     return policy_id
 
 
+@maybe_sync
+async def create_arborist_policy_for_role_id(
+    arborist_client: ArboristClient,
+    role_id: str,
+    resource_path: str,
+    resource_description: str = None,
+):
+    # TODO: maybe pull this block out into a new method - pull out from method above.
+    # create the resource
+    logger.debug(f"Attempting to create resource {resource_path} in Arborist")
+    resources = resource_path.split("/")
+    resource_name = resources[-1]
+    parent_path = "/".join(resources[:-1])
+    resource = {
+        "name": resource_name,
+        "description": resource_description,
+    }
+    res = arborist_client.create_resource(parent_path, resource, create_parents=True)
+    if inspect.isawaitable(res):
+        await res
+
+    # create the policy
+    policy_id = get_auto_policy_id_for_role_id_and_resource_path(role_id, resource_path)
+    logger.debug(f"Attempting to create policy {policy_id} in Arborist")
+    policy = {
+        "id": policy_id,
+        "description": "policy created by requestor",
+        "role_ids": [role_id],
+        "resource_paths": [resource_path],
+    }
+    res = arborist_client.create_policy(policy, skip_if_exists=True)
+    if inspect.isawaitable(res):
+        await res
+
+    return policy_id
+
+
+def get_auto_policy_id_for_role_id_and_resource_path(
+    role_id: str, resource_path: str
+) -> str:
+    """
+    Create a policy_name given a role_id and resource path with format
+    'study.[resource_path]_[role_id]'.
+    For example a role_id='study_registrant' and resource_path='/study/123456'
+    should have
+    policy_id = 'study.123456_study_registrant'
+    """
+    resources = resource_path.split("/")
+    policy_id = ".".join(resources[1:]) + "_" + role_id
+    return policy_id
+
+
+@maybe_sync
+async def list_roles(arborist_client: ArboristClient) -> dict:
+    """
+    We can cache this data later if needed, but it's tricky - the length
+    we can cache depends on the source of the information, so this MUST
+    invalidate the cache whenever Arborist adds a role.
+    For now, just make a call to Arborist every time we need this information.
+    """
+    res = arborist_client.list_roles()
+    if inspect.isawaitable(res):
+        res = await res
+
+    return res
+
+
+def get_role_for_id(existing_roles: list, role_id: str) -> dict:
+    for r in existing_roles:
+        if r["id"] == role_id:
+            return r
+    return None
+
+
 async def grant_user_access_to_policy(
     arborist_client: ArboristClient,
     username: str,

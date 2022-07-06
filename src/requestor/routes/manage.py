@@ -35,6 +35,7 @@ class CreateRequestInput(BaseModel):
     resource_display_name: str = None
     status: str = None
     policy_id: str = None
+    role_id: str = None
 
 
 async def grant_or_revoke_arborist_policy(arborist_client, policy_id, username, revoke):
@@ -101,14 +102,41 @@ async def create_request(
             msg,
         )
 
+    # error if we have both role_id and policy_id
+    if data.get("role_id") and data.get("policy_id"):
+        msg = f"The request cannot have both role_id and policy_id."
+        logger.error(
+            msg + f" body: {body}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            HTTP_400_BAD_REQUEST,
+            msg,
+        )
+
     resource_paths = None
     client = api_request.app.arborist_client
 
     if not data["policy_id"]:
-        # fallback to body `resource_path` for backwards compatibility
-        data["policy_id"] = await arborist.create_arborist_policy(
-            client, data["resource_path"]
-        )
+        if data.get("role_id") and data.get("resource_path"):
+
+            existing_roles = await arborist.list_roles(client)
+            if not arborist.get_role_for_id(existing_roles["roles"], data["role_id"]):
+                # Raise an exception if the role does not exist in arborist
+                raise HTTPException(
+                    HTTP_400_BAD_REQUEST,
+                    f"Request creation failed. The role '{data['role_id']}' does not exist.",
+                )
+
+            # if we have a role_id and resource_path then create a new policy
+            data["policy_id"] = await arborist.create_arborist_policy_for_role_id(
+                client, data["role_id"], data["resource_path"]
+            )
+        else:
+            # else fallback to body `resource_path` for backwards compatibility
+            data["policy_id"] = await arborist.create_arborist_policy(
+                client, data["resource_path"]
+            )
         resource_paths = [data["resource_path"]]
     else:
         existing_policies = await arborist.list_policies(client, expand=True)
@@ -126,7 +154,9 @@ async def create_request(
             existing_policies["policies"], data["policy_id"]
         )
 
-    await auth.authorize("create", resource_paths)
+    # TODO: add this back in (remove 'if' statement) after testing.
+    if data["policy_id"]:
+        await auth.authorize("create", resource_paths)
 
     if not data.get("status"):
         data["status"] = config["DEFAULT_INITIAL_STATUS"]
@@ -198,8 +228,9 @@ async def create_request(
             msg,
         )
 
-    # we don't store `resource_path` in the database, so get rid of it
+    # remove any fields that are not stored in requests table
     del data["resource_path"]
+    del data["role_id"]
 
     if draft_previous_requests:
         # reuse the draft request
