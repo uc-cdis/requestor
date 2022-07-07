@@ -245,7 +245,8 @@ async def list_roles(arborist_client: ArboristClient) -> dict:
     if inspect.isawaitable(res):
         res = await res
 
-    return res
+    # TODO: remove the .json after updating to newer version of gen3authz
+    return res.json
 
 
 def get_role_for_id(existing_roles: list, role_id: str) -> dict:
