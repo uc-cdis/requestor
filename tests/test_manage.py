@@ -1,4 +1,5 @@
 import asyncio
+import pytest
 from unittest.mock import MagicMock, patch
 
 from requestor.arborist import (
@@ -8,21 +9,33 @@ from requestor.arborist import (
 from requestor.config import config
 
 
-def test_create_request_with_resource_path_and_policy(client):
+@pytest.mark.parametrize(
+    "data",
+    [
+        {
+            # request with both resource_path and policy_id
+            "username": "requestor_user",
+            "resource_path": "/test-resource-path/resource",
+            "policy_id": "test-policy",
+            "resource_id": "uniqid",
+            "resource_display_name": "My Resource",
+        },
+        {
+            # request with role_id without resource_path
+            "username": "requestor_user",
+            "role_id": "test-role",
+            "resource_id": "uniqid",
+            "resource_display_name": "My Resource",
+        },
+    ],
+)
+def test_create_request_with_resource_path_and_or_policy(client, data):
     """
     When a user attempts to create a request with both resource_path and
     policy_id or with both of them missing, a 400 Bad request is returned to the client.
     """
     fake_jwt = "1.2.3"
 
-    # create a request with both resource_path and policy_id
-    data = {
-        "username": "requestor_user",
-        "resource_path": "/test-resource-path/resource",
-        "policy_id": "test-policy",
-        "resource_id": "uniqid",
-        "resource_display_name": "My Resource",
-    }
     res = client.post(
         "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
     )
