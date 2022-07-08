@@ -121,7 +121,6 @@ async def create_request(
         if data.get("role_id") and data.get("resource_path"):
 
             existing_roles = await arborist.list_roles(client)
-            logger.debug(f"Checking for role in existing roles: {existing_roles}")
             if not arborist.get_role_for_id(existing_roles["roles"], data["role_id"]):
                 # Raise an exception if the role does not exist in arborist
                 raise HTTPException(
