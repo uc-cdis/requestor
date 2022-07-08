@@ -155,9 +155,7 @@ async def create_request(
             existing_policies["policies"], data["policy_id"]
         )
 
-    # TODO: add this back in (remove 'if' statement) after testing.
-    if not data["role_id"]:
-        await auth.authorize("create", resource_paths)
+    await auth.authorize("create", resource_paths)
 
     if not data.get("status"):
         data["status"] = config["DEFAULT_INITIAL_STATUS"]
