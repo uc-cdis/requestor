@@ -38,6 +38,9 @@ components:
         resource_path:
           title: Resource Path
           type: string
+        role_id:
+          title: Role Id
+          type: string
         status:
           title: Status
           type: string
