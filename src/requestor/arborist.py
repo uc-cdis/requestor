@@ -110,18 +110,7 @@ async def create_arborist_policy(
     resource_path: str,
     resource_description: str = None,
 ):
-    # create the resource
-    logger.debug(f"Attempting to create resource {resource_path} in Arborist")
-    resources = resource_path.split("/")
-    resource_name = resources[-1]
-    parent_path = "/".join(resources[:-1])
-    resource = {
-        "name": resource_name,
-        "description": resource_description,
-    }
-    res = arborist_client.create_resource(parent_path, resource, create_parents=True)
-    if inspect.isawaitable(res):
-        await res
+    await create_resource(arborist_client, resource_path, resource_description)
 
     # Create the roles needed to query and download data.
     # If they already exist arborist would "Do Nothing"
@@ -188,19 +177,7 @@ async def create_arborist_policy_for_role_id(
     resource_path: str,
     resource_description: str = None,
 ):
-    # TODO: maybe pull this block out into a new method - pull out from method above.
-    # create the resource
-    logger.debug(f"Attempting to create resource {resource_path} in Arborist")
-    resources = resource_path.split("/")
-    resource_name = resources[-1]
-    parent_path = "/".join(resources[:-1])
-    resource = {
-        "name": resource_name,
-        "description": resource_description,
-    }
-    res = arborist_client.create_resource(parent_path, resource, create_parents=True)
-    if inspect.isawaitable(res):
-        await res
+    await create_resource(arborist_client, resource_path, resource_description)
 
     # create the policy
     policy_id = get_auto_policy_id_for_role_id_and_resource_path(role_id, resource_path)
@@ -216,6 +193,26 @@ async def create_arborist_policy_for_role_id(
         await res
 
     return policy_id
+
+
+@maybe_sync
+async def create_resource(
+    arborist_client: ArboristClient,
+    resource_path: str,
+    resource_description: str = None,
+):
+    # create the resource
+    logger.debug(f"Attempting to create resource {resource_path} in Arborist")
+    resources = resource_path.split("/")
+    resource_name = resources[-1]
+    parent_path = "/".join(resources[:-1])
+    resource = {
+        "name": resource_name,
+        "description": resource_description,
+    }
+    res = arborist_client.create_resource(parent_path, resource, create_parents=True)
+    if inspect.isawaitable(res):
+        await res
 
 
 def get_auto_policy_id_for_role_id_and_resource_path(
