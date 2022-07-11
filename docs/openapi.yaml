@@ -38,9 +38,11 @@ components:
         resource_path:
           title: Resource Path
           type: string
-        role_id:
-          title: Role Id
-          type: string
+        role_ids:
+          items:
+            type: string
+          title: Role Ids
+          type: array
         status:
           title: Status
           type: string
