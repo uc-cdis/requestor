@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 from requestor.arborist import (
     get_auto_policy_id_for_resource_path,
-    get_auto_policy_id_for_role_ids_and_resource_path,
+    get_auto_policy_id_for_role_ids_and_resource_paths,
 )
 from requestor.config import config
 
@@ -160,17 +160,33 @@ def test_create_duplicate_request(client):
     assert res.status_code == 201, res.text
 
 
-def test_create_request_without_access(client, mock_arborist_requests):
+@pytest.mark.parametrize(
+    "data",
+    [
+        {
+            # request with both policy_id
+            "username": "requestor_user",
+            "policy_id": "test-policy",
+            "resource_id": "uniqid",
+            "resource_display_name": "My Resource",
+        },
+        {
+            # include role_ids and resource_paths
+            "username": "requestor_user",
+            "role_ids": ["study_registrant"],
+            "resource_paths": ["/study/123456"],
+            "resource_id": "uniqid",
+            "resource_display_name": "My Resource",
+        },
+    ],
+)
+def test_create_request_without_access(
+    client, mock_arborist_requests, list_roles_patcher, data
+):
     fake_jwt = "1.2.3"
     mock_arborist_requests(authorized=False)
 
     # attempt to create a request
-    data = {
-        "username": "requestor_user",
-        "policy_id": "test-policy",
-        "resource_id": "uniqid",
-        "resource_display_name": "My Resource",
-    }
     res = client.post(
         "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
     )
@@ -378,8 +394,63 @@ def test_create_request_with_role_ids_and_resource_path(client, list_roles_patch
     assert request_data == {
         "request_id": request_id,
         "username": data["username"],
-        "policy_id": get_auto_policy_id_for_role_ids_and_resource_path(
-            data["role_ids"], data["resource_path"]
+        # cast string `resource_path` to a list for this method.
+        "policy_id": get_auto_policy_id_for_role_ids_and_resource_paths(
+            data["role_ids"], [data["resource_path"]]
+        ),
+        "resource_id": data["resource_id"],
+        "resource_display_name": data["resource_display_name"],
+        "status": config["DEFAULT_INITIAL_STATUS"],
+        # just ensure revoke, created_time and updated_time are there:
+        "revoke": False,
+        "created_time": request_data["created_time"],
+        "updated_time": request_data["updated_time"],
+    }
+
+    # get the request
+    res = client.get(f"/request/{request_id}")
+    assert res.status_code == 200, res.text
+    assert res.json() == request_data
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        {
+            # include single role_ids and single resource_paths
+            "username": "requestor_user",
+            "role_ids": ["study_registrant"],
+            "resource_paths": ["/study/123456"],
+            "resource_id": "uniqid",
+            "resource_display_name": "My Resource",
+        },
+        {
+            # include multiple role_ids and and resource_paths
+            "username": "requestor_user",
+            "role_ids": ["study_registrant", "/mds_user", "/cedar_user"],
+            "resource_paths": ["/study/123456", "/mds_gateway", "/cedar"],
+            "resource_id": "uniqid",
+            "resource_display_name": "My Resource",
+        },
+    ],
+)
+def test_create_request_with_role_ids_and_resource_paths(
+    client, list_roles_patcher, data
+):
+    fake_jwt = "1.2.3"
+
+    res = client.post(
+        "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+    )
+    assert res.status_code == 201, res.text
+    request_data = res.json()
+    request_id = request_data.get("request_id")
+    assert request_id, "POST /request did not return a request_id"
+    assert request_data == {
+        "request_id": request_id,
+        "username": data["username"],
+        "policy_id": get_auto_policy_id_for_role_ids_and_resource_paths(
+            data["role_ids"], data["resource_paths"]
         ),
         "resource_id": data["resource_id"],
         "resource_display_name": data["resource_display_name"],

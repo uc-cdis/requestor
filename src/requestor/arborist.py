@@ -174,21 +174,22 @@ async def create_arborist_policy(
 async def create_arborist_policy_for_role_ids(
     arborist_client: ArboristClient,
     role_ids: list[str],
-    resource_path: str,
+    resource_paths: list[str],
     resource_description: str = None,
 ):
-    await create_resource(arborist_client, resource_path, resource_description)
+    for resource_path in resource_paths:
+        await create_resource(arborist_client, resource_path, resource_description)
 
     # create the policy
-    policy_id = get_auto_policy_id_for_role_ids_and_resource_path(
-        role_ids, resource_path
+    policy_id = get_auto_policy_id_for_role_ids_and_resource_paths(
+        role_ids, resource_paths
     )
     logger.debug(f"Attempting to create policy {policy_id} in Arborist")
     policy = {
         "id": policy_id,
         "description": "policy created by requestor",
         "role_ids": role_ids,
-        "resource_path": resource_path,
+        "resource_paths": resource_paths,
     }
     res = arborist_client.create_policy(policy, skip_if_exists=True)
     if inspect.isawaitable(res):
@@ -217,21 +218,22 @@ async def create_resource(
         await res
 
 
-def get_auto_policy_id_for_role_ids_and_resource_path(
-    role_ids: list[str], resource_path: str
+def get_auto_policy_id_for_role_ids_and_resource_paths(
+    role_ids: list[str], resource_paths: list[str]
 ) -> str:
     """
-    Create a policy_name given role_ids and resource_path with format
-    'study.[resource_path]_[role_ids]'.
+    Create a policy_name given role_ids and resource_paths with format
+    'study.[resource_paths]_[role_ids]'.
     For example, for
-    resource_path='/study/123456'
+    resource_path=['/study/123456','/mds_gateway', '/cedar']
     and
     role_ids = ["study_registrant", "/mds_user", "/cedar_user"]
     we should have
-    policy_id = 'study.123456_study_registrant_mds_user_cedar_user'
+    policy_id = 'study.123456_mds_gateway_cedar_study_registrant_mds_user_cedar_user'
     """
-    resources = resource_path.split("/")
-    policy_id = ".".join(resources[1:]) + "_" + "_".join(role_ids)
+    resources = "_".join([".".join(r.split("/")[1:]) for r in resource_paths])
+    roles = "_".join(["".join(r.split("/")) for r in role_ids])
+    policy_id = resources + "_" + roles
     return policy_id
 
 

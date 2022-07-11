@@ -142,6 +142,24 @@ def list_roles_patcher():
                         },
                     ],
                 },
+                {
+                    "id": "/mds_user",
+                    "permissions": [
+                        {
+                            "id": "mds_access",
+                            "action": {"service": "mds_gateway", "method": "access"},
+                        },
+                    ],
+                },
+                {
+                    "id": "/cedar_user",
+                    "permissions": [
+                        {
+                            "id": "cedar_access",
+                            "action": {"service": "cedar", "method": "access"},
+                        },
+                    ],
+                },
             ]
         }
     )
