@@ -35,7 +35,7 @@ class CreateRequestInput(BaseModel):
     resource_display_name: str = None
     status: str = None
     policy_id: str = None
-    role_id: str = None
+    role_ids: list[str] = None
 
 
 async def grant_or_revoke_arborist_policy(arborist_client, policy_id, username, revoke):
@@ -90,6 +90,8 @@ async def create_request(
         f"Creating request. request_id: {request_id}. Received body: {data}. Revoke: {'revoke' in api_request.query_params}"
     )
 
+    # TODO: cast single resource_path into list of resource_paths
+
     # error (if we have both resource_path and policy_id) OR (if we have neither)
     if bool(data.get("resource_path")) == bool(data.get("policy_id")):
         msg = f"The request must have either a resource_path or a policy_id."
@@ -102,9 +104,9 @@ async def create_request(
             msg,
         )
 
-    # error if we have both role_id and policy_id
-    if data.get("role_id") and data.get("policy_id"):
-        msg = f"The request cannot have both role_id and policy_id."
+    # error if we have both role_ids and policy_id
+    if data.get("role_ids") and data.get("policy_id"):
+        msg = f"The request cannot have both role_ids and policy_id."
         logger.error(
             msg + f" body: {body}",
             exc_info=True,
@@ -118,19 +120,21 @@ async def create_request(
     client = api_request.app.arborist_client
 
     if not data["policy_id"]:
-        if data.get("role_id") and data.get("resource_path"):
+        if data.get("role_ids") and data.get("resource_path"):
 
             existing_roles = await arborist.list_roles(client)
-            if not arborist.get_role_for_id(existing_roles["roles"], data["role_id"]):
-                # Raise an exception if the role does not exist in arborist
+            existing_role_ids = [item["id"] for item in existing_roles["roles"]]
+            # Raise an exception if any role_id does not exist in arborist
+            roles_not_found = list(set(data["role_ids"]) - set(existing_role_ids))
+            if roles_not_found:
                 raise HTTPException(
                     HTTP_400_BAD_REQUEST,
-                    f"Request creation failed. The role '{data['role_id']}' does not exist.",
+                    f"Request creation failed. The roles {roles_not_found} do not exist.",
                 )
 
             # if we have a role_id and resource_path then create a new policy
-            data["policy_id"] = await arborist.create_arborist_policy_for_role_id(
-                client, data["role_id"], data["resource_path"]
+            data["policy_id"] = await arborist.create_arborist_policy_for_role_ids(
+                client, data["role_ids"], data["resource_path"]
             )
         else:
             # else fallback to body `resource_path` for backwards compatibility
@@ -228,7 +232,7 @@ async def create_request(
 
     # remove any fields that are not stored in requests table
     del data["resource_path"]
-    del data["role_id"]
+    del data["role_ids"]
 
     if draft_previous_requests:
         # reuse the draft request

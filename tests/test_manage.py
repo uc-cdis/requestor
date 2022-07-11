@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 from requestor.arborist import (
     get_auto_policy_id_for_resource_path,
-    get_auto_policy_id_for_role_id_and_resource_path,
+    get_auto_policy_id_for_role_ids_and_resource_path,
 )
 from requestor.config import config
 
@@ -21,9 +21,9 @@ from requestor.config import config
             "resource_display_name": "My Resource",
         },
         {
-            # request with role_id without resource_path
+            # request with role_ids without resource_path
             "username": "requestor_user",
-            "role_id": "test-role",
+            "role_ids": ["test-role"],
             "resource_id": "uniqid",
             "resource_display_name": "My Resource",
         },
@@ -214,14 +214,16 @@ def test_create_request_with_non_existent_role_id(client, list_roles_patcher):
     # attempt to create an access request with a role_id that is not present in arborist
     data = {
         "username": "requestor_user",
-        "role_id": "some-nonexistent-role",
+        "role_ids": ["study_registrant", "some-nonexistent-role"],
         "resource_path": "/test-resource-path/resource",
     }
     res = client.post(
         "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
     )
     assert res.status_code == 400, res.text
-    assert "does not exist" in res.text
+    assert "do not exist" in res.text
+    assert "nonexistent-role" in res.text
+    assert "study_registrant" not in res.text
 
 
 def test_update_request(client):
@@ -355,13 +357,13 @@ def test_create_request_with_resource_path(client):
     assert res.json() == request_data
 
 
-def test_create_request_with_role_id_and_resource_path(client, list_roles_patcher):
+def test_create_request_with_role_ids_and_resource_path(client, list_roles_patcher):
     fake_jwt = "1.2.3"
 
     data = {
-        # include role_id and and resource_path
+        # include role_ids and and resource_path
         "username": "requestor_user",
-        "role_id": "study_registrant",
+        "role_ids": ["study_registrant"],
         "resource_path": "/study/123456",
         "resource_id": "uniqid",
         "resource_display_name": "My Resource",
@@ -376,8 +378,8 @@ def test_create_request_with_role_id_and_resource_path(client, list_roles_patche
     assert request_data == {
         "request_id": request_id,
         "username": data["username"],
-        "policy_id": get_auto_policy_id_for_role_id_and_resource_path(
-            data["role_id"], data["resource_path"]
+        "policy_id": get_auto_policy_id_for_role_ids_and_resource_path(
+            data["role_ids"], data["resource_path"]
         ),
         "resource_id": data["resource_id"],
         "resource_display_name": data["resource_display_name"],
@@ -394,20 +396,20 @@ def test_create_request_with_role_id_and_resource_path(client, list_roles_patche
     assert res.json() == request_data
 
 
-def test_create_request_with_role_id_and_policy_id(client):
+def test_create_request_with_role_ids_and_policy_id(client):
     fake_jwt = "1.2.3"
 
-    # attempt to create an access request with role_id and policy_id
+    # attempt to create an access request with role_ids and policy_id
     data = {
         "username": "requestor_user",
-        "role_id": "test-role",
+        "role_ids": ["test-role"],
         "policy_id": "test-policy",
     }
     res = client.post(
         "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
     )
     assert res.status_code == 400, res.text
-    assert "cannot have both role_id and policy_id" in res.text
+    assert "cannot have both role_ids and policy_id" in res.text
 
 
 def test_update_request_without_access(client, mock_arborist_requests):
