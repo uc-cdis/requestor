@@ -251,13 +251,6 @@ async def list_roles(arborist_client: ArboristClient) -> dict:
     return res.json
 
 
-def get_role_for_id(existing_roles: list, role_id: str) -> dict:
-    for r in existing_roles:
-        if r["id"] == role_id:
-            return r
-    return None
-
-
 async def grant_user_access_to_policy(
     arborist_client: ArboristClient,
     username: str,
