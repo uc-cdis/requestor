@@ -13,22 +13,24 @@ from requestor.config import config
     "data",
     [
         {
-            # request with both resource_path and policy_id
+            # with both resource_path and policy_id
             "username": "requestor_user",
             "resource_path": "/test-resource-path/resource",
             "policy_id": "test-policy",
             "resource_id": "uniqid",
             "resource_display_name": "My Resource",
+            "err_msg": "The request must have either",
         },
         {
-            # request with role_ids without resource_path
+            # without resource_path and policy_id
             "username": "requestor_user",
             "role_ids": ["test-role"],
             "resource_id": "uniqid",
             "resource_display_name": "My Resource",
+            "err_msg": "The request must have either",
         },
         {
-            # request with both resource_path and resource_paths
+            # with both resource_path and resource_paths
             "username": "requestor_user",
             "role_ids": ["test-role"],
             "resource_path": "/test-resource-path/resource",
@@ -38,15 +40,26 @@ from requestor.config import config
             ],
             "resource_id": "uniqid",
             "resource_display_name": "My Resource",
+            "err_msg": "The request cannot have both",
+        },
+        {
+            # with role_ids and resource_path (without resource_paths)
+            "username": "requestor_user",
+            "role_ids": ["study_registrant"],
+            "resource_path": "/study/123456",
+            "resource_id": "uniqid",
+            "resource_display_name": "My Resource",
+            "err_msg": "The request cannot have both",
         },
     ],
 )
-def test_create_request_with_resource_path_and_or_policy(client, data):
+def test_create_request_with_unallowed_params(client, data):
     """
     When a user attempts to create a request with
         - both resource_path and policy_id
         - both of them missing
-        - role_id and both resource_path and resource_paths
+        - both resource_path and resource_paths
+        - role_id with resource_path without resource_paths
     a 400 Bad request is returned to the client.
     """
     fake_jwt = "1.2.3"
@@ -56,14 +69,7 @@ def test_create_request_with_resource_path_and_or_policy(client, data):
     )
 
     assert res.status_code == 400, res.text
-    assert "must have either" in res.json()["detail"]
-
-    res = client.post(
-        "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
-    )
-
-    assert res.status_code == 400, res.text
-    assert "must have either" in res.json()["detail"]
+    assert data["err_msg"] in res.json()["detail"]
 
 
 def test_create_request_without_username(client):
@@ -240,7 +246,7 @@ def test_create_request_with_non_existent_role_id(client, list_roles_patcher):
     data = {
         "username": "requestor_user",
         "role_ids": ["study_registrant", "some-nonexistent-role"],
-        "resource_path": "/test-resource-path/resource",
+        "resource_paths": ["/test-resource-path/resource"],
     }
     res = client.post(
         "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
@@ -367,46 +373,6 @@ def test_create_request_with_resource_path(client):
         "request_id": request_id,
         "username": data["username"],
         "policy_id": get_auto_policy_id_for_resource_path(data["resource_path"]),
-        "resource_id": data["resource_id"],
-        "resource_display_name": data["resource_display_name"],
-        "status": config["DEFAULT_INITIAL_STATUS"],
-        # just ensure revoke, created_time and updated_time are there:
-        "revoke": False,
-        "created_time": request_data["created_time"],
-        "updated_time": request_data["updated_time"],
-    }
-
-    # get the request
-    res = client.get(f"/request/{request_id}")
-    assert res.status_code == 200, res.text
-    assert res.json() == request_data
-
-
-def test_create_request_with_role_ids_and_resource_path(client, list_roles_patcher):
-    fake_jwt = "1.2.3"
-
-    data = {
-        # include role_ids and and resource_path
-        "username": "requestor_user",
-        "role_ids": ["study_registrant"],
-        "resource_path": "/study/123456",
-        "resource_id": "uniqid",
-        "resource_display_name": "My Resource",
-    }
-    res = client.post(
-        "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
-    )
-    assert res.status_code == 201, res.text
-    request_data = res.json()
-    request_id = request_data.get("request_id")
-    assert request_id, "POST /request did not return a request_id"
-    assert request_data == {
-        "request_id": request_id,
-        "username": data["username"],
-        # cast string `resource_path` to a list for this method.
-        "policy_id": get_auto_policy_id_for_role_ids_and_resource_paths(
-            data["role_ids"], [data["resource_path"]]
-        ),
         "resource_id": data["resource_id"],
         "resource_display_name": data["resource_display_name"],
         "status": config["DEFAULT_INITIAL_STATUS"],

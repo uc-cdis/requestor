@@ -91,47 +91,31 @@ async def create_request(
         f"Creating request. request_id: {request_id}. Received body: {data}. Revoke: {'revoke' in api_request.query_params}"
     )
 
-    if data.get("resource_path"):
-        if not data.get("resource_paths"):
-            data["resource_paths"] = [data["resource_path"]]
-        else:
-            # error if we have both resource_paths and resource_path
-            msg = f"The request must have either resource_paths or a resource_path."
-            logger.error(
-                msg + f" body: {body}",
-                exc_info=True,
-            )
-            raise HTTPException(
-                HTTP_400_BAD_REQUEST,
-                msg,
-            )
+    # catch errors on input
+    if data.get("resource_path") and data.get("resource_paths"):
+        msg = f"The request cannot have both resource_paths and resource_path."
+        raise_error(logger, msg, body)
 
-    # error (if we have both policy_id and (resource_paths or resource_path))
-    # OR (if we have neither)
+    # (both policy_id and (resource_paths or resource_path))
+    # OR (neither)
     if bool(data.get("policy_id")) == (
         bool(data.get("resource_paths")) or bool(data.get("resource_path"))
     ):
         msg = f"The request must have either resource_paths or a policy_id."
-        logger.error(
-            msg + f" body: {body}",
-            exc_info=True,
-        )
-        raise HTTPException(
-            HTTP_400_BAD_REQUEST,
-            msg,
-        )
+        raise_error(logger, msg, body)
 
-    # error if we have both role_ids and policy_id
+    # both role_ids and policy_id
     if data.get("role_ids") and data.get("policy_id"):
         msg = f"The request cannot have both role_ids and policy_id."
-        logger.error(
-            msg + f" body: {body}",
-            exc_info=True,
-        )
-        raise HTTPException(
-            HTTP_400_BAD_REQUEST,
-            msg,
-        )
+        raise_error(logger, msg, body)
+
+    # both role_ids and resource_path
+    if data.get("role_ids") and data.get("resource_path"):
+        msg = f"The request cannot have both role_ids and resource_path."
+        raise_error(logger, msg, body)
+
+    if data.get("resource_path") and not data.get("resource_paths"):
+        data["resource_paths"] = [data["resource_path"]]
 
     resource_paths = None
     client = api_request.app.arborist_client
@@ -447,6 +431,17 @@ async def delete_request(
         )
 
     return {"request_id": request_id}
+
+
+def raise_error(logger, msg: str, body: CreateRequestInput):
+    logger.error(
+        msg + f" body: {body}",
+        exc_info=True,
+    )
+    raise HTTPException(
+        HTTP_400_BAD_REQUEST,
+        msg,
+    )
 
 
 def init_app(app: FastAPI):
