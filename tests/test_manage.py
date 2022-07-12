@@ -24,32 +24,26 @@ from requestor.config import config
         {
             # without resource_path and policy_id
             "username": "requestor_user",
+            "resource_id": "uniqid",
+            "resource_display_name": "My Resource",
+            "err_msg": "The request must have either",
+        },
+        {
+            # with role_ids without resource_paths and resource_path
+            "username": "requestor_user",
             "role_ids": ["test-role"],
             "resource_id": "uniqid",
             "resource_display_name": "My Resource",
             "err_msg": "The request must have either",
         },
         {
-            # with both resource_path and resource_paths
-            "username": "requestor_user",
-            "role_ids": ["test-role"],
-            "resource_path": "/test-resource-path/resource",
-            "resource_paths": [
-                "/test-resource-path/resource",
-                "/other-test-path/other-resource",
-            ],
-            "resource_id": "uniqid",
-            "resource_display_name": "My Resource",
-            "err_msg": "The request cannot have both",
-        },
-        {
-            # with role_ids and resource_path (without resource_paths)
+            # with both role_ids and policy_id
             "username": "requestor_user",
             "role_ids": ["study_registrant"],
-            "resource_path": "/study/123456",
+            "policy_id": "test-policy",
             "resource_id": "uniqid",
             "resource_display_name": "My Resource",
-            "err_msg": "The request cannot have both",
+            "err_msg": "The request cannot have both role_ids and policy_id",
         },
     ],
 )
@@ -58,7 +52,6 @@ def test_create_request_with_unallowed_params(client, data):
     When a user attempts to create a request with
         - both resource_path and policy_id
         - both of them missing
-        - both resource_path and resource_paths
         - role_id with resource_path without resource_paths
     a 400 Bad request is returned to the client.
     """
@@ -400,9 +393,18 @@ def test_create_request_with_resource_path(client):
             "resource_display_name": "My Resource",
         },
         {
-            # include multiple role_ids and and resource_paths
+            # include multiple role_ids and resource_paths
             "username": "requestor_user",
             "role_ids": ["study_registrant", "/mds_user", "/cedar_user"],
+            "resource_paths": ["/study/123456", "/mds_gateway", "/cedar"],
+            "resource_id": "uniqid",
+            "resource_display_name": "My Resource",
+        },
+        {
+            # include role_ids and resource_path and resource_paths
+            "username": "requestor_user",
+            "role_ids": ["study_registrant", "/mds_user", "/cedar_user"],
+            "resource_path": "/older_study/123456",
             "resource_paths": ["/study/123456", "/mds_gateway", "/cedar"],
             "resource_id": "uniqid",
             "resource_display_name": "My Resource",
@@ -440,22 +442,6 @@ def test_create_request_with_role_ids_and_resource_paths(
     res = client.get(f"/request/{request_id}")
     assert res.status_code == 200, res.text
     assert res.json() == request_data
-
-
-def test_create_request_with_role_ids_and_policy_id(client):
-    fake_jwt = "1.2.3"
-
-    # attempt to create an access request with role_ids and policy_id
-    data = {
-        "username": "requestor_user",
-        "role_ids": ["test-role"],
-        "policy_id": "test-policy",
-    }
-    res = client.post(
-        "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
-    )
-    assert res.status_code == 400, res.text
-    assert "cannot have both role_ids and policy_id" in res.text
 
 
 def test_update_request_without_access(client, mock_arborist_requests):

@@ -92,10 +92,6 @@ async def create_request(
     )
 
     # catch errors on input
-    if data.get("resource_path") and data.get("resource_paths"):
-        msg = f"The request cannot have both resource_paths and resource_path."
-        raise_error(logger, msg, body)
-
     # (both policy_id and (resource_paths or resource_path))
     # OR (neither)
     if bool(data.get("policy_id")) == (
@@ -109,9 +105,11 @@ async def create_request(
         msg = f"The request cannot have both role_ids and policy_id."
         raise_error(logger, msg, body)
 
-    # both role_ids and resource_path
-    if data.get("role_ids") and data.get("resource_path"):
-        msg = f"The request cannot have both role_ids and resource_path."
+    # role_ids without resource_paths or resource_path
+    if data.get("role_ids") and not (
+        data.get("resource_paths") or data.get("resource_path")
+    ):
+        msg = f"A request with role_ids must have resource_paths."
         raise_error(logger, msg, body)
 
     if data.get("resource_path") and not data.get("resource_paths"):
