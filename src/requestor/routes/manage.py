@@ -105,13 +105,6 @@ async def create_request(
         msg = f"The request cannot have both role_ids and policy_id."
         raise_error(logger, msg, body)
 
-    # role_ids without resource_paths or resource_path
-    if data.get("role_ids") and not (
-        data.get("resource_paths") or data.get("resource_path")
-    ):
-        msg = f"A request with role_ids must have resource_paths."
-        raise_error(logger, msg, body)
-
     if data.get("resource_path") and not data.get("resource_paths"):
         data["resource_paths"] = [data["resource_path"]]
 
