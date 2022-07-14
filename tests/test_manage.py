@@ -52,7 +52,7 @@ def test_create_request_with_unallowed_params(client, data):
     When a user attempts to create a request with
         - both resource_path and policy_id
         - both of them missing
-        - role_id with resource_path without resource_paths
+        - both role_ids and policy_id
     a 400 Bad request is returned to the client.
     """
     fake_jwt = "1.2.3"
@@ -172,14 +172,14 @@ def test_create_duplicate_request(client):
     "data",
     [
         {
-            # request with both policy_id
+            # request with policy_id
             "username": "requestor_user",
             "policy_id": "test-policy",
             "resource_id": "uniqid",
             "resource_display_name": "My Resource",
         },
         {
-            # include role_ids and resource_paths
+            # request with role_ids and resource_paths
             "username": "requestor_user",
             "role_ids": ["study_registrant"],
             "resource_paths": ["/study/123456"],
