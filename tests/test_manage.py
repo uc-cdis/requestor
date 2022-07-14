@@ -3,7 +3,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 from requestor.arborist import (
-    get_auto_policy_id_for_resource_path,
+    get_auto_policy_id_for_resource_paths,
     get_auto_policy_id_for_role_ids_and_resource_paths,
 )
 from requestor.config import config
@@ -345,16 +345,44 @@ def test_create_request_with_granting_access(client):
     assert res.status_code == 201, res.text
 
 
-def test_create_request_with_resource_path(client):
+@pytest.mark.parametrize(
+    "data",
+    [
+        {
+            # provide resource_path to get the default reader policies
+            "username": "requestor_user",
+            "resource_path": "/study/123456",
+            "resource_id": "uniqid",
+            "resource_display_name": "My Resource",
+        },
+        {
+            # provide resource_paths without role_ids to get the default reader policies
+            "username": "requestor_user",
+            "resource_paths": ["/study/123456", "/mds_gateway", "/cedar"],
+            "resource_id": "uniqid",
+            "resource_display_name": "My Resource",
+        },
+        {
+            # resource_paths will take precedence over resource_path
+            "username": "requestor_user",
+            "resource_paths": ["/study/123456", "/mds_gateway", "/cedar"],
+            "resource_path": "/older_study/000111",
+            "resource_id": "uniqid",
+            "resource_display_name": "My Resource",
+        },
+    ],
+)
+def test_create_request_with_resource_path(client, data):
     fake_jwt = "1.2.3"
 
-    data = {
-        # provide resource_path to get the default reader policies
-        "username": "requestor_user",
-        "resource_path": "/study/123456",
-        "resource_id": "uniqid",
-        "resource_display_name": "My Resource",
-    }
+    if data.get("resource_paths"):
+        policy_id = get_auto_policy_id_for_resource_paths(data["resource_paths"])
+    elif data.get("resource_path"):
+        # resource_path will get cast to a list
+        policy_id = get_auto_policy_id_for_resource_paths([data["resource_path"]])
+    else:
+        policy_id = None
+
     res = client.post(
         "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
     )
@@ -365,7 +393,7 @@ def test_create_request_with_resource_path(client):
     assert request_data == {
         "request_id": request_id,
         "username": data["username"],
-        "policy_id": get_auto_policy_id_for_resource_path(data["resource_path"]),
+        "policy_id": policy_id,
         "resource_id": data["resource_id"],
         "resource_display_name": data["resource_display_name"],
         "status": config["DEFAULT_INITIAL_STATUS"],

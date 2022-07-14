@@ -91,20 +91,20 @@ async def create_request(
         f"Creating request. request_id: {request_id}. Received body: {data}. Revoke: {'revoke' in api_request.query_params}"
     )
 
-    # catch errors on input
-    # (both policy_id and (resource_paths or resource_path))
-    # OR (neither)
+    # error (if we have both policy_id and (resource_path or resource_paths))
+    # OR (if we have neither)
     if bool(data.get("policy_id")) == (
         bool(data.get("resource_paths")) or bool(data.get("resource_path"))
     ):
         msg = f"The request must have either resource_paths or a policy_id."
         raise_error(logger, msg, body)
 
-    # both role_ids and policy_id
+    # error if we have both role_ids and policy_id
     if data.get("role_ids") and data.get("policy_id"):
         msg = f"The request cannot have both role_ids and policy_id."
         raise_error(logger, msg, body)
 
+    # cast resource_path as list if resource_paths is not present
     if data.get("resource_path") and not data.get("resource_paths"):
         data["resource_paths"] = [data["resource_path"]]
 
@@ -129,11 +129,11 @@ async def create_request(
             )
             resource_paths = data["resource_paths"]
         else:
-            # else fallback to body `resource_path` for backwards compatibility
+            # else fallback to body `resource_paths` for backwards compatibility
             data["policy_id"] = await arborist.create_arborist_policy(
-                client, data["resource_path"]
+                client, data["resource_paths"]
             )
-            resource_paths = [data["resource_path"]]
+            resource_paths = data["resource_paths"]
     else:
         existing_policies = await arborist.list_policies(client, expand=True)
 

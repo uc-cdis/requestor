@@ -84,13 +84,14 @@ def get_resource_paths_for_policy(expanded_policies: list, policy_id: str) -> li
 
 
 def get_auto_policy_id_for_resource_path(resource_path: str) -> str:
-    """
-    For backwards compatibility, when given a `resource_path` instead of a
-    `policy_id`, we automatically generate a policy with `read` and
-    `read-storage` access to the provided `resource_path`.
-    """
     resources = resource_path.split("/")
     policy_id = ".".join(resources[1:]) + "_accessor"
+    return policy_id
+
+
+def get_auto_policy_id_for_resource_paths(resource_paths: list[str]) -> str:
+    resources = "_".join([".".join(r.split("/")[1:]) for r in resource_paths])
+    policy_id = resources + "_accessor"
     return policy_id
 
 
@@ -107,10 +108,16 @@ async def user_has_policy(
 @maybe_sync
 async def create_arborist_policy(
     arborist_client: ArboristClient,
-    resource_path: str,
+    resource_paths: list[str],
     resource_description: str = None,
 ):
-    await create_resource(arborist_client, resource_path, resource_description)
+    """
+    For backwards compatibility, when given a `resource_paths` instead of a
+    `policy_id` (and without existing `role_ids`), we automatically generate
+    a policy with `accessor` access to the provided `resource_paths`.
+    """
+    for resource_path in resource_paths:
+        await create_resource(arborist_client, resource_path, resource_description)
 
     # Create the roles needed to query and download data.
     # If they already exist arborist would "Do Nothing"
@@ -155,13 +162,13 @@ async def create_arborist_policy(
                 await res
 
     # create the policy
-    policy_id = get_auto_policy_id_for_resource_path(resource_path)
+    policy_id = get_auto_policy_id_for_resource_paths(resource_paths)
     logger.debug(f"Attempting to create policy {policy_id} in Arborist")
     policy = {
         "id": policy_id,
         "description": "policy created by requestor",
         "role_ids": ["peregrine_reader", "guppy_reader", "fence_storage_reader"],
-        "resource_paths": [resource_path],
+        "resource_paths": resource_paths,
     }
     res = arborist_client.create_policy(policy, skip_if_exists=True)
     if inspect.isawaitable(res):
