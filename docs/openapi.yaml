@@ -38,8 +38,6 @@ components:
         resource_path:
           title: Resource Path
           type: string
-          deprecated: true
-          description: Deprecated, use `resource_paths` instead
         resource_paths:
           items:
             type: string
