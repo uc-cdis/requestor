@@ -21,7 +21,7 @@ A user interacts with the service in the following way:
 - From a Gen3 Commons, the implementing organization will expose a "Request Access" option which will be displayed to users if they are logged in and do not currently have access to the resource (Program / Project) or policy.
 - The user is directed to an external form to complete an access request which should contain at a minimum:
   - User name
-  - Resource or policy access is being requested for
+  - Resources or resources+roles or policy access is being requested for (resources without a role will be assigned default reader roles)
   - Level of access
 - The service will generate a unique request ID (per user+resource or user+policy) and store this along with the username and resource or policy ID.
 - The service will send this data to the capturing system/process for review by appropriate administrative staff for the Gen3 Commons in question.
