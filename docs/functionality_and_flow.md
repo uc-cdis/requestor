@@ -21,8 +21,12 @@ A user interacts with the service in the following way:
 - From a Gen3 Commons, the implementing organization will expose a "Request Access" option which will be displayed to users if they are logged in and do not currently have access to the resource (Program / Project) or policy.
 - The user is directed to an external form to complete an access request which should contain at a minimum:
   - User name
-  - Resources or resources+roles or policy access is being requested for (resources without a role will be assigned default reader roles)
+  - One of the following for which access is being requested:
+    - policy
+    - resource_paths + existing role_ids
+    - resource_path[s] without a role_id (to be assigned default reader roles, currently `peregrine_reader`, `guppy_reader`, and `fence_storage_reader`)
   - Level of access
+- `resource_paths` will take prececence over `resource_path` if both are present in the request.
 - The service will generate a unique request ID (per user+resource or user+policy) and store this along with the username and resource or policy ID.
 - The service will send this data to the capturing system/process for review by appropriate administrative staff for the Gen3 Commons in question.
 - _The User may or may not receive confirmation of their request being received - this would be handled by the capturing system/process._

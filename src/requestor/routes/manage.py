@@ -223,9 +223,7 @@ async def create_request(
         )
 
     # remove any fields that are not stored in requests table
-    del data["resource_path"]
-    del data["resource_paths"]
-    del data["role_ids"]
+    [data.pop(key) for key in ["resource_path", "resource_paths", "role_ids"]]
 
     if draft_previous_requests:
         # reuse the draft request
