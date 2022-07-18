@@ -136,10 +136,6 @@ def list_roles_patcher():
                                 "method": "access",
                             },
                         },
-                        {
-                            "id": "mds_access",
-                            "action": {"service": "mds_gateway", "method": "access"},
-                        },
                     ],
                 },
                 {
@@ -152,11 +148,11 @@ def list_roles_patcher():
                     ],
                 },
                 {
-                    "id": "/cedar_user",
+                    "id": "/study_user",
                     "permissions": [
                         {
-                            "id": "cedar_access",
-                            "action": {"service": "cedar", "method": "access"},
+                            "id": "study_access",
+                            "action": {"service": "study_access", "method": "access"},
                         },
                     ],
                 },

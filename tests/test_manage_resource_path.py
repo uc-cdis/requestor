@@ -1,26 +1,308 @@
 """
 We now use `policy_id` instead of `resource_path` in access requests.
-This set of tests ensures backwards compatibility.
+This set of tests ensures backwards compatibility for `resource_path`
+as well as testing requests with `resource_paths` + `role_ids`.
 """
+import pytest
 
-
-from requestor.arborist import get_auto_policy_id_for_resource_path
+from requestor.arborist import (
+    get_auto_policy_id_for_resource_path,
+    get_auto_policy_id_for_resource_paths,
+    get_auto_policy_id_for_resource_paths_and_role_ids,
+)
 from requestor.config import config
 
 
-def test_create_request_without_username(client):
+def test_get_auto_policy_id_for_resource_path(client):
+    # single resource_path without policy_id or role_ids
+    resource_path = "/study/123456"
+    assert (
+        get_auto_policy_id_for_resource_path(resource_path) == "study.123456_accessor"
+    )
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        {
+            # single resource_path in resource_paths list
+            "resource_paths": ["/study/123456"],
+            "expected": "study.123456_accessor",
+        },
+        {
+            # mutiple resource_paths, each with leading slashes
+            # (content up to and including the first slash is removed)
+            "resource_paths": ["/study/123456", "/other_resource", "/another_resource"],
+            "expected": "study.123456_other_resource_another_resource_accessor",
+        },
+        {
+            # mutiple resource_paths, each with multiple slashes
+            # (content up to and including the first slash is removed,
+            # following slashes are converted to '.')
+            "resource_paths": [
+                "/study/123456",
+                "/another_study/98765",
+                "other_path/study/7890",
+            ],
+            "expected": "study.123456_another_study.98765_study.7890_accessor",
+        },
+    ],
+)
+def test_get_auto_policy_id_for_resource_paths(client, data):
+    """resource_paths without any role_ids."""
+    policy_id = get_auto_policy_id_for_resource_paths(data["resource_paths"])
+    assert policy_id == data["expected"]
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        {
+            # single resource_path in resource_paths + multiple role_ids
+            "resource_paths": ["/study/123456"],
+            "role_ids": ["my_reader", "my_other_reader"],
+            "expected": "study.123456_my_reader_my_other_reader",
+        },
+        {
+            # multiple resource_paths + multiple role_ids
+            "resource_paths": ["/study/123456", "/other_resource", "/another_resource"],
+            "role_ids": ["my_reader", "my_other_reader"],
+            "expected": "study.123456_other_resource_another_resource_my_reader_my_other_reader",
+        },
+        {
+            # resource_paths with multiple slashes
+            # (content up and including first slash is removed,
+            # following slashed are converted to '.')
+            "resource_paths": [
+                "/study/123456",
+                "/another_study/98765",
+                "other_path/study/7890",
+            ],
+            "role_ids": ["my_reader", "my_other_reader"],
+            "expected": "study.123456_another_study.98765_study.7890_my_reader_my_other_reader",
+        },
+        {
+            # role_ids with slashes (that get removed)
+            "resource_paths": ["/study/123456"],
+            "role_ids": ["/role_with_slash", "other_role/with_slash"],
+            "expected": "study.123456_role_with_slash_other_rolewith_slash",
+        },
+    ],
+)
+def test_get_auto_policy_id_for_resource_paths_and_role_ids(client, data):
+    """resource_paths + role_ids."""
+    policy_id = get_auto_policy_id_for_resource_paths_and_role_ids(
+        data["resource_paths"], data["role_ids"]
+    )
+    assert policy_id == data["expected"]
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        {
+            # with role_ids without resource_paths or resource_path
+            "username": "requestor_user",
+            "role_ids": ["test-role"],
+            "resource_id": "uniqid",
+            "resource_display_name": "My Resource",
+            "err_msg": "The request must have either",
+        },
+        {
+            # with both role_ids and policy_id
+            "username": "requestor_user",
+            "role_ids": ["study_registrant"],
+            "policy_id": "test-policy",
+            "resource_id": "uniqid",
+            "resource_display_name": "My Resource",
+            "err_msg": "The request cannot have both role_ids and policy_id",
+        },
+    ],
+)
+def test_create_request_with_unallowed_params(client, data):
+    """
+    When a user attempts to create a request with
+        - role_ids without resource_paths
+        - both role_ids and policy_id
+    a 400 Bad request is returned to the client.
+    """
+    fake_jwt = "1.2.3"
+
+    res = client.post(
+        "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+    )
+
+    assert res.status_code == 400, res.text
+    assert data["err_msg"] in res.json()["detail"]
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        {
+            # provide resource_path without policy_id to get the default reader policies
+            "username": "requestor_user",
+            "resource_path": "/study/123456",
+            "resource_id": "uniqid",
+            "resource_display_name": "My Resource",
+        },
+        {
+            # provide resource_paths without role_ids to get the default reader policies
+            "username": "requestor_user",
+            "resource_paths": ["/study/123456", "/study/7890", "/another_study/98765"],
+            "resource_id": "uniqid",
+            "resource_display_name": "My Resource",
+        },
+        {
+            # resource_paths will take precedence over resource_path
+            "username": "requestor_user",
+            "resource_path": "/older_study/000111",
+            "resource_paths": ["/study/123456", "/study/7890", "/another_study/98765"],
+            "resource_id": "uniqid",
+            "resource_display_name": "My Resource",
+        },
+    ],
+)
+def test_create_request_with_resource_path(client, data):
+    fake_jwt = "1.2.3"
+
+    if data.get("resource_paths"):
+        policy_id = get_auto_policy_id_for_resource_paths(data["resource_paths"])
+    elif data.get("resource_path"):
+        # resource_path will get cast to a list
+        policy_id = get_auto_policy_id_for_resource_paths([data["resource_path"]])
+    else:
+        policy_id = None
+
+    res = client.post(
+        "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+    )
+    assert res.status_code == 201, res.text
+    request_data = res.json()
+    request_id = request_data.get("request_id")
+    assert request_id, "POST /request did not return a request_id"
+    assert request_data == {
+        "request_id": request_id,
+        "username": data["username"],
+        "policy_id": policy_id,
+        "resource_id": data["resource_id"],
+        "resource_display_name": data["resource_display_name"],
+        "status": config["DEFAULT_INITIAL_STATUS"],
+        # just ensure revoke, created_time and updated_time are there:
+        "revoke": False,
+        "created_time": request_data["created_time"],
+        "updated_time": request_data["updated_time"],
+    }
+
+    # get the request
+    res = client.get(f"/request/{request_id}")
+    assert res.status_code == 200, res.text
+    assert res.json() == request_data
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        {
+            # include single item in resource_paths and single item in role_ids
+            "username": "requestor_user",
+            "resource_paths": ["/study/123456"],
+            "role_ids": ["study_registrant"],
+            "resource_id": "uniqid",
+            "resource_display_name": "My Resource",
+        },
+        {
+            # include multiple resource_paths and role_ids
+            "username": "requestor_user",
+            "resource_paths": ["/study/123456", "/study/7890", "/another_study/98765"],
+            "role_ids": ["study_registrant", "/mds_user", "/study_user"],
+            "resource_id": "uniqid",
+            "resource_display_name": "My Resource",
+        },
+        {
+            # include resource_path and resource_paths and role_ids
+            "username": "requestor_user",
+            "resource_path": "/older_study/98765",
+            "resource_paths": ["/study/123456", "/study/7890", "/another_study/98765"],
+            "role_ids": ["study_registrant", "/mds_user", "/study_user"],
+            "resource_id": "uniqid",
+            "resource_display_name": "My Resource",
+        },
+    ],
+)
+def test_create_request_with_resource_paths_and_role_ids(
+    client, list_roles_patcher, data
+):
+    fake_jwt = "1.2.3"
+
+    res = client.post(
+        "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+    )
+    assert res.status_code == 201, res.text
+    request_data = res.json()
+    request_id = request_data.get("request_id")
+    assert request_id, "POST /request did not return a request_id"
+    assert request_data == {
+        "request_id": request_id,
+        "username": data["username"],
+        "policy_id": get_auto_policy_id_for_resource_paths_and_role_ids(
+            data["resource_paths"], data["role_ids"]
+        ),
+        "resource_id": data["resource_id"],
+        "resource_display_name": data["resource_display_name"],
+        "status": config["DEFAULT_INITIAL_STATUS"],
+        # just ensure revoke, created_time and updated_time are there:
+        "revoke": False,
+        "created_time": request_data["created_time"],
+        "updated_time": request_data["updated_time"],
+    }
+
+    # get the request
+    res = client.get(f"/request/{request_id}")
+    assert res.status_code == 200, res.text
+    assert res.json() == request_data
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        {
+            # resource_path, no username
+            "resource_path": "/my/resource",
+            "resource_id": "uniqid",
+            "resource_display_name": "My Resource",
+        },
+        {
+            # resource_paths, no username
+            "resource_paths": ["/study/123456", "/study/7890", "/another_study/98765"],
+            "resource_id": "uniqid",
+            "resource_display_name": "My Resource",
+        },
+        {
+            # resource_paths will take precedence over resource_path
+            "resource_path": "/older_study/000111",
+            "resource_paths": ["/study/123456", "/study/7890", "/another_study/98765"],
+            "resource_id": "uniqid",
+            "resource_display_name": "My Resource",
+        },
+    ],
+)
+def test_create_request_without_username(client, data):
     """
     When a username is not provided in the body, the request is created
     using the username from the provided access token.
     """
     fake_jwt = "1.2.3"
 
+    if data.get("resource_paths"):
+        policy_id = get_auto_policy_id_for_resource_paths(data["resource_paths"])
+    elif data.get("resource_path"):
+        # resource_path will get cast to a list
+        policy_id = get_auto_policy_id_for_resource_paths([data["resource_path"]])
+    else:
+        policy_id = None
+
     # create a request
-    data = {
-        "resource_path": "/my/resource",
-        "resource_id": "uniqid",
-        "resource_display_name": "My Resource",
-    }
     res = client.post(
         "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
     )
@@ -32,7 +314,7 @@ def test_create_request_without_username(client):
     assert request_data == {
         "request_id": request_id,
         "username": "requestor_user",  # username from access_token_patcher
-        "policy_id": get_auto_policy_id_for_resource_path(data["resource_path"]),
+        "policy_id": policy_id,
         "resource_id": data["resource_id"],
         "resource_display_name": data["resource_display_name"],
         "status": config["DEFAULT_INITIAL_STATUS"],
@@ -43,7 +325,34 @@ def test_create_request_without_username(client):
     }
 
 
-def test_create_duplicate_request(client):
+@pytest.mark.parametrize(
+    "data",
+    [
+        {
+            # resource_path
+            "username": "requestor_user",
+            "resource_path": "/my/resource",
+            "resource_id": "uniqid",
+            "resource_display_name": "My Resource",
+        },
+        {
+            # resource_paths
+            "username": "requestor_user",
+            "resource_paths": ["/study/123456", "/study/7890", "/another_study/98765"],
+            "resource_id": "uniqid",
+            "resource_display_name": "My Resource",
+        },
+        {
+            # resource_paths will take precedence over resource_path
+            "username": "requestor_user",
+            "resource_path": "/older_study/000111",
+            "resource_paths": ["/study/123456", "/study/7890", "/another_study/98765"],
+            "resource_id": "uniqid",
+            "resource_display_name": "My Resource",
+        },
+    ],
+)
+def test_create_duplicate_request(client, data):
     """
     Users can only request access to a resource once.
     (username, resource_path) should be unique, except if other
@@ -111,17 +420,33 @@ def test_create_duplicate_request(client):
     assert res.status_code == 201, res.text
 
 
-def test_create_request_without_access(client, mock_arborist_requests):
+@pytest.mark.parametrize(
+    "data",
+    [
+        {
+            # request with resource_path
+            "username": "requestor_user",
+            "resource_path": "/my/resource",
+            "resource_id": "uniqid",
+            "resource_display_name": "My Resource",
+        },
+        {
+            # request with resource_paths and role_ids
+            "username": "requestor_user",
+            "role_ids": ["study_registrant"],
+            "resource_paths": ["/study/123456"],
+            "resource_id": "uniqid",
+            "resource_display_name": "My Resource",
+        },
+    ],
+)
+def test_create_request_without_access(
+    client, mock_arborist_requests, list_roles_patcher, data
+):
     fake_jwt = "1.2.3"
     mock_arborist_requests(authorized=False)
 
     # attempt to create a request
-    data = {
-        "username": "requestor_user",
-        "resource_path": "/my/resource",
-        "resource_id": "uniqid",
-        "resource_display_name": "My Resource",
-    }
     res = client.post(
         "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
     )
@@ -131,6 +456,24 @@ def test_create_request_without_access(client, mock_arborist_requests):
     res = client.get("/request", headers={"Authorization": f"bearer {fake_jwt}"})
     assert res.status_code == 200, res.text
     assert res.json() == []
+
+
+def test_create_request_with_non_existent_role_id(client, list_roles_patcher):
+    fake_jwt = "1.2.3"
+
+    # attempt to create an access request with a role_id that is not present in arborist
+    data = {
+        "username": "requestor_user",
+        "role_ids": ["study_registrant", "some-nonexistent-role"],
+        "resource_paths": ["/test-resource-path/resource"],
+    }
+    res = client.post(
+        "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+    )
+    assert res.status_code == 400, res.text
+    assert "do not exist" in res.text
+    assert "nonexistent-role" in res.text
+    assert "study_registrant" not in res.text
 
 
 def test_update_request(client):

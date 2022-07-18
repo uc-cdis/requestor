@@ -92,6 +92,7 @@ def get_auto_policy_id_for_resource_path(resource_path: str) -> str:
 def get_auto_policy_id_for_resource_paths(resource_paths: list[str]) -> str:
     resources = "_".join([".".join(r.split("/")[1:]) for r in resource_paths])
     policy_id = resources + "_accessor"
+    # TODO: check the length of policy_id and truncate if too long for arborist db.
     return policy_id
 
 
@@ -112,7 +113,7 @@ async def create_arborist_policy(
     resource_description: str = None,
 ):
     """
-    For backwards compatibility, when given a `resource_paths` instead of a
+    For backwards compatibility, when given a `resource_path[s]` instead of a
     `policy_id` (and without existing `role_ids`), we automatically generate
     a policy with `accessor` access to the provided `resource_paths`.
     """
@@ -188,8 +189,8 @@ async def create_arborist_policy_for_role_ids(
         await create_resource(arborist_client, resource_path, resource_description)
 
     # create the policy
-    policy_id = get_auto_policy_id_for_role_ids_and_resource_paths(
-        role_ids, resource_paths
+    policy_id = get_auto_policy_id_for_resource_paths_and_role_ids(
+        resource_paths, role_ids
     )
     logger.debug(f"Attempting to create policy {policy_id} in Arborist")
     policy = {
@@ -225,22 +226,34 @@ async def create_resource(
         await res
 
 
-def get_auto_policy_id_for_role_ids_and_resource_paths(
-    role_ids: list[str], resource_paths: list[str]
+def get_auto_policy_id_for_resource_paths_and_role_ids(
+    resource_paths: list[str], role_ids: list[str]
 ) -> str:
     """
     Create a policy_name given role_ids and resource_paths with format
-    'study.[resource_paths]_[role_ids]'.
-    For example, for
-    resource_path=['/study/123456','/mds_gateway', '/cedar']
+    '[resource_paths]_[role_ids]'
+    where items have been concatenated with underscore ('_').
+
+    The logic for each resource_path matches `get_auto_policy_id_for_resource_path`:
+        - content up to and including first slash ('/') is removed
+        - following slashes are replaced with a dot ('.').
+
+    The logic for the role_ids is:
+        - slashes are removed.
+
+    As an example, with
+    resource_paths=['/study/123456','other_path/study/7890', '/another_resource']
     and
-    role_ids = ["study_registrant", "/mds_user", "/cedar_user"]
-    we should have
-    policy_id = 'study.123456_mds_gateway_cedar_study_registrant_mds_user_cedar_user'
+    role_ids = ["study_registrant", "/other-resource-user", "/study-user"]
+    the expected result is
+    policy_id = 'study.123456_study.7890_another_resource_study_registrant_other-resource-user_study-user'
+
+    See `test_get_auto_policy_id_for_resource_paths_and_role_ids` for more examples.
     """
     resources = "_".join([".".join(r.split("/")[1:]) for r in resource_paths])
     roles = "_".join(["".join(r.split("/")) for r in role_ids])
     policy_id = resources + "_" + roles
+    # TODO: check the length of policy_id and truncate if too long for arborist db.
     return policy_id
 
 
