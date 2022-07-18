@@ -517,6 +517,14 @@ def test_update_request(client):
     assert request_data["created_time"] == created_time
     assert request_data["updated_time"] != updated_time
 
+    # update the request status with the same status
+    res = client.put(f"/request/{request_id}", json={"status": status})
+    assert res.status_code == 200, res.text
+    request_data = res.json()
+    assert request_data["status"] == status
+    assert request_data["created_time"] == created_time
+    assert request_data["updated_time"] != updated_time
+
     # update the request status and grant access
     status = config["UPDATE_ACCESS_STATUSES"][0]
     res = client.put(f"/request/{request_id}", json={"status": status})
