@@ -90,7 +90,7 @@ components:
       type: http
 info:
   title: Requestor
-  version: 1.6.0
+  version: 1.5.1
 openapi: 3.0.2
 paths:
   /_status:
