@@ -92,7 +92,6 @@ def get_auto_policy_id_for_resource_path(resource_path: str) -> str:
 def get_auto_policy_id_for_resource_paths(resource_paths: list[str]) -> str:
     resources = "_".join([".".join(r.split("/")[1:]) for r in resource_paths])
     policy_id = resources + "_accessor"
-    # TODO: check the length of policy_id and truncate if too long for arborist db.
     return policy_id
 
 
@@ -253,7 +252,6 @@ def get_auto_policy_id_for_resource_paths_and_role_ids(
     resources = "_".join([".".join(r.split("/")[1:]) for r in resource_paths])
     roles = "_".join(["".join(r.split("/")) for r in role_ids])
     policy_id = resources + "_" + roles
-    # TODO: check the length of policy_id and truncate if too long for arborist db.
     return policy_id
 
 
