@@ -1,43 +1,46 @@
 import asyncio
+import pytest
 from unittest.mock import MagicMock, patch
 
 from requestor.config import config
 
 
-def test_create_request_with_resource_path_and_policy(client):
+@pytest.mark.parametrize(
+    "data",
+    [
+        {
+            # with both resource_path and policy_id
+            "username": "requestor_user",
+            "resource_path": "/test-resource-path/resource",
+            "policy_id": "test-policy",
+            "resource_id": "uniqid",
+            "resource_display_name": "My Resource",
+            "err_msg": "The request must have either",
+        },
+        {
+            # without resource_path and policy_id
+            "username": "requestor_user",
+            "resource_id": "uniqid",
+            "resource_display_name": "My Resource",
+            "err_msg": "The request must have either",
+        },
+    ],
+)
+def test_create_request_with_unallowed_params(client, data):
     """
-    When a user attempts to create a request with both resource_path and
-    policy_id or with both of them missing, a 400 Bad request is returned to the client.
+    When a user attempts to create a request with
+        - both resource_path and policy_id
+        - both of them missing
+    a 400 Bad request is returned to the client.
     """
     fake_jwt = "1.2.3"
 
-    # create a request with both resource_path and policy_id
-    data = {
-        "username": "requestor_user",
-        "resource_path": "/test-resource-path/resource",
-        "policy_id": "test-policy",
-        "resource_id": "uniqid",
-        "resource_display_name": "My Resource",
-    }
     res = client.post(
         "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
     )
 
     assert res.status_code == 400, res.text
-    assert "must have either" in res.json()["detail"]
-
-    # create a request which has neither resource_path nor policy_id
-    data = {
-        "username": "requestor_user",
-        "resource_id": "uniqid",
-        "resource_display_name": "My Resource",
-    }
-    res = client.post(
-        "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
-    )
-
-    assert res.status_code == 400, res.text
-    assert "must have either" in res.json()["detail"]
+    assert data["err_msg"] in res.json()["detail"]
 
 
 def test_create_request_without_username(client):
@@ -147,13 +150,14 @@ def test_create_request_without_access(client, mock_arborist_requests):
     fake_jwt = "1.2.3"
     mock_arborist_requests(authorized=False)
 
-    # attempt to create a request
     data = {
+        # request with policy_id
         "username": "requestor_user",
         "policy_id": "test-policy",
         "resource_id": "uniqid",
         "resource_display_name": "My Resource",
     }
+    # attempt to create a request
     res = client.post(
         "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
     )

@@ -84,13 +84,14 @@ def get_resource_paths_for_policy(expanded_policies: list, policy_id: str) -> li
 
 
 def get_auto_policy_id_for_resource_path(resource_path: str) -> str:
-    """
-    For backwards compatibility, when given a `resource_path` instead of a
-    `policy_id`, we automatically generate a policy with `read` and
-    `read-storage` access to the provided `resource_path`.
-    """
     resources = resource_path.split("/")
     policy_id = ".".join(resources[1:]) + "_accessor"
+    return policy_id
+
+
+def get_auto_policy_id_for_resource_paths(resource_paths: list[str]) -> str:
+    resources = "_".join([".".join(r.split("/")[1:]) for r in resource_paths])
+    policy_id = resources + "_accessor"
     return policy_id
 
 
@@ -107,21 +108,16 @@ async def user_has_policy(
 @maybe_sync
 async def create_arborist_policy(
     arborist_client: ArboristClient,
-    resource_path: str,
+    resource_paths: list[str],
     resource_description: str = None,
 ):
-    # create the resource
-    logger.debug(f"Attempting to create resource {resource_path} in Arborist")
-    resources = resource_path.split("/")
-    resource_name = resources[-1]
-    parent_path = "/".join(resources[:-1])
-    resource = {
-        "name": resource_name,
-        "description": resource_description,
-    }
-    res = arborist_client.create_resource(parent_path, resource, create_parents=True)
-    if inspect.isawaitable(res):
-        await res
+    """
+    For backwards compatibility, when given a `resource_path[s]` instead of a
+    `policy_id` (and without existing `role_ids`), we automatically generate
+    a policy with `accessor` access to the provided `resource_paths`.
+    """
+    for resource_path in resource_paths:
+        await create_resource(arborist_client, resource_path, resource_description)
 
     # Create the roles needed to query and download data.
     # If they already exist arborist would "Do Nothing"
@@ -166,19 +162,112 @@ async def create_arborist_policy(
                 await res
 
     # create the policy
-    policy_id = get_auto_policy_id_for_resource_path(resource_path)
+    policy_id = get_auto_policy_id_for_resource_paths(resource_paths)
     logger.debug(f"Attempting to create policy {policy_id} in Arborist")
     policy = {
         "id": policy_id,
         "description": "policy created by requestor",
         "role_ids": ["peregrine_reader", "guppy_reader", "fence_storage_reader"],
-        "resource_paths": [resource_path],
+        "resource_paths": resource_paths,
     }
     res = arborist_client.create_policy(policy, skip_if_exists=True)
     if inspect.isawaitable(res):
         await res
 
     return policy_id
+
+
+@maybe_sync
+async def create_arborist_policy_for_role_ids(
+    arborist_client: ArboristClient,
+    role_ids: list[str],
+    resource_paths: list[str],
+    resource_description: str = None,
+):
+    for resource_path in resource_paths:
+        await create_resource(arborist_client, resource_path, resource_description)
+
+    # create the policy
+    policy_id = get_auto_policy_id_for_resource_paths_and_role_ids(
+        resource_paths, role_ids
+    )
+    logger.debug(f"Attempting to create policy {policy_id} in Arborist")
+    policy = {
+        "id": policy_id,
+        "description": "policy created by requestor",
+        "role_ids": role_ids,
+        "resource_paths": resource_paths,
+    }
+    res = arborist_client.create_policy(policy, skip_if_exists=True)
+    if inspect.isawaitable(res):
+        await res
+
+    return policy_id
+
+
+@maybe_sync
+async def create_resource(
+    arborist_client: ArboristClient,
+    resource_path: str,
+    resource_description: str = None,
+):
+    # create the resources
+    logger.debug(f"Attempting to create resource {resource_path} in Arborist")
+    resources = resource_path.split("/")
+    resource_name = resources[-1]
+    parent_path = "/".join(resources[:-1])
+    resource = {
+        "name": resource_name,
+        "description": resource_description,
+    }
+    res = arborist_client.create_resource(parent_path, resource, create_parents=True)
+    if inspect.isawaitable(res):
+        await res
+
+
+def get_auto_policy_id_for_resource_paths_and_role_ids(
+    resource_paths: list[str], role_ids: list[str]
+) -> str:
+    """
+    Create a policy_name given role_ids and resource_paths with format
+    '[resource_paths]_[role_ids]'
+    where items have been concatenated with underscore ('_').
+
+    The logic for each resource_path matches `get_auto_policy_id_for_resource_path`:
+        - content up to and including first slash ('/') is removed
+        - following slashes are replaced with a dot ('.').
+
+    The logic for the role_ids is:
+        - slashes are removed.
+
+    As an example, with
+    resource_paths=['/study/123456','other_path/study/7890', '/another_resource']
+    and
+    role_ids = ["study_registrant", "/other-resource-user", "/study-user"]
+    the expected result is
+    policy_id = 'study.123456_study.7890_another_resource_study_registrant_other-resource-user_study-user'
+
+    See `test_get_auto_policy_id_for_resource_paths_and_role_ids` for more examples.
+    """
+    resources = "_".join([".".join(r.split("/")[1:]) for r in resource_paths])
+    roles = "_".join(["".join(r.split("/")) for r in role_ids])
+    policy_id = resources + "_" + roles
+    return policy_id
+
+
+@maybe_sync
+async def list_roles(arborist_client: ArboristClient) -> dict:
+    """
+    We can cache this data later if needed, but it's tricky - the length
+    we can cache depends on the source of the information, so this MUST
+    invalidate the cache whenever Arborist adds a role.
+    For now, just make a call to Arborist every time we need this information.
+    """
+    res = arborist_client.list_roles()
+    if inspect.isawaitable(res):
+        res = await res
+
+    return res
 
 
 async def grant_user_access_to_policy(
