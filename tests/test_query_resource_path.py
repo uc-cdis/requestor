@@ -137,7 +137,7 @@ def test_list_requests_with_access(client):
 
     # create requests
     request_data = {}
-    for resource_path in ["/my/resource", "something-i-cant-access"]:
+    for resource_path in ["/my/resource", "/something-i-cant-access"]:
         data = {
             "resource_path": resource_path,
             "resource_id": "uniqid",
@@ -151,7 +151,7 @@ def test_list_requests_with_access(client):
 
     # list requests
     # the mocked auth_mapping response in mock_arborist_requests does not
-    # include "something-i-cant-access", so it should not be returned
+    # include "/something-i-cant-access", so it should not be returned
     res = client.get("/request", headers={"Authorization": f"bearer {fake_jwt}"})
     assert res.status_code == 200, res.text
     assert res.json() == [request_data["/my/resource"]]

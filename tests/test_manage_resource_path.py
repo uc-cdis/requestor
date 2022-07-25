@@ -117,9 +117,26 @@ def test_get_auto_policy_id_for_resource_paths_and_role_ids(client, data):
             "resource_display_name": "My Resource",
             "err_msg": "The request cannot have both role_ids and policy_id",
         },
+        {
+            # resource_path without slash
+            "username": "requestor_user",
+            "resource_path": "path-without-slash",
+            "resource_id": "uniqid",
+            "resource_display_name": "My Resource",
+            "err_msg": "does not have content after a forward slash",
+        },
+        {
+            # resource_paths without slash
+            "username": "requestor_user",
+            "role_ids": ["study_registrant"],
+            "resource_paths": ["path-without-slash"],
+            "resource_id": "uniqid",
+            "resource_display_name": "My Resource",
+            "err_msg": "does not have content after a forward slash",
+        },
     ],
 )
-def test_create_request_with_unallowed_params(client, data):
+def test_create_request_with_unallowed_params(client, list_roles_patcher, data):
     """
     When a user attempts to create a request with
         - role_ids without resource_paths
