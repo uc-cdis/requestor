@@ -141,6 +141,7 @@ def test_create_request_with_unallowed_params(client, list_roles_patcher, data):
     When a user attempts to create a request with
         - role_ids without resource_paths
         - both role_ids and policy_id
+        - resource_paths do not have content following a slash
     a 400 Bad request is returned to the client.
     """
     fake_jwt = "1.2.3"
