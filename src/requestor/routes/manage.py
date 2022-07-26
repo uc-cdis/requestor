@@ -112,6 +112,12 @@ async def create_request(
     client = api_request.app.arborist_client
 
     if not data["policy_id"]:
+        # Check format of resource_paths (should have content after slash)
+        for p in data["resource_paths"]:
+            if not p.split("/")[1:]:
+                msg = f"Request creation failed. Resource path '{p}' does not have content after a forward slash ('/')."
+                raise_error(logger, msg, body)
+
         if data.get("role_ids") and data.get("resource_paths"):
 
             existing_roles = await arborist.list_roles(client)
