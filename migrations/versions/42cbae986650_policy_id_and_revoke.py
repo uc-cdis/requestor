@@ -66,7 +66,7 @@ def upgrade():
     for resource_path in existing_resource_paths:
         policy_id = get_auto_policy_id_for_resource_path(resource_path)
         if not config["LOCAL_MIGRATION"] and policy_id not in existing_policies:
-            create_arborist_policy(arborist_client, resource_path)
+            create_arborist_policy(arborist_client, [resource_path])
         connection.execute(
             f"UPDATE requests SET policy_id='{escape(policy_id)}', revoke=False WHERE resource_path='{escape(resource_path)}'"
         )
