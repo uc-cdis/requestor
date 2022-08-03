@@ -158,7 +158,12 @@ async def create_request(
     if not data.get("username"):
         logger.debug("No username provided in body, using token username")
         token_claims = await auth.get_token_claims()
-        token_username = token_claims["context"]["user"]["name"]
+        token_username = token_claims.get("context", {}).get("user", {}).get("name")
+        if not token_username:
+            raise HTTPException(
+                HTTP_400_BAD_REQUEST,
+                "Must provide a username in the request body or token",
+            )
         logger.debug(f"Got username from token: {token_username}")
         data["username"] = token_username
 

@@ -3,7 +3,43 @@ import pytest
 from requestor.config import config
 
 
-def test_create_get_and_list_request(client):
+def test_create_and_get_request(client):
+    fake_jwt = "1.2.3"
+
+    # create a request
+    data = {
+        "username": "requestor_user",
+        "policy_id": "test-policy",
+        "resource_id": "uniqid",
+        "resource_display_name": "My Resource",
+    }
+    res = client.post(
+        "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
+    )
+    assert res.status_code == 201, res.text
+    request_data = res.json()
+    request_id = request_data.get("request_id")
+    assert request_id, "POST /request did not return a request_id"
+    assert request_data == {
+        "request_id": request_id,
+        "username": data["username"],
+        "policy_id": data["policy_id"],
+        "resource_id": data["resource_id"],
+        "resource_display_name": data["resource_display_name"],
+        "status": config["DEFAULT_INITIAL_STATUS"],
+        # just ensure revoke, created_time and updated_time are there:
+        "revoke": False,
+        "created_time": request_data["created_time"],
+        "updated_time": request_data["updated_time"],
+    }
+
+    # get the request
+    res = client.get(f"/request/{request_id}")
+    assert res.status_code == 200, res.text
+    assert res.json() == request_data
+
+
+def test_create_and_list_request(client, access_token_user_only_patcher):
     fake_jwt = "1.2.3"
 
     # list requests: empty
@@ -37,11 +73,6 @@ def test_create_get_and_list_request(client):
         "created_time": request_data["created_time"],
         "updated_time": request_data["updated_time"],
     }
-
-    # get the request
-    res = client.get(f"/request/{request_id}")
-    assert res.status_code == 200, res.text
-    assert res.json() == request_data
 
     # list requests
     res = client.get("/request", headers={"Authorization": f"bearer {fake_jwt}"})
@@ -92,7 +123,7 @@ def test_get_request_without_access(client, mock_arborist_requests):
     assert not_found_err == unauthorized_err
 
 
-def test_get_filtered_requests(client):
+def test_get_filtered_requests(client, access_token_user_only_patcher):
 
     fake_jwt = "1.2.3"
     filtered_requests = []
@@ -173,7 +204,7 @@ def test_get_filtered_requests(client):
     assert res.status_code == 400, res.text
 
 
-def test_get_user_requests(client):
+def test_get_user_requests(client, access_token_user_only_patcher):
     fake_jwt = "1.2.3"
 
     # create a request for the current user
@@ -205,7 +236,7 @@ def test_get_user_requests(client):
     assert res.status_code == 401, res.text
 
 
-def test_get_active_user_requests(client):
+def test_get_active_user_requests(client, access_token_user_only_patcher):
     fake_jwt = "1.2.3"
 
     # create a request with a DRAFT status
@@ -260,7 +291,7 @@ def test_get_active_user_requests(client):
     assert res.json() == [active_request1, active_request2]
 
 
-def test_get_filtered_user_requests(client):
+def test_get_filtered_user_requests(client, access_token_user_only_patcher):
     fake_jwt = "1.2.3"
     filtered_requests = []
 
@@ -337,7 +368,7 @@ def test_get_filtered_user_requests(client):
     assert res.status_code == 400, res.text
 
 
-def test_list_requests_with_access(client):
+def test_list_requests_with_access(client, access_token_user_only_patcher):
     fake_jwt = "1.2.3"
 
     # create requests
@@ -403,7 +434,9 @@ def test_list_requests_with_access(client):
         },
     ],
 )
-def test_check_user_resource_paths_prefixes(client, list_policies_patcher, test_data):
+def test_check_user_resource_paths_prefixes(
+    client, list_policies_patcher, test_data, access_token_user_only_patcher
+):
     """
     Test if having requested access to the resource path in
     test_data["resource_path"] means having requested access to
@@ -448,7 +481,9 @@ def test_check_user_resource_paths_prefixes(client, list_policies_patcher, test_
         }
     ],
 )
-def test_check_user_resource_paths_multiple(client, list_policies_patcher, test_data):
+def test_check_user_resource_paths_multiple(
+    client, list_policies_patcher, test_data, access_token_user_only_patcher
+):
     fake_jwt = "1.2.3"
     expected_matches = {
         "/a/b": True,
@@ -481,7 +516,7 @@ def test_check_user_resource_paths_multiple(client, list_policies_patcher, test_
     assert res.json() == expected_matches
 
 
-def test_check_user_resource_paths_username(client):
+def test_check_user_resource_paths_username(client, access_token_user_only_patcher):
     fake_jwt = "1.2.3"
 
     resource_path_to_match = "/a/b"
@@ -534,7 +569,9 @@ def test_check_user_resource_paths_username(client):
         },
     ],
 )
-def test_check_user_resource_paths_status(client, list_policies_patcher, test_data):
+def test_check_user_resource_paths_status(
+    client, list_policies_patcher, test_data, access_token_user_only_patcher
+):
     fake_jwt = "1.2.3"
 
     # create a request with the status to test
@@ -588,7 +625,9 @@ def test_check_user_resource_paths_status(client, list_policies_patcher, test_da
         },
     ],
 )
-def test_check_permissions_mismatch(client, list_policies_patcher, test_data):
+def test_check_permissions_mismatch(
+    client, list_policies_patcher, test_data, access_token_user_only_patcher
+):
     fake_jwt = "1.2.3"
 
     # create a request with an active status
