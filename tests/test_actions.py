@@ -1,6 +1,6 @@
 import mock
 
-from requestor.arborist import get_auto_policy_id_for_resource_path
+from requestor.arborist import get_auto_policy_id
 from requestor.config import config
 
 
@@ -60,7 +60,7 @@ def test_create_request_with_redirect_resource_paths(client):
     assert request_data == {
         "request_id": request_id,
         "username": data["username"],
-        "policy_id": get_auto_policy_id_for_resource_path(data["resource_path"]),
+        "policy_id": get_auto_policy_id(data["resource_path"]),
         "resource_id": data["resource_id"],
         "resource_display_name": data["resource_display_name"],
         "status": config["DEFAULT_INITIAL_STATUS"],

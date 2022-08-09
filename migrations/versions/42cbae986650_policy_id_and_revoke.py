@@ -15,7 +15,7 @@ from gen3authz.client.arborist.client import ArboristClient
 
 from requestor.arborist import (
     create_arborist_policy,
-    get_auto_policy_id_for_resource_path,
+    get_auto_policy_id,
     get_resource_paths_for_policy,
     list_policies,
 )
@@ -64,7 +64,7 @@ def upgrade():
     # add the `policy_id` corresponding to each row's `resource_path`
     # and default `revoke` to False
     for resource_path in existing_resource_paths:
-        policy_id = get_auto_policy_id_for_resource_path(resource_path)
+        policy_id = get_auto_policy_id(resource_path)
         if not config["LOCAL_MIGRATION"] and policy_id not in existing_policies:
             create_arborist_policy(arborist_client, [resource_path])
         connection.execute(

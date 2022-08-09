@@ -5,66 +5,58 @@ as well as testing requests with `resource_paths` + `role_ids`.
 """
 import pytest
 
-from requestor.arborist import (
-    get_auto_policy_id_for_resource_path,
-    get_auto_policy_id_for_resource_paths,
-    get_auto_policy_id_for_resource_paths_and_role_ids,
-)
+from requestor.arborist import get_auto_policy_id
 from requestor.config import config
-
-
-def test_get_auto_policy_id_for_resource_path(client):
-    # single resource_path without policy_id or role_ids
-    resource_path = "/study/123456"
-    assert (
-        get_auto_policy_id_for_resource_path(resource_path) == "study.123456_accessor"
-    )
 
 
 @pytest.mark.parametrize(
     "data",
     [
         {
+            # single resource_path
+            "resource_path": "/study/123456",
+            "resource_paths": None,
+            "role_ids": None,
+            "expected": "study.123456_accessor",
+        },
+        {
             # single resource_path in resource_paths list
+            "resource_path": None,
             "resource_paths": ["/study/123456"],
+            "role_ids": None,
             "expected": "study.123456_accessor",
         },
         {
             # mutiple resource_paths, each with leading slashes
             # (content up to and including the first slash is removed)
+            "resource_path": None,
             "resource_paths": ["/study/123456", "/other_resource", "/another_resource"],
+            "role_ids": None,
             "expected": "study.123456_other_resource_another_resource_accessor",
         },
         {
             # mutiple resource_paths, each with multiple slashes
             # (content up to and including the first slash is removed,
             # following slashes are converted to '.')
+            "resource_path": None,
             "resource_paths": [
                 "/study/123456",
                 "/another_study/98765",
                 "other_path/study/7890",
             ],
+            "role_ids": None,
             "expected": "study.123456_another_study.98765_study.7890_accessor",
         },
-    ],
-)
-def test_get_auto_policy_id_for_resource_paths(client, data):
-    """resource_paths without any role_ids."""
-    policy_id = get_auto_policy_id_for_resource_paths(data["resource_paths"])
-    assert policy_id == data["expected"]
-
-
-@pytest.mark.parametrize(
-    "data",
-    [
         {
             # single resource_path in resource_paths + multiple role_ids
+            "resource_path": None,
             "resource_paths": ["/study/123456"],
             "role_ids": ["my_reader", "my_other_reader"],
             "expected": "study.123456_my_reader_my_other_reader",
         },
         {
             # multiple resource_paths + multiple role_ids
+            "resource_path": None,
             "resource_paths": ["/study/123456", "/other_resource", "/another_resource"],
             "role_ids": ["my_reader", "my_other_reader"],
             "expected": "study.123456_other_resource_another_resource_my_reader_my_other_reader",
@@ -73,6 +65,7 @@ def test_get_auto_policy_id_for_resource_paths(client, data):
             # resource_paths with multiple slashes
             # (content up and including first slash is removed,
             # following slashed are converted to '.')
+            "resource_path": None,
             "resource_paths": [
                 "/study/123456",
                 "/another_study/98765",
@@ -83,17 +76,25 @@ def test_get_auto_policy_id_for_resource_paths(client, data):
         },
         {
             # role_ids with slashes (that get removed)
+            "resource_path": None,
             "resource_paths": ["/study/123456"],
             "role_ids": ["/role_with_slash", "other_role/with_slash"],
             "expected": "study.123456_role_with_slash_other_rolewith_slash",
         },
     ],
 )
-def test_get_auto_policy_id_for_resource_paths_and_role_ids(client, data):
-    """resource_paths + role_ids."""
-    policy_id = get_auto_policy_id_for_resource_paths_and_role_ids(
-        data["resource_paths"], data["role_ids"]
-    )
+def test_get_auto_policy_id(client, data):
+    """pass either resource_paths[s] or resource_paths+role_ids"""
+    if data["role_ids"]:
+        policy_id = get_auto_policy_id(
+            resource_path=data["resource_path"],
+            resource_paths=data["resource_paths"],
+            role_ids=data["role_ids"],
+        )
+    else:
+        policy_id = get_auto_policy_id(
+            resource_path=data["resource_path"], resource_paths=data["resource_paths"]
+        )
     assert policy_id == data["expected"]
 
 
@@ -143,12 +144,14 @@ def test_create_request_with_unallowed_params(client, data):
             # provide resource_path without policy_id to get the default reader policies
             "username": "requestor_user",
             "resource_path": "/study/123456",
+            "resource_paths": None,
             "resource_id": "uniqid",
             "resource_display_name": "My Resource",
         },
         {
             # provide resource_paths without role_ids to get the default reader policies
             "username": "requestor_user",
+            "resource_path": None,
             "resource_paths": ["/study/123456", "/study/7890", "/another_study/98765"],
             "resource_id": "uniqid",
             "resource_display_name": "My Resource",
@@ -167,10 +170,9 @@ def test_create_request_with_resource_path(client, data):
     fake_jwt = "1.2.3"
 
     if data.get("resource_paths"):
-        policy_id = get_auto_policy_id_for_resource_paths(data["resource_paths"])
+        policy_id = get_auto_policy_id(resource_paths=data["resource_paths"])
     elif data.get("resource_path"):
-        # resource_path will get cast to a list
-        policy_id = get_auto_policy_id_for_resource_paths([data["resource_path"]])
+        policy_id = get_auto_policy_id(data["resource_path"])
     else:
         policy_id = None
 
@@ -245,8 +247,8 @@ def test_create_request_with_resource_paths_and_role_ids(
     assert request_data == {
         "request_id": request_id,
         "username": data["username"],
-        "policy_id": get_auto_policy_id_for_resource_paths_and_role_ids(
-            data["resource_paths"], data["role_ids"]
+        "policy_id": get_auto_policy_id(
+            resource_paths=data["resource_paths"], role_ids=data["role_ids"]
         ),
         "resource_id": data["resource_id"],
         "resource_display_name": data["resource_display_name"],
@@ -295,10 +297,9 @@ def test_create_request_without_username(client, data):
     fake_jwt = "1.2.3"
 
     if data.get("resource_paths"):
-        policy_id = get_auto_policy_id_for_resource_paths(data["resource_paths"])
+        policy_id = get_auto_policy_id(resource_paths=data["resource_paths"])
     elif data.get("resource_path"):
-        # resource_path will get cast to a list
-        policy_id = get_auto_policy_id_for_resource_paths([data["resource_path"]])
+        policy_id = get_auto_policy_id(data["resource_path"])
     else:
         policy_id = None
 
@@ -377,7 +378,7 @@ def test_create_duplicate_request(client, data):
     assert request_data == {
         "request_id": request_id,
         "username": data["username"],
-        "policy_id": get_auto_policy_id_for_resource_path(data["resource_path"]),
+        "policy_id": get_auto_policy_id(data["resource_path"]),
         "resource_id": data["resource_id"],
         "resource_display_name": data["resource_display_name"],
         "status": config["DEFAULT_INITIAL_STATUS"],

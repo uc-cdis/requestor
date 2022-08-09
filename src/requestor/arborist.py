@@ -83,15 +83,48 @@ def get_resource_paths_for_policy(expanded_policies: list, policy_id: str) -> li
     return []
 
 
-def get_auto_policy_id_for_resource_path(resource_path: str) -> str:
-    resources = resource_path.split("/")
-    policy_id = ".".join(resources[1:]) + "_accessor"
-    return policy_id
+def get_auto_policy_id(
+    resource_path: str = None,
+    resource_paths: list[str] = None,
+    role_ids: list[str] = ["accessor"],
+) -> str:
+    """
+    Create a policy_name given resource_path[s] or resource_paths+role_ids,
+    with the format
 
+    '[resource_paths]_[role_ids]'
 
-def get_auto_policy_id_for_resource_paths(resource_paths: list[str]) -> str:
-    resources = "_".join([".".join(r.split("/")[1:]) for r in resource_paths])
-    policy_id = resources + "_accessor"
+    where items have been concatenated with underscore ('_').
+
+    The logic for each resource_path is as follows:
+        - content up to and including first slash ('/') is removed
+        - following slashes are replaced with a dot ('.').
+
+    The logic for the role_ids is:
+        - slashes are removed.
+
+    The role_ids defaults to "accessor" if none are provided.
+
+    As an example, with
+    resource_paths=['/study/123456','other_path/study/7890', '/another_resource']
+    and
+    role_ids = ["study_registrant", "/other-resource-user", "/study-user"]
+    the expected result is
+    policy_id = 'study.123456_study.7890_another_resource_study_registrant_other-resource-user_study-user'
+
+    See `test_get_auto_policy_id` for more examples.
+    """
+
+    if resource_paths:
+        policy_root = "_".join([".".join(r.split("/")[1:]) for r in resource_paths])
+    elif resource_path:
+        policy_root = ".".join(resource_path.split("/")[1:])
+
+    if not role_ids:
+        role_ids = ["accessor"]
+    roles = "_".join(["".join(r.split("/")) for r in role_ids])
+    policy_id = policy_root + "_" + roles
+
     return policy_id
 
 
@@ -162,7 +195,7 @@ async def create_arborist_policy(
                 await res
 
     # create the policy
-    policy_id = get_auto_policy_id_for_resource_paths(resource_paths)
+    policy_id = get_auto_policy_id(resource_paths=resource_paths)
     logger.debug(f"Attempting to create policy {policy_id} in Arborist")
     policy = {
         "id": policy_id,
@@ -188,9 +221,7 @@ async def create_arborist_policy_for_role_ids(
         await create_resource(arborist_client, resource_path, resource_description)
 
     # create the policy
-    policy_id = get_auto_policy_id_for_resource_paths_and_role_ids(
-        resource_paths, role_ids
-    )
+    policy_id = get_auto_policy_id(resource_paths=resource_paths, role_ids=role_ids)
     logger.debug(f"Attempting to create policy {policy_id} in Arborist")
     policy = {
         "id": policy_id,
@@ -223,36 +254,6 @@ async def create_resource(
     res = arborist_client.create_resource(parent_path, resource, create_parents=True)
     if inspect.isawaitable(res):
         await res
-
-
-def get_auto_policy_id_for_resource_paths_and_role_ids(
-    resource_paths: list[str], role_ids: list[str]
-) -> str:
-    """
-    Create a policy_name given role_ids and resource_paths with format
-    '[resource_paths]_[role_ids]'
-    where items have been concatenated with underscore ('_').
-
-    The logic for each resource_path matches `get_auto_policy_id_for_resource_path`:
-        - content up to and including first slash ('/') is removed
-        - following slashes are replaced with a dot ('.').
-
-    The logic for the role_ids is:
-        - slashes are removed.
-
-    As an example, with
-    resource_paths=['/study/123456','other_path/study/7890', '/another_resource']
-    and
-    role_ids = ["study_registrant", "/other-resource-user", "/study-user"]
-    the expected result is
-    policy_id = 'study.123456_study.7890_another_resource_study_registrant_other-resource-user_study-user'
-
-    See `test_get_auto_policy_id_for_resource_paths_and_role_ids` for more examples.
-    """
-    resources = "_".join([".".join(r.split("/")[1:]) for r in resource_paths])
-    roles = "_".join(["".join(r.split("/")) for r in role_ids])
-    policy_id = resources + "_" + roles
-    return policy_id
 
 
 @maybe_sync
