@@ -143,6 +143,7 @@ async def create_arborist_policy(
     arborist_client: ArboristClient,
     resource_paths: list[str],
     resource_description: str = None,
+    role_ids: list[str] = None,
 ):
     """
     For backwards compatibility, when given a `resource_path[s]` instead of a
@@ -152,76 +153,58 @@ async def create_arborist_policy(
     for resource_path in resource_paths:
         await create_resource(arborist_client, resource_path, resource_description)
 
-    # Create the roles needed to query and download data.
-    # If they already exist arborist would "Do Nothing"
-    roles = [
-        {
-            "id": "peregrine_reader",
-            "permissions": [
-                {"id": "reader", "action": {"service": "peregrine", "method": "read"}}
-            ],
-        },
-        {
-            "id": "guppy_reader",
-            "permissions": [
-                {"id": "reader", "action": {"service": "guppy", "method": "read"}}
-            ],
-        },
-        {
-            "id": "fence_storage_reader",
-            "permissions": [
-                {
-                    "id": "storage_reader",
-                    "action": {"service": "fence", "method": "read-storage"},
-                }
-            ],
-        },
-    ]
+    if role_ids:
+        policy_id = get_auto_policy_id(resource_paths=resource_paths, role_ids=role_ids)
+    else:
+        # Create the roles needed to query and download data.
+        roles = [
+            {
+                "id": "peregrine_reader",
+                "permissions": [
+                    {
+                        "id": "reader",
+                        "action": {"service": "peregrine", "method": "read"},
+                    }
+                ],
+            },
+            {
+                "id": "guppy_reader",
+                "permissions": [
+                    {"id": "reader", "action": {"service": "guppy", "method": "read"}}
+                ],
+            },
+            {
+                "id": "fence_storage_reader",
+                "permissions": [
+                    {
+                        "id": "storage_reader",
+                        "action": {"service": "fence", "method": "read-storage"},
+                    }
+                ],
+            },
+        ]
 
-    for role in roles:
-        try:
-            res = arborist_client.update_role(role["id"], role)
-            if inspect.isawaitable(res):
-                await res
-        except ArboristError as e:
-            logger.info(
-                "An error occured while updating role - '{}', '{}'".format(
-                    {role["id"]}, str(e)
+        for role in roles:
+            try:
+                res = arborist_client.update_role(role["id"], role)
+                if inspect.isawaitable(res):
+                    await res
+            except ArboristError as e:
+                logger.info(
+                    "An error occured while updating role - '{}', '{}'".format(
+                        {role["id"]}, str(e)
+                    )
                 )
-            )
-            logger.debug(f"Attempting to create role '{role['id']}' in Arborist")
-            res = arborist_client.create_role(role)
-            if inspect.isawaitable(res):
-                await res
+                logger.debug(f"Attempting to create role '{role['id']}' in Arborist")
+                res = arborist_client.create_role(role)
+                if inspect.isawaitable(res):
+                    await res
 
-    # create the policy
-    policy_id = get_auto_policy_id(resource_paths=resource_paths)
-    logger.debug(f"Attempting to create policy {policy_id} in Arborist")
-    policy = {
-        "id": policy_id,
-        "description": "policy created by requestor",
-        "role_ids": ["peregrine_reader", "guppy_reader", "fence_storage_reader"],
-        "resource_paths": resource_paths,
-    }
-    res = arborist_client.create_policy(policy, skip_if_exists=True)
-    if inspect.isawaitable(res):
-        await res
+        # get the policy_id with the default role
+        policy_id = get_auto_policy_id(resource_paths=resource_paths)
+        # set reader roles for policy
+        role_ids = ["peregrine_reader", "guppy_reader", "fence_storage_reader"]
 
-    return policy_id
-
-
-@maybe_sync
-async def create_arborist_policy_for_role_ids(
-    arborist_client: ArboristClient,
-    role_ids: list[str],
-    resource_paths: list[str],
-    resource_description: str = None,
-):
-    for resource_path in resource_paths:
-        await create_resource(arborist_client, resource_path, resource_description)
-
-    # create the policy
-    policy_id = get_auto_policy_id(resource_paths=resource_paths, role_ids=role_ids)
     logger.debug(f"Attempting to create policy {policy_id} in Arborist")
     policy = {
         "id": policy_id,

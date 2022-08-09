@@ -124,8 +124,10 @@ async def create_request(
                     f"Request creation failed. The roles {roles_not_found} do not exist.",
                 )
 
-            data["policy_id"] = await arborist.create_arborist_policy_for_role_ids(
-                client, data["role_ids"], data["resource_paths"]
+            data["policy_id"] = await arborist.create_arborist_policy(
+                arborist_client=client,
+                resource_paths=data["resource_paths"],
+                role_ids=data["role_ids"],
             )
             resource_paths = data["resource_paths"]
         else:
