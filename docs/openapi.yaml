@@ -163,26 +163,18 @@ paths:
       tags:
       - Query
     post:
-      description: 'Create a new access request.
-
-
-        Use the "revoke" query parameter to create a request to revoke access
-
-        instead of a request to grant access.
-
-
-        If no "status" is specified in the request body, will use the configured
-
-        DEFAULT_INITIAL_STATUS. Because users can only request access to a
-
-        policy once, each ("username", "policy_id") combination must be
-
-        unique unless past requests'' statuses are in FINAL_STATUSES.
-
-
-        If no "username" is specified in the request body, will create an access
-
-        request for the user who provided the token.'
+      description: "Create a new access request.\n\nUse the \"revoke\" query parameter\
+        \ to create a request to revoke access\ninstead of a request to grant access.\n\
+        \nIf no \"status\" is specified in the request body, will use the configured\n\
+        DEFAULT_INITIAL_STATUS. Because users can only request access to a\npolicy\
+        \ once, each (\"username\", \"policy_id\") combination must be\nunique unless\
+        \ past requests' statuses are in FINAL_STATUSES.\n\nIf no \"username\" is\
+        \ specified in the request body, will create an access\nrequest for the user\
+        \ who provided the token.\n\nThe request should include one of the following\
+        \ for which access is being granted:\n\n  * policy\n  * resource_paths + existing\
+        \ role_ids\n  * resource_path[s] without a role_id (a default reader role\
+        \ is assigned)\n\n\"resource_paths\" will take precedence over \"resource_path\"\
+        \ if both are present in the request."
       operationId: create_request_request_post
       requestBody:
         content:
