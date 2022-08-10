@@ -84,6 +84,15 @@ async def create_request(
 
     If no "username" is specified in the request body, will create an access
     request for the user who provided the token.
+
+    The request should include one of the following for which access is being granted:
+
+      * policy
+      * resource_paths + existing role_ids
+      * resource_path[s] without a role_id (a default reader role is assigned)
+
+    "resource_paths" will take precedence over "resource_path" if both are present in the request.
+
     """
     data = body.dict()
     request_id = str(uuid.uuid4())
@@ -91,12 +100,14 @@ async def create_request(
         f"Creating request. request_id: {request_id}. Received body: {data}. Revoke: {'revoke' in api_request.query_params}"
     )
 
-    # error (if we have both policy_id and (resource_path or resource_paths))
+    # cast resource_path as list if resource_paths is not present
+    if data.get("resource_path") and not data.get("resource_paths"):
+        data["resource_paths"] = [data["resource_path"]]
+
+    # error (if we have both policy_id and resource_paths)
     # OR (if we have neither)
-    if bool(data.get("policy_id")) == (
-        bool(data.get("resource_paths")) or bool(data.get("resource_path"))
-    ):
-        msg = f"The request must have either resource_paths or a policy_id."
+    if bool(data.get("policy_id")) == bool(data.get("resource_paths")):
+        msg = f"The request must have either resource_path[s] or a policy_id."
         raise_error(logger, msg, body)
 
     # error if we have both role_ids and policy_id
@@ -104,19 +115,14 @@ async def create_request(
         msg = f"The request cannot have both role_ids and policy_id."
         raise_error(logger, msg, body)
 
-    # cast resource_path as list if resource_paths is not present
-    if data.get("resource_path") and not data.get("resource_paths"):
-        data["resource_paths"] = [data["resource_path"]]
-
     resource_paths = None
     client = api_request.app.arborist_client
 
     if not data["policy_id"]:
-        if data.get("role_ids") and data.get("resource_paths"):
-
+        if data.get("role_ids"):
+            # check if requested roles exist in arborist
             existing_roles = await arborist.list_roles(client)
             existing_role_ids = [item["id"] for item in existing_roles["roles"]]
-            # Check if any role_id does not exist in arborist
             roles_not_found = list(set(data["role_ids"]) - set(existing_role_ids))
             if roles_not_found:
                 raise HTTPException(
@@ -124,18 +130,12 @@ async def create_request(
                     f"Request creation failed. The roles {roles_not_found} do not exist.",
                 )
 
-            data["policy_id"] = await arborist.create_arborist_policy(
-                arborist_client=client,
-                resource_paths=data["resource_paths"],
-                role_ids=data["role_ids"],
-            )
-            resource_paths = data["resource_paths"]
-        else:
-            # else fallback to body `resource_paths` for backwards compatibility
-            data["policy_id"] = await arborist.create_arborist_policy(
-                client, data["resource_paths"]
-            )
-            resource_paths = data["resource_paths"]
+        data["policy_id"] = await arborist.create_arborist_policy(
+            arborist_client=client,
+            resource_paths=data["resource_paths"],
+            role_ids=data["role_ids"],
+        )
+        resource_paths = data["resource_paths"]
     else:
         existing_policies = await arborist.list_policies(client, expand=True)
 
