@@ -5,44 +5,6 @@ from unittest.mock import MagicMock, patch
 from requestor.config import config
 
 
-@pytest.mark.parametrize(
-    "data",
-    [
-        {
-            # with both resource_path and policy_id
-            "username": "requestor_user",
-            "resource_path": "/test-resource-path/resource",
-            "policy_id": "test-policy",
-            "resource_id": "uniqid",
-            "resource_display_name": "My Resource",
-            "err_msg": "The request must have either",
-        },
-        {
-            # without resource_path and policy_id
-            "username": "requestor_user",
-            "resource_id": "uniqid",
-            "resource_display_name": "My Resource",
-            "err_msg": "The request must have either",
-        },
-    ],
-)
-def test_create_request_with_unallowed_params(client, data):
-    """
-    When a user attempts to create a request with
-        - both resource_path and policy_id
-        - both of them missing
-    a 400 Bad request is returned to the client.
-    """
-    fake_jwt = "1.2.3"
-
-    res = client.post(
-        "/request", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
-    )
-
-    assert res.status_code == 400, res.text
-    assert data["err_msg"] in res.json()["detail"]
-
-
 def test_create_request_without_username(client):
     """
     When a username is not provided in the body, the request is created

@@ -118,6 +118,22 @@ def test_get_auto_policy_id(client, data):
             "resource_display_name": "My Resource",
             "err_msg": "The request cannot have both role_ids and policy_id",
         },
+        {
+            # with both resource_path and policy_id
+            "username": "requestor_user",
+            "resource_path": "/test-resource-path/resource",
+            "policy_id": "test-policy",
+            "resource_id": "uniqid",
+            "resource_display_name": "My Resource",
+            "err_msg": "The request must have either",
+        },
+        {
+            # without resource_path and policy_id
+            "username": "requestor_user",
+            "resource_id": "uniqid",
+            "resource_display_name": "My Resource",
+            "err_msg": "The request must have either",
+        },
     ],
 )
 def test_create_request_with_unallowed_params(client, data):
@@ -326,34 +342,7 @@ def test_create_request_without_username(client, data):
     }
 
 
-@pytest.mark.parametrize(
-    "data",
-    [
-        {
-            # resource_path
-            "username": "requestor_user",
-            "resource_path": "/my/resource",
-            "resource_id": "uniqid",
-            "resource_display_name": "My Resource",
-        },
-        {
-            # resource_paths
-            "username": "requestor_user",
-            "resource_paths": ["/study/123456", "/study/7890", "/another_study/98765"],
-            "resource_id": "uniqid",
-            "resource_display_name": "My Resource",
-        },
-        {
-            # resource_paths will take precedence over resource_path
-            "username": "requestor_user",
-            "resource_path": "/older_study/000111",
-            "resource_paths": ["/study/123456", "/study/7890", "/another_study/98765"],
-            "resource_id": "uniqid",
-            "resource_display_name": "My Resource",
-        },
-    ],
-)
-def test_create_duplicate_request(client, data):
+def test_create_duplicate_request(client):
     """
     Users can only request access to a resource once.
     (username, resource_path) should be unique, except if other
