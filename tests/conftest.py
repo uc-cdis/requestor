@@ -117,9 +117,7 @@ def list_policies_patcher(test_data):
 @pytest.fixture(scope="function")
 def list_roles_patcher():
     """
-    This fixture patches the list_roles method with a mock implementation based on
-    the test_data provided which is a dictionary consisting of the
-    role_id and the associated permissions.
+    This fixture patches the list_roles method.
     """
 
     future = asyncio.Future()
