@@ -24,9 +24,8 @@ A user interacts with the service in the following way:
   - One of the following for which access is being requested:
     - policy
     - resource_paths + existing role_ids
-    - resource_path[s] without a role_id (to be assigned default reader roles, currently `peregrine_reader`, `guppy_reader`, and `fence_storage_reader`)
+    - resource_path[s] without a role_id
   - Level of access
-- `resource_paths` will take precedence over `resource_path` if both are present in the request.
 - The service will generate a unique request ID (per user+resource or user+policy) and store this along with the username and resource or policy ID.
 - The service will send this data to the capturing system/process for review by appropriate administrative staff for the Gen3 Commons in question.
 - _The User may or may not receive confirmation of their request being received - this would be handled by the capturing system/process._
