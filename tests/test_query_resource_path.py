@@ -10,7 +10,7 @@ from requestor.arborist import get_auto_policy_id_for_resource_path
 from requestor.config import config
 
 
-def test_create_get_and_list_request(client):
+def test_create_get_and_list_request(client, access_token_user_only_patcher):
     fake_jwt = "1.2.3"
 
     # list requests: empty
@@ -99,7 +99,7 @@ def test_get_request_without_access(client, mock_arborist_requests):
     assert not_found_err == unauthorized_err
 
 
-def test_get_user_requests(client):
+def test_get_user_requests(client, access_token_user_only_patcher):
     fake_jwt = "1.2.3"
 
     # create a request for the current user
@@ -132,7 +132,7 @@ def test_get_user_requests(client):
     assert res.status_code == 401, res.text
 
 
-def test_list_requests_with_access(client):
+def test_list_requests_with_access(client, access_token_user_only_patcher):
     fake_jwt = "1.2.3"
 
     # create requests
@@ -190,7 +190,9 @@ def test_list_requests_with_access(client):
         },
     ],
 )
-def test_check_user_resource_paths_prefixes(client, list_policies_patcher, test_data):
+def test_check_user_resource_paths_prefixes(
+    client, list_policies_patcher, test_data, access_token_user_only_patcher
+):
     """
     Test if having requested access to the resource path in
     test_data["resource_path"] means having requested access to
@@ -227,7 +229,9 @@ def test_check_user_resource_paths_prefixes(client, list_policies_patcher, test_
 
 
 @pytest.mark.parametrize("test_data", [{"resource_paths": ["/a/b", "/c"]}])
-def test_check_user_resource_paths_multiple(client, list_policies_patcher, test_data):
+def test_check_user_resource_paths_multiple(
+    client, list_policies_patcher, test_data, access_token_user_only_patcher
+):
     fake_jwt = "1.2.3"
     existing_resource_paths = test_data["resource_paths"]
     expected_matches = {
@@ -262,7 +266,7 @@ def test_check_user_resource_paths_multiple(client, list_policies_patcher, test_
     assert res.json() == expected_matches
 
 
-def test_check_user_resource_paths_username(client):
+def test_check_user_resource_paths_username(client, access_token_user_only_patcher):
     fake_jwt = "1.2.3"
 
     resource_path_to_match = "/a/b"
@@ -312,7 +316,9 @@ def test_check_user_resource_paths_username(client):
         },
     ],
 )
-def test_check_user_resource_paths_status(client, list_policies_patcher, test_data):
+def test_check_user_resource_paths_status(
+    client, list_policies_patcher, test_data, access_token_user_only_patcher
+):
     fake_jwt = "1.2.3"
     resource_path_to_match = test_data["resource_path"]
 
