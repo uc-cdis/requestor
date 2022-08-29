@@ -108,12 +108,12 @@ async def create_request(
     # OR (if we have neither)
     if bool(data.get("policy_id")) == bool(data.get("resource_paths")):
         msg = f"The request must have either resource_path(s) or a policy_id."
-        raise_error(logger, msg, body)
+        log_and_raise_400_error(logger, msg, body)
 
     # error if we have both role_ids and policy_id
     if data.get("role_ids") and data.get("policy_id"):
         msg = f"The request cannot have both role_ids and policy_id."
-        raise_error(logger, msg, body)
+        log_and_raise_400_error(logger, msg, body)
 
     resource_paths = None
     client = api_request.app.arborist_client
@@ -429,7 +429,7 @@ async def delete_request(
     return {"request_id": request_id}
 
 
-def raise_error(logger, msg: str, body: CreateRequestInput):
+def log_and_raise_400_error(logger, msg: str, body: CreateRequestInput):
     logger.error(
         msg + f" body: {body}",
         exc_info=True,
