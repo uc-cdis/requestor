@@ -5,6 +5,7 @@ from starlette.requests import Request
 from starlette.status import (
     HTTP_200_OK,
     HTTP_400_BAD_REQUEST,
+    HTTP_403_FORBIDDEN,
     HTTP_404_NOT_FOUND,
 )
 
@@ -105,6 +106,8 @@ async def list_requests(
 
     # get the resources the current user has access to see
     token_claims = await auth.get_token_claims()
+    # TODO update this endpoint to accept client tokens. We need to get the
+    # auth mapping for the client instead of the user
     username = token_claims["context"]["user"]["name"]
     authz_mapping = await api_request.app.arborist_client.auth_mapping(username)
     authorized_resource_paths = [
@@ -171,7 +174,12 @@ async def list_user_requests(api_request: Request, auth=Depends(Auth)) -> dict:
     # their own requests.
     filter_dict, active = populate_filters_from_query_params(api_request.query_params)
     token_claims = await auth.get_token_claims()
-    username = token_claims["context"]["user"]["name"]
+    username = token_claims.get("context", {}).get("user", {}).get("name")
+    if not username:
+        raise HTTPException(
+            HTTP_403_FORBIDDEN,
+            "This endpoint does not support tokens that are not linked to a user",
+        )
     logger.debug(f"Getting requests for user '{username}' with active = '{active}'")
     user_requests = await get_filtered_requests(
         # if we only want active requests, filter out requests in a final status
@@ -237,7 +245,12 @@ async def check_user_resource_paths(
     # no authz checks because we assume the current user can read
     # their own requests.
     token_claims = await auth.get_token_claims()
-    username = token_claims["context"]["user"]["name"]
+    username = token_claims.get("context", {}).get("user", {}).get("name")
+    if not username:
+        raise HTTPException(
+            HTTP_403_FORBIDDEN,
+            "This endpoint does not support tokens that are not linked to a user",
+        )
     user_requests = await get_filtered_requests(username, draft=False, final=False)
     positive_requests = [r for r in user_requests if not r.revoke]
     existing_policies = await arborist.list_policies(

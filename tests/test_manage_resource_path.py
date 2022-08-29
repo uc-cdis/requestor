@@ -305,7 +305,7 @@ def test_create_request_with_resource_paths_and_role_ids(
         },
     ],
 )
-def test_create_request_without_username(client, data):
+def test_create_request_without_username(client, data, access_token_user_only_patcher):
     """
     When a username is not provided in the body, the request is created
     using the username from the provided access token.
@@ -431,7 +431,11 @@ def test_create_duplicate_request(client):
     ],
 )
 def test_create_request_without_access(
-    client, mock_arborist_requests, list_roles_patcher, data
+    client,
+    mock_arborist_requests,
+    list_roles_patcher,
+    data,
+    access_token_user_only_patcher,
 ):
     fake_jwt = "1.2.3"
     mock_arborist_requests(authorized=False)
