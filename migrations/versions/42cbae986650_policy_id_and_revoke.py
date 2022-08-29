@@ -64,7 +64,7 @@ def upgrade():
     # add the `policy_id` corresponding to each row's `resource_path`
     # and default `revoke` to False
     for resource_path in existing_resource_paths:
-        policy_id = get_auto_policy_id(resource_path)
+        policy_id = get_auto_policy_id([resource_path])
         if not config["LOCAL_MIGRATION"] and policy_id not in existing_policies:
             create_arborist_policy(arborist_client, [resource_path])
         connection.execute(

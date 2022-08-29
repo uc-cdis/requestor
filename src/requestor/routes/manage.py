@@ -87,9 +87,9 @@ async def create_request(
 
     The request should include one of the following for which access is being granted:
 
-      * policy
-      * resource_paths + existing role_ids
-      * resource_path[s] without a role_id (a default reader role is assigned)
+      * policy_id
+      * resource_path(s) + existing role_ids
+      * resource_path(s) without a role_id (a default reader role is assigned)
 
     "resource_paths" will take precedence over "resource_path" if both are present in the request.
 
@@ -107,7 +107,7 @@ async def create_request(
     # error (if we have both policy_id and resource_paths)
     # OR (if we have neither)
     if bool(data.get("policy_id")) == bool(data.get("resource_paths")):
-        msg = f"The request must have either resource_path[s] or a policy_id."
+        msg = f"The request must have either resource_path(s) or a policy_id."
         raise_error(logger, msg, body)
 
     # error if we have both role_ids and policy_id

@@ -80,7 +80,7 @@ def list_policies_patcher(test_data):
     policy_id = (
         test_data["policy_id"]
         if "policy_id" in test_data
-        else get_auto_policy_id(resource_path=resource_paths[0])
+        else get_auto_policy_id(resource_paths=[resource_paths[0]])
     )
 
     future = asyncio.Future()

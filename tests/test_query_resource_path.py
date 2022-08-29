@@ -35,7 +35,7 @@ def test_create_get_and_list_request(client):
     assert request_data == {
         "request_id": request_id,
         "username": data["username"],
-        "policy_id": get_auto_policy_id(data["resource_path"]),
+        "policy_id": get_auto_policy_id([data["resource_path"]]),
         "resource_id": data["resource_id"],
         "resource_display_name": data["resource_display_name"],
         "status": config["DEFAULT_INITIAL_STATUS"],

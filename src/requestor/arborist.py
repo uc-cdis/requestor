@@ -84,7 +84,6 @@ def get_resource_paths_for_policy(expanded_policies: list, policy_id: str) -> li
 
 
 def get_auto_policy_id(
-    resource_path: str = None,
     resource_paths: list[str] = None,
     role_ids: list[str] = ["accessor"],
 ) -> str:
@@ -103,7 +102,7 @@ def get_auto_policy_id(
     The logic for the role_ids is:
         - slashes are removed.
 
-    The role_ids defaults to "accessor" if none are provided.
+    The role_ids defaults to ["accessor"] if none are provided.
 
     As an example, with
     resource_paths=['/study/123456','other_path/study/7890', '/another_resource']
@@ -154,7 +153,7 @@ async def create_arborist_policy(
         await create_resource(arborist_client, resource_path, resource_description)
 
     if role_ids:
-        policy_id = get_auto_policy_id(resource_paths=resource_paths, role_ids=role_ids)
+        policy_id = get_auto_policy_id(resource_paths, role_ids)
     else:
         # Create the roles needed to query and download data.
         roles = [
@@ -201,7 +200,7 @@ async def create_arborist_policy(
                     await res
 
         # get the policy_id with the default role
-        policy_id = get_auto_policy_id(resource_paths=resource_paths)
+        policy_id = get_auto_policy_id(resource_paths)
         # set reader roles for policy
         role_ids = ["peregrine_reader", "guppy_reader", "fence_storage_reader"]
 
