@@ -84,11 +84,11 @@ def get_resource_paths_for_policy(expanded_policies: list, policy_id: str) -> li
 
 
 def get_auto_policy_id(
-    resource_paths: list[str] = None,
+    resource_paths: list[str] = [],
     role_ids: list[str] = ["accessor"],
 ) -> str:
     """
-    Create a policy_name given resource_path[s] or resource_paths+role_ids,
+    Create a policy_name given resource_paths and role_ids,
     with the format
 
     '[resource_paths]_[role_ids]'
@@ -114,13 +114,7 @@ def get_auto_policy_id(
     See `test_get_auto_policy_id` for more examples.
     """
 
-    if resource_paths:
-        policy_root = "_".join([".".join(r.split("/")[1:]) for r in resource_paths])
-    elif resource_path:
-        policy_root = ".".join(resource_path.split("/")[1:])
-
-    if not role_ids:
-        role_ids = ["accessor"]
+    policy_root = "_".join([".".join(r.split("/")[1:]) for r in resource_paths])
     roles = "_".join(["".join(r.split("/")) for r in role_ids])
     policy_id = policy_root + "_" + roles
 
@@ -141,13 +135,12 @@ async def user_has_policy(
 async def create_arborist_policy(
     arborist_client: ArboristClient,
     resource_paths: list[str],
-    resource_description: str = None,
-    role_ids: list[str] = None,
+    resource_description: str = "",
+    role_ids: list[str] = [],
 ):
     """
-    For backwards compatibility, when given a `resource_path[s]` instead of a
-    `policy_id` (and without existing `role_ids`), we automatically generate
-    a policy with `accessor` access to the provided `resource_paths`.
+    Create a policy for resource_paths and role_ids. Default to `accessor` access
+    to the resource_paths if role_ids are not specified.
     """
     for resource_path in resource_paths:
         await create_resource(arborist_client, resource_path, resource_description)
