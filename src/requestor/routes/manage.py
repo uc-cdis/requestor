@@ -86,12 +86,9 @@ async def create_request(
     request for the user who provided the token.
 
     The request should include one of the following for which access is being granted:
-
       * policy_id
       * resource_path(s) + existing role_ids
       * resource_path(s) without a role_id (a default reader role is assigned)
-
-    "resource_paths" will take precedence over "resource_path" if both are present in the request.
 
     """
     data = body.dict()

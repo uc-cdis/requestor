@@ -1,7 +1,5 @@
 """
-We now use `policy_id` instead of `resource_path` in access requests.
-This set of tests ensures backwards compatibility for `resource_path`
-as well as testing requests with `resource_paths` + `role_ids`.
+Tests requests with `resource_paths` and `role_ids`.
 """
 import pytest
 
@@ -70,7 +68,7 @@ from requestor.config import config
     ],
 )
 def test_get_auto_policy_id(client, data):
-    """pass either resource_paths[s] or resource_paths+role_ids"""
+    """pass either resource_paths or resource_paths+role_ids"""
     if data["role_ids"]:
         policy_id = get_auto_policy_id(
             resource_paths=data["resource_paths"],

@@ -23,8 +23,8 @@ A user interacts with the service in the following way:
   - User name
   - One of the following for which access is being requested:
     - policy
-    - resource_paths + existing role_ids
-    - resource_path[s] without a role_id
+    - resource_path(s) + existing role_ids
+    - resource_path(s) without a role_id
   - Level of access
 - The service will generate a unique request ID (per user+resource or user+policy) and store this along with the username and resource or policy ID.
 - The service will send this data to the capturing system/process for review by appropriate administrative staff for the Gen3 Commons in question.
