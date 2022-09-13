@@ -16,3 +16,4 @@ The documentation can be browsed in the [docs](docs) folder, and key documents a
 * [Functionality and flow](docs/functionality_and_flow.md)
 * [Requestor Statuses](docs/statuses.md)
 * [Local installation](docs/local_installation.md)
+* [Controlling authorization](docs/authorization.md)

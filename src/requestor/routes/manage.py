@@ -40,9 +40,6 @@ class CreateRequestInput(BaseModel):
 
 
 async def grant_or_revoke_arborist_policy(arborist_client, policy_id, username, revoke):
-    # assume we are always granting a user access to a resource.
-    # in the future we may want to handle more use cases
-    logger.debug(f"username: {username}, policy_id: {policy_id}")
     if revoke:
         success = await arborist.revoke_user_access_to_policy(
             arborist_client,
