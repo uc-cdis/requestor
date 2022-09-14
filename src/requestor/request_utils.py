@@ -90,7 +90,16 @@ def get_credentials(creds_id: str) -> Tuple[str, str]:
             },
             auth=(creds["config"]["client_id"], creds["config"]["client_secret"]),
         )
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            response_txt = response.text
+            try:
+                response_txt = response.json()
+            except Exception:
+                pass
+            logger.error(f"Error making external call: {e} - {response_txt}")
+            raise
         assert (
             "access_token" in response.json()
         ), f"Did not receive an access token from {creds['config']['url']}"
