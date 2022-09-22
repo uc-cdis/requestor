@@ -84,8 +84,8 @@ def get_resource_paths_for_policy(expanded_policies: list, policy_id: str) -> li
 
 
 def get_auto_policy_id(
-    resource_paths: list[str] = [],
-    role_ids: list[str] = ["accessor"],
+    resource_paths: list[str] = None,
+    role_ids: list[str] = None,
 ) -> str:
     """
     Create a policy_name given resource_paths and role_ids,
@@ -113,6 +113,11 @@ def get_auto_policy_id(
 
     See `test_get_auto_policy_id` for more examples.
     """
+
+    if not resource_paths:
+        resource_paths = []
+    if not role_ids:
+        role_ids = ["accessor"]
 
     policy_root = "_".join([".".join(r.split("/")[1:]) for r in resource_paths])
     roles = "_".join(["".join(r.split("/")) for r in role_ids])
