@@ -171,10 +171,9 @@ paths:
         \ past requests' statuses are in FINAL_STATUSES.\n\nIf no \"username\" is\
         \ specified in the request body, will create an access\nrequest for the user\
         \ who provided the token.\n\nThe request should include one of the following\
-        \ for which access is being granted:\n\n  * policy_id\n  * resource_path(s)\
+        \ for which access is being granted:\n  * policy_id\n  * resource_path(s)\
         \ + existing role_ids\n  * resource_path(s) without a role_id (a default reader\
-        \ role is assigned)\n\n\"resource_paths\" will take precedence over \"resource_path\"\
-        \ if both are present in the request."
+        \ role is assigned)"
       operationId: create_request_request_post
       requestBody:
         content:
