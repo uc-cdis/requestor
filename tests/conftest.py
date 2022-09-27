@@ -8,7 +8,7 @@ from starlette.config import environ
 from starlette.testclient import TestClient
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from requestor.arborist import get_auto_policy_id_for_resource_path
+from requestor.arborist import get_auto_policy_id
 
 
 # Set REQUESTOR_CONFIG_PATH *before* loading the configuration
@@ -80,7 +80,7 @@ def list_policies_patcher(test_data):
     policy_id = (
         test_data["policy_id"]
         if "policy_id" in test_data
-        else get_auto_policy_id_for_resource_path(resource_paths[0])
+        else get_auto_policy_id(resource_paths=[resource_paths[0]])
     )
 
     future = asyncio.Future()
@@ -117,9 +117,7 @@ def list_policies_patcher(test_data):
 @pytest.fixture(scope="function")
 def list_roles_patcher():
     """
-    This fixture patches the list_roles method with a mock implementation based on
-    the test_data provided which is a dictionary consisting of the
-    role_id and the associated permissions.
+    This fixture patches the list_roles method.
     """
 
     future = asyncio.Future()

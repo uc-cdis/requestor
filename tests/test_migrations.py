@@ -2,7 +2,7 @@ from alembic.config import main as alembic_main
 from datetime import datetime
 import pytest
 
-from requestor.arborist import get_auto_policy_id_for_resource_path
+from requestor.arborist import get_auto_policy_id
 from requestor.models import db
 
 
@@ -44,7 +44,7 @@ async def test_42cbae986650_upgrade(resource_path):
     assert len(data) == 1
     request = {k: v for k, v in data[0].items()}
     assert resource_path not in request
-    assert request["policy_id"] == get_auto_policy_id_for_resource_path(resource_path)
+    assert request["policy_id"] == get_auto_policy_id([resource_path])
     assert request["revoke"] == False
 
 
@@ -61,7 +61,7 @@ async def test_42cbae986650_downgrade(resource_path):
     uuid = "571c6a1a-f21f-11ea-adc1-0242ac120002"
     date = str(datetime.now())
     # escape single quotes
-    sql_policy = get_auto_policy_id_for_resource_path(resource_path).replace("'", "''")
+    sql_policy = get_auto_policy_id([resource_path]).replace("'", "''")
     insert_stmt = f"INSERT INTO requests(\"request_id\", \"username\", \"policy_id\", \"resource_id\", \"resource_display_name\", \"status\", \"revoke\", \"created_time\", \"updated_time\") VALUES ('{uuid}', 'username', '{sql_policy}', 'my_resource', 'My Resource', 'DRAFT', 'false', '{date}', '{date}')"
     await db.scalar(db.text(insert_stmt))
 
@@ -74,7 +74,7 @@ async def test_42cbae986650_downgrade(resource_path):
         "resource_id": "my_resource",
         "resource_display_name": "My Resource",
         "status": "DRAFT",
-        "policy_id": get_auto_policy_id_for_resource_path(resource_path),
+        "policy_id": get_auto_policy_id([resource_path]),
         "revoke": "False",
         "created_time": date,
         "updated_time": date,
