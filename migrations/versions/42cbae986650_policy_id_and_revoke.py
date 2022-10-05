@@ -72,7 +72,7 @@ def upgrade():
             if not config["LOCAL_MIGRATION"] and policy_id not in existing_policies:
                 create_arborist_policy(arborist_client, [resource_path])
             connection.execute(
-                f"UPDATE requests SET policy_id='{escape(policy_id)} ', revoke=False WHERE request_id='{request_id}'"
+                f"UPDATE requests SET policy_id='{escape(policy_id)}', revoke=False WHERE request_id='{request_id}'"
             )
 
         # Grab another batch of rows
