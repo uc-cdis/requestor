@@ -147,9 +147,11 @@ async def create_arborist_policy(
     Create a policy for resource_paths and role_ids. Default to `accessor` access
     to the resource_paths if role_ids are not specified.
     """
+    logger.debug(f"Attempting to create resources for '{resource_paths}' in Arborist")
     for resource_path in resource_paths:
         await create_resource(arborist_client, resource_path, resource_description)
 
+    logger.debug(f"Attempting to create role_ids for {role_ids} in Arborist")
     if role_ids:
         policy_id = get_auto_policy_id(resource_paths, role_ids)
     else:
