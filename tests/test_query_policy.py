@@ -39,7 +39,9 @@ def test_create_get_and_list_request(client):
     }
 
     # get the request
-    res = client.get(f"/request/{request_id}")
+    res = client.get(
+        f"/request/{request_id}", headers={"Authorization": f"bearer {fake_jwt}"}
+    )
     assert res.status_code == 200, res.text
     assert res.json() == request_data
 
@@ -72,20 +74,26 @@ def test_get_request_without_access(client, mock_arborist_requests):
     assert request_id, "POST /request did not return a request_id"
 
     # get the request
-    res = client.get(f"/request/{request_id}")
+    res = client.get(
+        f"/request/{request_id}", headers={"Authorization": f"bearer {fake_jwt}"}
+    )
     assert res.status_code == 200, res.text
     assert res.json() == request_data
 
     # get a request that doesn't exist
     uuid = "571c6a1a-f21f-11ea-adc1-0242ac120002"
-    res = client.get(f"/request/{uuid}")
+    res = client.get(
+        f"/request/{uuid}", headers={"Authorization": f"bearer {fake_jwt}"}
+    )
     assert res.status_code == 404, res.text
     not_found_err = res.json()
 
     mock_arborist_requests(authorized=False)
 
     # attempt to get a request that exists without having access
-    res = client.get(f"/request/{request_id}")
+    res = client.get(
+        f"/request/{request_id}", headers={"Authorization": f"bearer {fake_jwt}"}
+    )
     assert res.status_code == 404, res.text
     unauthorized_err = res.json()
 

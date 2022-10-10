@@ -8,7 +8,7 @@ from requestor.arborist import get_auto_policy_id_for_resource_path
 from requestor.config import config
 
 
-def test_create_request_without_username(client):
+def test_create_request_without_username(client, token_username):
     """
     When a username is not provided in the body, the request is created
     using the username from the provided access token.
@@ -31,7 +31,7 @@ def test_create_request_without_username(client):
     assert request_id, "POST /request did not return a request_id"
     assert request_data == {
         "request_id": request_id,
-        "username": "requestor_user",  # username from access_token_patcher
+        "username": token_username,
         "policy_id": get_auto_policy_id_for_resource_path(data["resource_path"]),
         "resource_id": data["resource_id"],
         "resource_display_name": data["resource_display_name"],
@@ -212,7 +212,9 @@ def test_update_request_without_access(client, mock_arborist_requests):
 
     # check that the request was not updated
     mock_arborist_requests()  # authorize the GET request
-    res = client.get(f"/request/{request_id}")
+    res = client.get(
+        f"/request/{request_id}", headers={"Authorization": f"bearer {fake_jwt}"}
+    )
     assert res.status_code == 200, res.text
     assert res.json() == request_data
 
@@ -236,7 +238,9 @@ def test_delete_request(client):
     assert request_id, "POST /request did not return a request_id"
 
     # get the request
-    res = client.get(f"/request/{request_id}")
+    res = client.get(
+        f"/request/{request_id}", headers={"Authorization": f"bearer {fake_jwt}"}
+    )
     assert res.status_code == 200, res.text
     assert res.json() == request_data
 
@@ -245,7 +249,9 @@ def test_delete_request(client):
     assert res.status_code == 200, res.text
 
     # make sure the request doesn't exist anymore
-    res = client.get(f"/request/{request_id}")
+    res = client.get(
+        f"/request/{request_id}", headers={"Authorization": f"bearer {fake_jwt}"}
+    )
     assert res.status_code == 404, res.text
 
     # delete a request that doesn't exist
@@ -280,7 +286,9 @@ def test_delete_request_without_access(client, mock_arborist_requests):
 
     # get the request
     mock_arborist_requests()  # authorize the GET request
-    res = client.get(f"/request/{request_id}")
+    res = client.get(
+        f"/request/{request_id}", headers={"Authorization": f"bearer {fake_jwt}"}
+    )
     assert res.status_code == 200, res.text
     assert res.json() == request_data
 

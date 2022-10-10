@@ -130,8 +130,8 @@ async def list_requests(
             # admin access - not implemented
             continue
         # A request is authorized if all the resource_paths in the request's
-        # policy are authorized.
-        if all(
+        # policy are authorized, or if this user made the request
+        if r.username == username or all(  # TODO username unit tests
             # A resource_path is authorized if authorized_resource_paths
             # contains the path or any of its prefixes
             any(
@@ -193,19 +193,25 @@ async def get_request(
     request = await RequestModel.query.where(
         RequestModel.request_id == request_id
     ).gino.first()
-    existing_policies = await arborist.list_policies(
-        api_request.app.arborist_client, expand=True
-    )
+    token_claims = await auth.get_token_claims()
+    username = token_claims["context"]["user"]["name"]
+
     if request:
-        authorized = await auth.authorize(
-            "read",
-            # Note that GETting a request with no resource paths would require
-            # admin access - not implemented
-            arborist.get_resource_paths_for_policy(
-                existing_policies["policies"], request.policy_id
-            ),
-            throw=False,
-        )
+        # TODO username unit tests
+        authorized = request.username == username  # this user made the request
+        if not authorized:
+            existing_policies = await arborist.list_policies(
+                api_request.app.arborist_client, expand=True
+            )
+            authorized = await auth.authorize(
+                "read",
+                # Note that GETting a request with no resource paths would require
+                # admin access - not implemented
+                arborist.get_resource_paths_for_policy(
+                    existing_policies["policies"], request.policy_id
+                ),
+                throw=False,
+            )
 
     if not request or not authorized:
         # return the same error for unauthorized and not found

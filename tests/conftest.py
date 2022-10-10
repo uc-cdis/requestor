@@ -114,10 +114,15 @@ def list_policies_patcher(test_data):
     policy_expand_patch.stop()
 
 
+@pytest.fixture()
+def token_username():
+    return "requestor_token_user"
+
+
 @pytest.fixture(autouse=True, scope="function")
-def access_token_patcher(client, request):
+def access_token_patcher(client, request, token_username):
     async def get_access_token(*args, **kwargs):
-        return {"sub": "1", "context": {"user": {"name": "requestor_user"}}}
+        return {"sub": "1", "context": {"user": {"name": token_username}}}
 
     access_token_mock = MagicMock()
     access_token_mock.return_value = get_access_token
