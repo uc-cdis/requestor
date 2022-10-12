@@ -10,7 +10,7 @@ from requestor.arborist import get_auto_policy_id
 from requestor.config import config
 
 
-def test_create_get_and_list_request(client, access_token_user_only_patcher):
+def test_create_get_and_list_request(client):
     fake_jwt = "1.2.3"
 
     # list requests: empty
@@ -132,13 +132,14 @@ def test_get_user_requests(client, access_token_user_only_patcher):
     assert res.status_code == 401, res.text
 
 
-def test_list_requests_with_access(client, access_token_user_only_patcher):
+def test_list_requests_with_access(client):
     fake_jwt = "1.2.3"
 
     # create requests
     request_data = {}
     for resource_path in ["/my/resource", "something-i-cant-access"]:
         data = {
+            "username": "requestor_user",
             "resource_path": resource_path,
             "resource_id": "uniqid",
             "resource_display_name": "My Resource",
