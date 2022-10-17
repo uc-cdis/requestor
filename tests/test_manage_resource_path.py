@@ -317,7 +317,6 @@ def test_create_request_without_access(
     client,
     mock_arborist_requests,
     list_roles_patcher,
-    access_token_user_only_patcher,
 ):
     fake_jwt = "1.2.3"
     mock_arborist_requests(authorized=False)
