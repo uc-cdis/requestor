@@ -73,7 +73,6 @@ def upgrade():
                 create_arborist_policy(
                     arborist_client=arborist_client,
                     resource_paths=[resource_path],
-                    resource_description="",
                 )
             connection.execute(
                 f"UPDATE requests SET policy_id='{escape(policy_id)}', revoke=False WHERE request_id='{request_id}'"
@@ -96,6 +95,7 @@ def downgrade():
     # get the list of existing policies from Arborist
     if not config["LOCAL_MIGRATION"]:
         existing_policies = list_policies(arborist_client, expand=True)
+
     # add the `resource_path` column back
     op.add_column("requests", sa.Column("resource_path", sa.String()))
 
