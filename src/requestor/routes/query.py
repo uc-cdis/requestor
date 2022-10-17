@@ -5,6 +5,7 @@ from starlette.requests import Request
 from starlette.status import (
     HTTP_200_OK,
     HTTP_400_BAD_REQUEST,
+    HTTP_401_UNAUTHORIZED,
     HTTP_403_FORBIDDEN,
     HTTP_404_NOT_FOUND,
 )
@@ -111,6 +112,11 @@ async def list_requests(
         authz_mapping = await api_request.app.arborist_client.auth_mapping(username)
     else:
         client_id = token_claims.get("azp")
+        if not client_id:
+            raise HTTPException(
+                HTTP_401_UNAUTHORIZED,
+                "The provided token does not include a username or a client ID",
+            )
         authz_mapping = await api_request.app.arborist_client.client_auth_mapping(
             client_id
         )
