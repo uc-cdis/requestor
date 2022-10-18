@@ -97,15 +97,9 @@ def downgrade():
     if not config["LOCAL_MIGRATION"]:
         existing_policies = list_policies(arborist_client, expand=True)
 
-    # get the resource_paths for the existing policies and store in dict
+    # create a dict for storing existing policiy_ids and resource_path
     if not config["LOCAL_MIGRATION"]:
         policy_resource = {}
-        for policy_id in existing_policies:
-            resource_paths = get_resource_paths_for_policy(
-                existing_policies["policies"], policy_id
-            )
-            assert len(resource_paths) > 0, f"No resource_paths for policy {policy_id}"
-            policy_resource[policy_id] = resource_paths
 
     # add the `resource_path` column back
     op.add_column("requests", sa.Column("resource_path", sa.String()))
@@ -121,7 +115,15 @@ def downgrade():
             request_id, policy_id = r[0], r[1]
 
             if not config["LOCAL_MIGRATION"]:
-                resource_paths = policy_resource[policy_id]
+                resource_paths = policy_resource.get(policy_id)
+                if not resource_paths:
+                    resource_paths = get_resource_paths_for_policy(
+                        existing_policies["policies"], policy_id
+                    )
+                    assert (
+                        len(resource_paths) > 0
+                    ), f"No resource_paths for policy {policy_id}"
+                    policy_resource[policy_id] = resource_paths
             else:
                 # hardcoded to avoid querying Arborist
                 resource_paths = ["/test/resource/path"]
