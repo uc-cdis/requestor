@@ -70,10 +70,11 @@ def upgrade():
             # and default `revoke` to False
             policy_id = get_auto_policy_id([resource_path])
             if not config["LOCAL_MIGRATION"] and policy_id not in existing_policies:
-                create_arborist_policy(
+                created_policy_id = create_arborist_policy(
                     arborist_client=arborist_client,
                     resource_paths=[resource_path],
                 )
+                existing_policies.append(created_policy_id)
             connection.execute(
                 f"UPDATE requests SET policy_id='{escape(policy_id)}', revoke=False WHERE request_id='{request_id}'"
             )
@@ -96,10 +97,20 @@ def downgrade():
     if not config["LOCAL_MIGRATION"]:
         existing_policies = list_policies(arborist_client, expand=True)
 
+    # get the resource_paths for the existing policies and store in dict
+    if not config["LOCAL_MIGRATION"]:
+        policy_resource = {}
+        for policy_id in existing_policies:
+            resource_paths = get_resource_paths_for_policy(
+                existing_policies["policies"], policy_id
+            )
+            assert len(resource_paths) > 0, f"No resource_paths for policy {policy_id}"
+            policy_resource[policy_id] = resource_paths
+
     # add the `resource_path` column back
     op.add_column("requests", sa.Column("resource_path", sa.String()))
 
-    # get the list of existing policy_ids in the database
+    # convert policy_id to resource_path
     connection = op.get_bind()
     offset = 0
     limit = 500
@@ -110,12 +121,7 @@ def downgrade():
             request_id, policy_id = r[0], r[1]
 
             if not config["LOCAL_MIGRATION"]:
-                resource_paths = get_resource_paths_for_policy(
-                    existing_policies["policies"], policy_id
-                )
-                assert (
-                    len(resource_paths) > 0
-                ), f"No resource_paths for policy {policy_id}"
+                resource_paths = policy_resource[policy_id]
             else:
                 # hardcoded to avoid querying Arborist
                 resource_paths = ["/test/resource/path"]
