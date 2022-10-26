@@ -227,7 +227,7 @@ def test_backoff_retry(client):
         assert mock_requests.post.call_count == config["DEFAULT_MAX_RETRIES"]
 
 
-def test_create_request_failure_revert(client, access_token_user_only_patcher):
+def test_create_request_failure_revert(client):
     """
     If something goes wrong during an external call, access should not be
     granted, the request should not be created and we should get a 500.

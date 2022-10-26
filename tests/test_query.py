@@ -39,7 +39,7 @@ def test_create_and_get_request(client):
     assert res.json() == request_data
 
 
-def test_create_and_list_request(client, access_token_user_only_patcher):
+def test_create_and_list_request(client):
     fake_jwt = "1.2.3"
 
     # list requests: empty
@@ -123,8 +123,7 @@ def test_get_request_without_access(client, mock_arborist_requests):
     assert not_found_err == unauthorized_err
 
 
-def test_get_filtered_requests(client, access_token_user_only_patcher):
-
+def test_get_filtered_requests(client):
     fake_jwt = "1.2.3"
     filtered_requests = []
 
@@ -368,13 +367,14 @@ def test_get_filtered_user_requests(client, access_token_user_only_patcher):
     assert res.status_code == 400, res.text
 
 
-def test_list_requests_with_access(client, access_token_user_only_patcher):
+def test_list_requests_with_access(client):
     fake_jwt = "1.2.3"
 
     # create requests
     request_data = {}
     for policy_id in ["test-policy", "test-policy-i-cant-access"]:
         data = {
+            "username": "requestor_user",
             "policy_id": policy_id,
             "resource_id": "uniqid",
             "resource_display_name": "My Resource",
@@ -447,6 +447,7 @@ def test_check_user_resource_paths_prefixes(
 
     # create request
     data = {
+        "username": "requestor_user",
         "policy_id": test_data["policy_id"],
         "resource_id": "uniqid",
         "resource_display_name": "My Resource",

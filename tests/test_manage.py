@@ -111,9 +111,7 @@ def test_create_duplicate_request(client):
     assert res.status_code == 201, res.text
 
 
-def test_create_request_without_access(
-    client, mock_arborist_requests, access_token_user_only_patcher
-):
+def test_create_request_without_access(client, mock_arborist_requests):
     fake_jwt = "1.2.3"
     mock_arborist_requests(authorized=False)
 

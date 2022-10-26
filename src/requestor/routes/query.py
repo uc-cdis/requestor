@@ -5,6 +5,7 @@ from starlette.requests import Request
 from starlette.status import (
     HTTP_200_OK,
     HTTP_400_BAD_REQUEST,
+    HTTP_401_UNAUTHORIZED,
     HTTP_403_FORBIDDEN,
     HTTP_404_NOT_FOUND,
 )
@@ -106,10 +107,19 @@ async def list_requests(
 
     # get the resources the current user has access to see
     token_claims = await auth.get_token_claims()
-    # TODO update this endpoint to accept client tokens. We need to get the
-    # auth mapping for the client instead of the user
-    username = token_claims["context"]["user"]["name"]
-    authz_mapping = await api_request.app.arborist_client.auth_mapping(username)
+    username = token_claims.get("context", {}).get("user", {}).get("name")
+    if username:
+        authz_mapping = await api_request.app.arborist_client.auth_mapping(username)
+    else:
+        client_id = token_claims.get("azp")
+        if not client_id:
+            raise HTTPException(
+                HTTP_401_UNAUTHORIZED,
+                "The provided token does not include a username or a client ID",
+            )
+        authz_mapping = await api_request.app.arborist_client.client_auth_mapping(
+            client_id
+        )
     authorized_resource_paths = [
         resource_path
         for resource_path, access in authz_mapping.items()
