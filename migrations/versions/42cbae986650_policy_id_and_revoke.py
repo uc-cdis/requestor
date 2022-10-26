@@ -60,14 +60,13 @@ def upgrade():
     connection = op.get_bind()
     offset = 0
     limit = 500
-    query = f"SELECT request_id, resource_path FROM requests ORDER by request_id LIMIT {limit} OFFSET {offset}"
+    query = f"SELECT resource_path FROM requests ORDER by resource_path LIMIT {limit} OFFSET {offset}"
     results = connection.execute(query).fetchall()
-    while results:
-        for r in results:
-            request_id, resource_path = r[0], r[1]
 
-            # add the `policy_id` corresponding to each row's `resource_path`
-            # and default `revoke` to False
+    # add the `policy_id` corresponding to each row's `resource_path`
+    # and default `revoke` to False
+    while results:
+        for resource_path in set(r[0] for r in results):
             policy_id = get_auto_policy_id([resource_path])
             if (
                 not config["LOCAL_MIGRATION"]
@@ -79,12 +78,12 @@ def upgrade():
                 )
                 existing_policies["policies"].append(created_policy_id)
             connection.execute(
-                f"UPDATE requests SET policy_id='{escape(policy_id)}', revoke=False WHERE request_id='{request_id}'"
+                f"UPDATE requests SET policy_id='{escape(policy_id)}', revoke=False WHERE resource_path='{escape(resource_path)}'"
             )
 
         # Grab another batch of rows
         offset += limit
-        query = f"SELECT request_id, resource_path FROM requests ORDER by request_id LIMIT {limit} OFFSET {offset}"
+        query = f"SELECT resource_path FROM requests ORDER by resource_path LIMIT {limit} OFFSET {offset}"
         results = connection.execute(query).fetchall()
 
     # now that there are no null values, make the columns non-nullable
@@ -100,10 +99,6 @@ def downgrade():
     if not config["LOCAL_MIGRATION"]:
         existing_policies = list_policies(arborist_client, expand=True)
 
-    # create a dict for storing existing policiy_ids and resource_path
-    if not config["LOCAL_MIGRATION"]:
-        policy_resource = {}
-
     # add the `resource_path` column back
     op.add_column("requests", sa.Column("resource_path", sa.String()))
 
@@ -111,34 +106,30 @@ def downgrade():
     connection = op.get_bind()
     offset = 0
     limit = 500
-    query = f"SELECT request_id, policy_id FROM requests ORDER by request_id LIMIT {limit} OFFSET {offset}"
+    query = f"SELECT policy_id FROM requests ORDER by policy_id LIMIT {limit} OFFSET {offset}"
     results = connection.execute(query).fetchall()
-    while results:
-        for r in results:
-            request_id, policy_id = r[0], r[1]
 
+    while results:
+        for policy_id in set(r[0] for r in results):
             if not config["LOCAL_MIGRATION"]:
-                resource_paths = policy_resource.get(policy_id)
-                if not resource_paths:
-                    resource_paths = get_resource_paths_for_policy(
-                        existing_policies["policies"], policy_id
-                    )
-                    assert (
-                        len(resource_paths) > 0
-                    ), f"No resource_paths for policy {policy_id}"
-                    policy_resource[policy_id] = resource_paths
+                resource_paths = get_resource_paths_for_policy(
+                    existing_policies["policies"], policy_id
+                )
+                assert (
+                    len(resource_paths) > 0
+                ), f"No resource_paths for policy {policy_id}"
             else:
                 # hardcoded to avoid querying Arborist
                 resource_paths = ["/test/resource/path"]
             # use the first item in the policy’s list of resources, because this
             # schema only allows 1 resource_path
             connection.execute(
-                f"UPDATE requests SET resource_path='{escape(resource_paths[0])}' WHERE request_id='{request_id}'"
+                f"UPDATE requests SET resource_path='{escape(resource_paths[0])}' WHERE policy_id='{escape(policy_id)}'"
             )
 
-        # Grab another batch of rows
+        # get another batch of rows
         offset += limit
-        query = f"SELECT request_id, policy_id FROM requests ORDER by request_id LIMIT {limit} OFFSET {offset}"
+        query = f"SELECT policy_id FROM requests ORDER by policy_id LIMIT {limit} OFFSET {offset}"
         results = connection.execute(query).fetchall()
 
     # now that there are no null values, make the column non-nullable
