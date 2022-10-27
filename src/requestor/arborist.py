@@ -148,7 +148,9 @@ async def create_arborist_policy(
     to the resource_paths if role_ids are not specified.
     """
     for resource_path in resource_paths:
-        await create_resource(arborist_client, resource_path, resource_description)
+        res = create_resource(arborist_client, resource_path, resource_description)
+        if inspect.isawaitable(res):
+            await res
 
     if role_ids:
         policy_id = get_auto_policy_id(resource_paths, role_ids)
