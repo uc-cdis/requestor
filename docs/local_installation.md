@@ -111,3 +111,6 @@ helm upgrade --install gen3/requestor
 You can also store your images in a local registry. Kind and Minikube are popular for their local registries:
 - https://kind.sigs.k8s.io/docs/user/local-registry/
 - https://minikube.sigs.k8s.io/docs/handbook/registry/#enabling-insecure-registries
+
+Dependencies:
+Requestor relies on Arborist to run. Please view the [Arborist Quick Start Guide](https://github.com/uc-cdis/arborist) for more information.
