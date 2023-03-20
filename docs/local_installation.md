@@ -77,6 +77,7 @@ helm upgrade --install gen3/requestor
 These commands will add the Gen3 helm chart repo and install the requestor service to your Kubernetes cluster.
 
 Deploying requestor this way will use the defaults that are defined in this [values.yaml file](https://github.com/uc-cdis/gen3-helm/blob/master/helm/requestor/values.yaml)
+
 You can learn more about these values by accessing the requestor [README.md](https://github.com/uc-cdis/gen3-helm/blob/master/helm/requestor/README.md)
 
 If you would like to override any of the default values, simply copy the above values.yaml file into a local file and make any changes needed.
