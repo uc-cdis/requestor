@@ -546,14 +546,14 @@ test = ["aiofiles (>=0.5.0,<0.6.0)", "async_exit_stack (>=1.0.1,<2.0.0)", "async
 
 [[package]]
 name = "gen3authz"
-version = "2.0.0"
+version = "2.1.0"
 description = "Gen3 authz client"
 category = "main"
 optional = false
 python-versions = ">=3.6,<4.0"
 files = [
-    {file = "gen3authz-2.0.0-py3-none-any.whl", hash = "sha256:bd6c06f9f06aa1cbebc000697db9b7462f13fa90fed087d06c2b2eed4055b0fa"},
-    {file = "gen3authz-2.0.0.tar.gz", hash = "sha256:fa612ee83c8f95908d2ad09daf21cc1d763bcf03c76f9eb1edc291ead50a5727"},
+    {file = "gen3authz-2.1.0-py3-none-any.whl", hash = "sha256:6817f2214f1c48475cd2c74778da1a286ca0c667100f76087918b63912966827"},
+    {file = "gen3authz-2.1.0.tar.gz", hash = "sha256:158a0c51a85362cdeac4d227ed52dcd3b22de9e89662dc22d21e24740133718b"},
 ]
 
 [package.dependencies]
@@ -1416,4 +1416,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "9ae7f1dacc2ba06afc324e430a4ffa98558dc02fcab8f288500e17770b83a04b"
+content-hash = "4cc06df79803562cce8443ad2b8a1d273b27e268e3a8abbb21fd31d6ebaa0c72"
