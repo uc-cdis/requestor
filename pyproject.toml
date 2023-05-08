@@ -16,7 +16,7 @@ alembic = "^1.4.2"
 authutils = "^6.2.1"
 cdislogging = "^1.0.0"
 fastapi = "^0.65.0"
-gen3authz = { path = "./gen3authz-2.0.0.tar.gz"}
+gen3authz = "^2.1.0"
 gen3config = "^1.0.0"
 httpx = ">=0.20.0,<1.0.0"
 jsonschema = "^4.6.0"

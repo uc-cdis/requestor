@@ -279,7 +279,14 @@ paths:
       - Query
   /request/{request_id}:
     delete:
-      description: Delete an access request.
+      description: 'Delete an access request.
+
+
+        /!\ Note that deleting an access request that has already been approved does
+        NOT revoke the access
+
+        that has been granted. It only removes the trace of that access request from
+        the database.'
       operationId: delete_request_request__request_id__delete
       parameters:
       - in: path
