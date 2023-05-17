@@ -11,7 +11,7 @@ Requestor's endpoints are protected by Arborist policies:
 
 User johndoe@example.com wants to request access to dataset D. The resource path for dataset D in the `user.yaml` file is `/programs/P/projects/D`.
 
-The authorization is flexible: we can allow specific users to request access to specific datasets, or allow all users to request access to all datasets, or something in-between. The example below shows shows how to configure the latter.
+The authorization is flexible: we can allow specific users to request access to specific datasets, or allow all users to request access to all datasets (see the example configuration below), or something in-between.
 
 
 ```yaml
