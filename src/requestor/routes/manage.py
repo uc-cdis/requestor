@@ -123,12 +123,6 @@ async def create_request(
                     HTTP_400_BAD_REQUEST,
                     f"Request creation failed. The roles {roles_not_found} do not exist.",
                 )
-
-        data["policy_id"] = await arborist.create_arborist_policy(
-            arborist_client=client,
-            resource_paths=data["resource_paths"],
-            role_ids=data["role_ids"],
-        )
         resource_paths = data["resource_paths"]
     else:
         existing_policies = await arborist.list_policies(client, expand=True)
@@ -147,6 +141,15 @@ async def create_request(
         )
 
     await auth.authorize("create", resource_paths)
+
+    if not data["policy_id"]:
+        # create the policy _after_ checking authz so we don't allow unauthorized users to
+        # create resources and policies
+        data["policy_id"] = await arborist.create_arborist_policy(
+            arborist_client=client,
+            resource_paths=data["resource_paths"],
+            role_ids=data["role_ids"],
+        )
 
     if not data.get("status"):
         data["status"] = config["DEFAULT_INITIAL_STATUS"]
