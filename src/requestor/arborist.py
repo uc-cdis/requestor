@@ -259,6 +259,7 @@ async def grant_user_access_to_policy(
     policy_id: str,
 ) -> bool:
     # create the user
+    # TODO create user on access request creation instead of approval?
     logger.debug(f"Attempting to create user {username} in Arborist")
     await arborist_client.create_user_if_not_exist(username)
 
