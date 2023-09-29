@@ -5,7 +5,7 @@ Requestor's endpoints are protected by Arborist policies:
 - To update an access request, users must have `update` access on service `requestor` for the relevant resource paths.
 - To delete an access request, users must have `delete` access on service `requestor` for the relevant resource paths.
 - Users can see their own access requests regardless of their access in Arborist by hitting the `GET  /request/user` endpoint.
-- To see other access requests (when `GET`ting a specific access request or when querying existing access rerquests), users must have `read` access on service `requestor` for the relevant resource paths.
+- To see other access requests (when `GET`ting a specific access request or when querying existing access requests), users must have `read` access on service `requestor` for the relevant resource paths.
 
 ### Authorization configuration example
 
