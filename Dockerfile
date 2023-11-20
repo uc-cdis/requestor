@@ -2,7 +2,7 @@ ARG AZLINUX_BASE_VERSION=master
 
 FROM 707767160287.dkr.ecr.us-east-1.amazonaws.com/gen3/python-build-base:${AZLINUX_BASE_VERSION} as base
 
-ENV appname=indexd
+ENV appname=requestor
 ENV POETRY_NO_INTERACTION=1 \
     POETRY_VIRTUALENVS_IN_PROJECT=1 \
     POETRY_VIRTUALENVS_CREATE=1
@@ -19,9 +19,6 @@ RUN pip install --upgrade poetry \
 
 COPY . /$appname
 RUN poetry install --without dev --no-interaction
-
-RUN COMMIT=`git rev-parse HEAD` && echo "COMMIT=\"${COMMIT}\"" >$appname/index/version_data.py \
-    && VERSION=`git describe --always --tags` && echo "VERSION=\"${VERSION}\"" >>$appname/index/version_data.py
 
 FROM base
 RUN source /venv/bin/activate
