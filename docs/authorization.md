@@ -95,3 +95,22 @@ authz:
 ```
 
 The administrator now has access to update the status of the access request. If they approve the request, johndoe@example.com is granted access to the `dataset_D_reader` policy.
+
+### Removing access
+
+A user's access to a policy can be removed by creating a new request that includes the `revoke` query parameter. Submit a `POST` request to the `request` endpoint, for example:
+
+```
+POST https://mycommons.org/requestor/request?revoke
+```
+
+The body of the request should have the `username` and `policy_id`, for example
+
+```json
+{
+    "username": "johndoe@example.com",
+    "policy_id": "dataset_D_reader",
+}
+```
+
+The user's access will be revoked when the new request has been approved by an administrator.
