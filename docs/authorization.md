@@ -113,4 +113,8 @@ The body of the request should have the `username` and `policy_id`, for example
 }
 ```
 
-The user's access will be revoked when the new request has been approved by an administrator.
+Just like access requests, revocation requests must be approved before they take effect. The user's access will be revoked when the new request has been approved by an administrator.
+
+**IMPORTANT NOTE:** Requestor can only revoke access that has been granted through Requestor.
+
+What does this mean? Access granted through the [user.yaml file](https://github.com/uc-cdis/fence/blob/master/docs/user.yaml_guide.md) cannot be revoked by Requestor. Similarly, removing access through the user.yaml file will not revoke access granted by Requestor.
