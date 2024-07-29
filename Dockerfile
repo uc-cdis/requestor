@@ -29,7 +29,7 @@ USER gen3
 
 RUN python -m venv /venv
 
-COPY poetry.lock pyproject.toml alembic.ini /${appname}/
+COPY poetry.lock pyproject.toml alembic.ini README.md /${appname}/
 
 RUN pip install poetry && \
     poetry install -vv --only main --no-interaction
