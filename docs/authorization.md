@@ -95,3 +95,26 @@ authz:
 ```
 
 The administrator now has access to update the status of the access request. If they approve the request, johndoe@example.com is granted access to the `dataset_D_reader` policy.
+
+### Removing access
+
+A user's access to a policy can be removed by creating a new request that includes the `revoke` query parameter. Submit a `POST` request to the `request` endpoint, for example:
+
+```
+POST https://mycommons.org/requestor/request?revoke
+```
+
+The body of the request should have the `username` and `policy_id`, for example
+
+```json
+{
+    "username": "johndoe@example.com",
+    "policy_id": "dataset_D_reader",
+}
+```
+
+Just like access requests, revocation requests must be approved before they take effect. The user's access will be revoked when the new request has been approved by an administrator.
+
+**IMPORTANT NOTE:** Requestor can only revoke access that has been granted through Requestor.
+
+What does this mean? Access granted through the [user.yaml file](https://github.com/uc-cdis/fence/blob/master/docs/user.yaml_guide.md) cannot be revoked by Requestor. Similarly, removing access through the user.yaml file will not revoke access granted by Requestor.
