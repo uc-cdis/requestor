@@ -29,12 +29,13 @@ USER gen3
 
 RUN python -m venv /venv
 
-COPY poetry.lock pyproject.toml alembic.ini /${appname} /migrations/
+COPY poetry.lock pyproject.toml alembic.ini /${appname}/
 
 RUN pip install poetry && \
     poetry install -vv --only main --no-interaction
 
 COPY --chown=gen3:gen3 ./src /$appname
+COPY --chown=gen3:gen3 ./migrations /$appname/migrations
 COPY --chown=gen3:gen3 ./deployment/wsgi/wsgi.py /$appname/wsgi.py
 
 # Run poetry again so this app itself gets installed too
