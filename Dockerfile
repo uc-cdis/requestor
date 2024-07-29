@@ -36,7 +36,8 @@ RUN pip install poetry && \
 
 COPY --chown=gen3:gen3 ./src /$appname
 COPY --chown=gen3:gen3 ./migrations /$appname/migrations
-COPY --chown=gen3:gen3 ./deployment/wsgi/wsgi.py /$appname/wsgi.py
+COPY --chown=gen3:gen3 ./deployment/wsgi/wsgi.py /$appname/deployment/wsgi/wsgi.py
+COPY --chown=gen3:gen3 ./deployment/wsgi/gunicorn.conf.py /$appname/deployment/wsgi/gunicorn.conf.py
 
 # Run poetry again so this app itself gets installed too
 RUN poetry install --without dev --no-interaction
