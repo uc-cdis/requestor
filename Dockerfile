@@ -1,6 +1,6 @@
-FROM quay.io/cdis/python:python3.9-buster-2.0.0 as base
+FROM quay.io/cdis/python:python3.9-buster-2.0.0 AS base
 
-FROM base as builder
+FROM base AS builder
 RUN pip install --upgrade pip poetry
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
