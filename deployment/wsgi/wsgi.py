@@ -1,4 +1,3 @@
-from requestor import app_init, app
+from requestor.app import app_init
 
-app_init(app)
-application = app
+application = app_init()
