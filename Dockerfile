@@ -1,7 +1,7 @@
 ARG AZLINUX_BASE_VERSION=master
 
 # Base stage with python-build-base
-FROM quay.io/cdis/python-build-base:${AZLINUX_BASE_VERSION} as base
+FROM quay.io/cdis/python-build-base:${AZLINUX_BASE_VERSION} AS base
 
 # Comment this in, and comment out the line above, if quay is down
 # FROM 707767160287.dkr.ecr.us-east-1.amazonaws.com/gen3/python-build-base:${AZLINUX_BASE_VERSION} as base
@@ -16,23 +16,21 @@ WORKDIR /${appname}
 # create gen3 user
 # Create a group 'gen3' with GID 1000 and a user 'gen3' with UID 1000
 RUN groupadd -g 1000 gen3 && \
+    mkdir -p /env && \
     useradd -m -s /bin/bash -u 1000 -g gen3 gen3  && \
     chown -R gen3:gen3 /$appname && \
-    chown -R gen3:gen3 /venv
+    chown -R gen3:gen3 /env
 
+RUN pip install --upgrade pip poetry
 
 # Builder stage
-FROM base as builder
+FROM base AS builder
 
 USER gen3
 
-
-RUN python -m venv /venv
-
 COPY poetry.lock pyproject.toml alembic.ini README.md /${appname}/
 
-RUN pip install poetry && \
-    poetry install -vv --only main --no-interaction
+RUN python -m venv /env && . /env/bin/activate && poetry install -vv --no-interaction
 
 COPY --chown=gen3:gen3 ./src /$appname
 COPY --chown=gen3:gen3 ./migrations /$appname/migrations
@@ -41,12 +39,12 @@ COPY --chown=gen3:gen3 ./deployment/wsgi/gunicorn.conf.py /$appname/deployment/w
 COPY --chown=gen3:gen3 ./dockerrun.bash /$appname/dockerrun.bash
 
 # Run poetry again so this app itself gets installed too
-RUN poetry install --without dev --no-interaction
+RUN python -m venv /env && . /env/bin/activate && poetry install -vv --no-interaction
 
 # Final stage
 FROM base
 
-COPY --from=builder /venv /venv
+COPY --from=builder /env /env
 COPY --from=builder /$appname /$appname
 
 # Install nginx
@@ -71,9 +69,12 @@ COPY ./deployment/nginx/nginx.conf /etc/nginx/nginx.conf
 # Switch to non-root user 'gen3' for the serving process
 USER gen3
 
-RUN source /venv/bin/activate
+RUN source /env/bin/activate
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONIOENCODING=UTF-8
+
+# Add /env/bin to PATH
+ENV PATH="/env/bin:$PATH"
 
 CMD ["/bin/bash", "-c", "/requestor/dockerrun.bash"]
