@@ -159,7 +159,7 @@ async def list_requests(
 
 
 @router.get("/request/user", status_code=HTTP_200_OK)
-async def list_user_requests(api_request: Request, auth=Depends(Auth)) -> dict:
+async def list_user_requests(api_request: Request, auth=Depends(Auth)) -> list:
     """
     List current user's requests.
 
@@ -239,7 +239,7 @@ async def get_request(
 async def check_user_resource_paths(
     api_request: Request,
     resource_paths: list = Body(..., embed=True),
-    permissions: list = None,
+    permissions: list = Body(None, embed=True),
     auth=Depends(Auth),
 ) -> dict:
     """
