@@ -4,3 +4,4 @@ workers = 1
 user = "gen3"
 group = "gen3"
 timeout = 300
+worker_class = "uvicorn.workers.UvicornWorker"
