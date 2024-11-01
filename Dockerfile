@@ -26,7 +26,7 @@ COPY --chown=gen3:gen3 ./deployment/wsgi/gunicorn.conf.py /$appname/deployment/w
 COPY --chown=gen3:gen3 ./dockerrun.bash /$appname/dockerrun.bash
 
 # Run poetry again so this app itself gets installed too
-RUN poetry install --no-interaction
+RUN poetry install --no-interaction --only main
 
 # Final stage
 FROM base
