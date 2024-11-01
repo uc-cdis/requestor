@@ -17,7 +17,7 @@ USER gen3
 
 COPY poetry.lock pyproject.toml alembic.ini README.md /${appname}/
 
-RUN poetry install -vv --only main --no-interaction
+RUN poetry install -vv --without dev --no-interaction
 
 COPY --chown=gen3:gen3 ./src /$appname
 COPY --chown=gen3:gen3 ./migrations /$appname/migrations
@@ -26,7 +26,7 @@ COPY --chown=gen3:gen3 ./deployment/wsgi/gunicorn.conf.py /$appname/deployment/w
 COPY --chown=gen3:gen3 ./dockerrun.bash /$appname/dockerrun.bash
 
 # Run poetry again so this app itself gets installed too
-RUN poetry install --no-interaction --only main
+RUN poetry install --no-interaction --without dev
 
 # Final stage
 FROM base
