@@ -110,6 +110,7 @@ def get_credentials(creds_id: str) -> Tuple[str, str]:
 @retry_wrapper
 def make_external_call(external_call_id: str, data: dict) -> None:
     conf = config["EXTERNAL_CALL_CONFIGS"][external_call_id]
+    # TODO use `httpx` instead of `requests` to make async call
     requests_func = getattr(requests, conf["method"].lower())
     form_data = {
         e["name"]: data[e["param"]]
