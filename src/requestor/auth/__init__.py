@@ -3,7 +3,7 @@ from fastapi import HTTPException, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from starlette.requests import Request
 from starlette.status import HTTP_401_UNAUTHORIZED, HTTP_403_FORBIDDEN
-
+import os
 from gen3authz.client.arborist.errors import ArboristError
 
 from .. import logger
