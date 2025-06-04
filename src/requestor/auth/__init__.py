@@ -33,11 +33,17 @@ class Auth:
                 err_msg,
             )
 
+        issuer_override = os.getenv("ISSUER_OVERRIDE", None)
+
         try:
             # NOTE: token can be None if no Authorization header was provided, we
             # expect this to cause a downstream exception since it is invalid
             token_claims = await access_token(
-                "user", "openid", audience="openid", purpose="access"
+                "user",
+                "openid",
+                audience="openid",
+                purpose="access",
+                issuer=issuer_override,
             )(self.bearer_token)
         except Exception as e:
             logger.error(
