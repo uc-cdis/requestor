@@ -11,7 +11,7 @@ include = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = ">=3.13,<4"
 alembic = "^1.4.2"
 authutils = "^6.2.1"
 cdislogging = "^1.0.0"
@@ -20,26 +20,37 @@ gen3authz = "^2.1.0"
 gen3config = "^1.0.0"
 httpx = ">=0.20.0,<1.0.0"
 jsonschema = "^4.6.0"
-psycopg2-binary = "^2.8.5"
+#psycopg2-binary = "^2.8.5"
 pydantic = "^1.8.2"
-python-multipart = "^0.0.9"
+#python-multipart = "^0.0.9"
 requests = "^2.32.0"
 sniffio = "^1.2.0"
 uvicorn = ">=0.11.8,<1.0.0"
 gino = {version = "^1.0.1", extras = ["starlette"]}
-importlib-metadata = {version = "^1.7.0", python = "<3.8"}
+#importlib-metadata = {version = "^1.7.0", python = "<3.8"}
 gunicorn = "^22.0.0"
+sqlalchemy = ">=1,<2"
+pyyaml = ">=6"
+starlette = ">=0.50"
+asyncpg = "*"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
 mock = "^4.0.3"
 pytest = "^6.0.1"
 pytest-asyncio = "^0.16.0"
 pytest-cov = "^2.8"
+deptry = "^0.24.0"
 
 [tool.poetry.plugins."requestor.modules"]
 "system" = "requestor.routes.system"
 "manage" = "requestor.routes.manage"
 "query" = "requestor.routes.query"
+
+[tool.deptry]
+known_first_party = ["requestor"]
+
+[tool.deptry.per_rule_ignores]
+DEP002 = ["gunicorn"]  # not imported but used in Dockerfile
 
 [build-system]
 requires = ["poetry>=1.0.0"]
