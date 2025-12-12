@@ -2,7 +2,8 @@ import asyncio
 from fastapi import FastAPI
 from fastapi.routing import APIRoute
 import httpx
-from importlib.metadata import entry_points, version
+import importlib
+# from importlib.metadata import entry_points, version
 import os
 
 from cdislogging import get_logger
@@ -25,10 +26,21 @@ except Exception:
     logger.warning("Unable to load config, using default config...", exc_info=True)
     config.load(config_path=DEFAULT_CFG_PATH)
 
-from .models import db
+# from .models import db
 
 
 def load_modules(app: FastAPI = None) -> None:
+    for module_name in ["manage", "query", "system"]:  # TODO auto iterate over directory
+        mod = importlib.import_module("requestor.routes."+module_name)
+        if app:
+            # print(mod)
+            # print(dir(mod))
+            init_app = getattr(mod, "init_app", None)
+            # print(module_name, init_app)
+            if init_app:
+                init_app(app)
+    return
+
     # FIXME: Identify the cause for duplicate entry points (PXP-8443)
     # Added a set on entry points to dodge the intermittent duplicate modules issue
     for ep in set(entry_points()["requestor.modules"]):
@@ -47,7 +59,7 @@ def app_init() -> FastAPI:
     debug = config["DEBUG"]
     app = FastAPI(
         title="Requestor",
-        version=version("requestor"),
+        version=importlib.metadata.version("requestor"),
         debug=debug,
         root_path=config["DOCS_URL_PREFIX"],
     )
@@ -71,7 +83,7 @@ def app_init() -> FastAPI:
             logger=get_logger("requestor.gen3authz", log_level="debug"),
         )
 
-    db.init_app(app)
+    # db.init_app(app)
     load_modules(app)
 
     @app.on_event("shutdown")

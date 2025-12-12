@@ -1,9 +1,10 @@
 import uuid
 
 from asyncpg.exceptions import UniqueViolationError
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, Body, Depends, FastAPI, HTTPException
 from pydantic import BaseModel
+from sqlalchemy import delete, insert, select
 from starlette.requests import Request
 from starlette.status import (
     HTTP_200_OK,
@@ -17,7 +18,7 @@ import traceback
 from .. import logger, arborist
 from ..auth import Auth
 from ..config import config
-from ..models import db, Request as RequestModel
+from ..models import Request as RequestModel, DataAccessLayer, get_data_access_layer
 from ..request_utils import post_status_update
 
 
@@ -67,6 +68,7 @@ async def create_request(
     api_request: Request,
     body: CreateRequestInput,
     auth=Depends(Auth),
+    data_access_layer: DataAccessLayer = Depends(get_data_access_layer),
 ) -> dict:
     """
     Create a new access request.
@@ -191,24 +193,17 @@ async def create_request(
 
     # get requests for this (username, policy_id) for which the status is
     # not in FINAL_STATUSES. users can only request access to a resource once.
-    previous_requests = [
-        r
-        for r in (
-            await RequestModel.query.where(
-                RequestModel.username == data["username"],
-            )
-            .where(
-                RequestModel.policy_id == data["policy_id"],
-            )
-            .where(
-                RequestModel.revoke == data.get("revoke", False),
-            )
-            .where(
-                RequestModel.status.notin_(config["FINAL_STATUSES"]),
-            )
-            .gino.all()
-        )
-    ]
+    query = select(RequestModel).where(
+        RequestModel.username == data["username"],
+    ).where(
+        RequestModel.policy_id == data["policy_id"],
+    ).where(
+        RequestModel.revoke == data.get("revoke", False),
+    ).where(
+        RequestModel.status.notin_(config["FINAL_STATUSES"]),
+    )
+    result = await data_access_layer.db_session.execute(query)
+    previous_requests = list(result.scalars().all())
     draft_previous_requests = [
         r for r in previous_requests if r.status in config["DRAFT_STATUSES"]
     ]
@@ -237,20 +232,32 @@ async def create_request(
         request = draft_previous_requests[0]
     else:
         # create a new request
+        data = {"request_id": request_id, **data}
+        # data["request_id"] = request_id
         try:
-            request = await RequestModel.create(request_id=request_id, **data)
+            # obj = RequestModel(**request)
+            # oobj = await data_access_layer.db_session.execute(insert(RequestModel).values(**request).returning(RequestModel))
+            request = (await data_access_layer.db_session.scalars(insert(RequestModel).values(**data).returning(RequestModel))).one()
+            # data_access_layer.db_session.add(obj)
+            # request = await RequestModel.create(request_id=request_id, **data)
         except UniqueViolationError:
             raise HTTPException(
                 HTTP_409_CONFLICT,
                 "request_id already exists. Please try again",
             )
-    res = request.to_dict()
+
+
+    # print("   *** obj", obj.created_time)
+    # data_access_layer.db_session.refresh(obj)
+    # print("   *** oobj", oobj.created_time)
+    # res = request.to_dict()
+    # print('request', request)
 
     if request.status in config["UPDATE_ACCESS_STATUSES"]:
         # the access request is approved: grant/revoke access
-        action = "revoke" if request.revoke else "grant"
+        action = "revoke" if request["revoke"] else "grant"
         logger.debug(
-            f"Status '{request.status}' is one of UPDATE_ACCESS_STATUSES {config['UPDATE_ACCESS_STATUSES']}, attempting to {action} access in Arborist"
+            f"Status '{request["status"]}' is one of UPDATE_ACCESS_STATUSES {config['UPDATE_ACCESS_STATUSES']}, attempting to {action} access in Arborist"
         )
         await grant_or_revoke_arborist_policy(
             api_request.app.arborist_client,
@@ -260,14 +267,16 @@ async def create_request(
         )
 
     try:
-        redirect_url = post_status_update(request.status, res, resource_paths)
+        redirect_url = post_status_update(request.status, request, resource_paths)
+        # raise Exception("test")
     except Exception:  # if external calls or other actions fail: revert
         logger.error("Something went wrong during post-status-update actions")
         if not draft_previous_requests:
             logger.warning(f"Deleting the request that was just created ({request_id})")
-            await RequestModel.delete.where(
-                RequestModel.request_id == request_id
-            ).gino.status()
+            await data_access_layer.db_session.execute(delete(RequestModel).where(RequestModel.request_id == request_id))
+            # await RequestModel.delete.where(
+            #     RequestModel.request_id == request_id
+            # ).gino.status()
         if request.status in config["UPDATE_ACCESS_STATUSES"]:
             logger.warning(f"Reverting the previous access {action} action")
             await grant_or_revoke_arborist_policy(
@@ -284,9 +293,9 @@ async def create_request(
 
     # CORS limits redirections, so we redirect on the client side
     if redirect_url:
-        res["redirect_url"] = redirect_url
+        request.redirect_url = redirect_url
 
-    return res
+    return request.to_dict()
 
 
 @router.put("/request/{request_id}", status_code=HTTP_200_OK)
@@ -350,7 +359,7 @@ async def update_request(
         old_status = request.status
         request = await (
             RequestModel.update.where(RequestModel.request_id == request_id)
-            .values(status=status, updated_time=datetime.utcnow())
+            .values(status=status, updated_time=datetime.now(timezone.utc))
             .returning(*RequestModel)
             .gino.first()
         )
@@ -368,7 +377,7 @@ async def update_request(
         logger.warning(f"Reverting to the previous status: {old_status}")
         request = await (
             RequestModel.update.where(RequestModel.request_id == request_id)
-            .values(status=old_status, updated_time=datetime.utcnow())
+            .values(status=old_status, updated_time=datetime.now(timezone.utc))
             .returning(*RequestModel)
             .gino.first()
         )

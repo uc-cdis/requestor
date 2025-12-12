@@ -11,8 +11,9 @@ include = [
 ]
 
 [tool.poetry.dependencies]
+# TODO >= instead of ^
 python = ">=3.13,<4"
-alembic = "^1.4.2"
+alembic = ">=1"
 authutils = "^6.2.1"
 cdislogging = "^1.0.0"
 fastapi = "<1"
@@ -26,10 +27,11 @@ pydantic = "^1.8.2"
 requests = "^2.32.0"
 sniffio = "^1.2.0"
 uvicorn = ">=0.11.8,<1.0.0"
-gino = {version = "^1.0.1", extras = ["starlette"]}
+#gino = {version = "^1.0.1", extras = ["starlette"]}
 #importlib-metadata = {version = "^1.7.0", python = "<3.8"}
 gunicorn = "^22.0.0"
-sqlalchemy = ">=1,<2"
+#sqlalchemy = ">=2"
+sqlalchemy = { extras = ["asyncio"], version = ">=2" }
 pyyaml = ">=6"
 starlette = ">=0.50"
 asyncpg = "*"
@@ -41,16 +43,14 @@ pytest-asyncio = "^0.16.0"
 pytest-cov = "^2.8"
 deptry = "^0.24.0"
 
-[tool.poetry.plugins."requestor.modules"]
-"system" = "requestor.routes.system"
-"manage" = "requestor.routes.manage"
-"query" = "requestor.routes.query"
-
 [tool.deptry]
 known_first_party = ["requestor"]
 
 [tool.deptry.per_rule_ignores]
-DEP002 = ["gunicorn"]  # not imported but used in Dockerfile
+DEP002 = [
+  "gunicorn",  # not imported but used in Dockerfile
+  #"psycopg2-binary",   # not imported but used by sqlalchemy
+]
 
 [build-system]
 requires = ["poetry>=1.0.0"]

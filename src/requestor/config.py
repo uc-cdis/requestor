@@ -17,19 +17,27 @@ NON_EMPTY_STRING_SCHEMA = {"type": "string", "minLength": 1}
 class RequestorConfig(Config):
     def __init__(self, *args, **kwargs):
         super(RequestorConfig, self).__init__(*args, **kwargs)
+        # self.post_process()
 
     def post_process(self) -> None:
+        # raise Exception("here")
         # generate DB_URL from DB configs or env vars
-        self["DB_URL"] = make_url(
-            URL(
-                drivername=os.environ.get("DB_DRIVER", self["DB_DRIVER"]),
-                host=os.environ.get("DB_HOST", self["DB_HOST"]),
-                port=os.environ.get("DB_PORT", self["DB_PORT"]),
-                username=os.environ.get("DB_USER", self["DB_USER"]),
-                password=os.environ.get("DB_PASSWORD", self["DB_PASSWORD"]),
-                database=os.environ.get("DB_DATABASE", self["DB_DATABASE"]),
-            ),
-        )
+        # print(self.keys())
+        # print('self._configs', self._configs)
+        # self["DB_URL"] = make_url(
+        #     URL(
+        #         drivername=os.environ.get("DB_DRIVER", self["DB_DRIVER"]),
+        #         host=os.environ.get("DB_HOST", self["DB_HOST"]),
+        #         port=os.environ.get("DB_PORT", self["DB_PORT"]),
+        #         username=os.environ.get("DB_USER", self["DB_USER"]),
+        #         password=os.environ.get("DB_PASSWORD", self["DB_PASSWORD"]),
+        #         database=os.environ.get("DB_DATABASE", self["DB_DATABASE"]),
+        #         query={},
+        #     ),
+        # )
+        # TODO: f"{DB_DRIVER}://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_DATABASE}"
+        self["DB_URL"] = "postgresql+asyncpg://postgres:postgres@localhost:5432/requestor_test"
+        # print('self["DB_URL"]', self["DB_URL"])
 
     def validate(self) -> None:
         """
@@ -39,6 +47,8 @@ class RequestorConfig(Config):
 
         from .models import Request as RequestModel
 
+        # print(dir(RequestModel))
+        # self.allowed_params_from_db = list(RequestModel.__fields__.keys())
         self.allowed_params_from_db = [
             column.key for column in RequestModel.__table__.columns
         ]
