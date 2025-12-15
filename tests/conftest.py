@@ -33,7 +33,7 @@ def app():
 
 
 @pytest_asyncio.fixture(autouse=True, scope="session")
-async def setup_test_database(): # TODO rename
+async def setup_test_database():  # TODO rename
     """
     At teardown, restore original config and reset test DB.
     """
@@ -338,6 +338,9 @@ def mock_arborist_requests(request):
                 "POST": ({}, 204 if authorized else 403)
             },
             "http://arborist-service/user/requestor_user/policy/test-policy": {
+                "DELETE": ({}, 204 if authorized else 403)
+            },
+            "http://arborist-service/user/requestor_user/policy/test-policy-with-external-calls": {
                 "DELETE": ({}, 204 if authorized else 403)
             },
             "http://arborist-service/policy/?expand": {

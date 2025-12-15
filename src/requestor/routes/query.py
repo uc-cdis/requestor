@@ -21,7 +21,11 @@ router = APIRouter()
 
 
 async def get_filtered_requests(
-    data_access_layer, username: str = None, draft: bool = True, final: bool = True, filters: dict = {}
+    data_access_layer,
+    username: str = None,
+    draft: bool = True,
+    final: bool = True,
+    filters: dict = {},
 ) -> list:
     """
     If not None, gets all the requests made by user with given username.
@@ -30,9 +34,6 @@ async def get_filtered_requests(
     Add filters if neccessary as a dictionary of {param : <List of values>} to get filtered results
     """
     query = select(RequestModel)
-    result = await data_access_layer.db_session.execute(query)
-
-    # query = RequestModel.query
     if username:
         query = query.where(RequestModel.username == username)
     if not draft:
@@ -42,7 +43,7 @@ async def get_filtered_requests(
     for field, values in filters.items():
         query = query.where(getattr(RequestModel, field).in_(values))
 
-    # return [r for r in (await query.gino.all())]
+    result = await data_access_layer.db_session.execute(query)
     return list(result.scalars().all())
 
 
@@ -60,23 +61,27 @@ def populate_filters_from_query_params(query_params):
         elif not hasattr(RequestModel, param):
             raise HTTPException(
                 HTTP_400_BAD_REQUEST,
-                f"The parameter - '{param}' is invalid.",
+                f"The parameter '{param}' is invalid",
             )
         elif not value:
             raise HTTPException(
                 HTTP_400_BAD_REQUEST,
-                f"The param '{param}' must have a non-empty value.",
+                f"The param '{param}' must have a non-empty value",
             )
         else:
             try:
                 if getattr(RequestModel, param).type.python_type == bool:
                     value = value.lower() == "true"
                 elif getattr(RequestModel, param).type.python_type == datetime:
+                    # `multi_items()` interprets `+` as an encoded space, but in the case of a
+                    # datetime it's an actual `+` character. To support dates provided as input
+                    # as non-url-encoded strings, replace spaces with `+`.
+                    value = value.replace(" ", "+")
                     value = datetime.fromisoformat(value)
             except ValueError:
                 raise HTTPException(
                     HTTP_400_BAD_REQUEST,
-                    f"The value - '{value}' for '{param}' parameter is invalid.",
+                    f"The value '{value}' for '{param}' parameter is invalid.",
                 )
             filter_dict[param].add(value)
     return filter_dict, active
@@ -109,7 +114,9 @@ async def list_requests(
     "policy_id=foo&revoke=False" means "the policy is foo and revoke is false" (different field names).
     """
     filter_dict, active = populate_filters_from_query_params(api_request.query_params)
-    requests = await get_filtered_requests(data_access_layer, final=(not active), filters=filter_dict)
+    requests = await get_filtered_requests(
+        data_access_layer, final=(not active), filters=filter_dict
+    )
 
     # get the resources the current user has access to see
     token_claims = await auth.get_token_claims()
@@ -165,7 +172,11 @@ async def list_requests(
 
 
 @router.get("/request/user", status_code=HTTP_200_OK)
-async def list_user_requests(api_request: Request, auth=Depends(Auth), data_access_layer: DataAccessLayer = Depends(get_data_access_layer)) -> list:
+async def list_user_requests(
+    api_request: Request,
+    auth=Depends(Auth),
+    data_access_layer: DataAccessLayer = Depends(get_data_access_layer),
+) -> list:
     """
     List current user's requests.
 
@@ -216,9 +227,7 @@ async def get_request(
 ) -> dict:
     logger.debug(f"Getting request '{request_id}'")
 
-    query = select(RequestModel).where(
-        RequestModel.request_id == request_id
-    )
+    query = select(RequestModel).where(RequestModel.request_id == request_id)
     result = await data_access_layer.db_session.execute(query)
     request = result.scalar()
     if not request:
@@ -277,7 +286,9 @@ async def check_user_resource_paths(
             HTTP_403_FORBIDDEN,
             "This endpoint does not support tokens that are not linked to a user",
         )
-    user_requests = await get_filtered_requests(data_access_layer, username, draft=False, final=False)
+    user_requests = await get_filtered_requests(
+        data_access_layer, username, draft=False, final=False
+    )
     positive_requests = [r for r in user_requests if not r.revoke]
     existing_policies = await arborist.list_policies(
         api_request.app.arborist_client, expand=True

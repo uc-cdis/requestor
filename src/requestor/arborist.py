@@ -190,7 +190,7 @@ async def create_arborist_policy(
                     await res
             except ArboristError as e:
                 logger.info(
-                    "An error occured while updating role - '{}', '{}'".format(
+                    "An error occured while updating role '{}': '{}'".format(
                         {role["id"]}, str(e)
                     )
                 )

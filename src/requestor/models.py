@@ -1,11 +1,17 @@
 from collections.abc import AsyncIterable
 from datetime import datetime, timezone
-from pydantic import BaseModel
+
+# from pydantic import BaseModel
 
 # from gino.ext.starlette import Gino
 from sqlalchemy import Column, DateTime, String
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.sql.sqltypes import Boolean
 
@@ -37,7 +43,7 @@ engine = None
 async_sessionmaker_instance = None
 
 
-async def initialize_db() -> None:
+async def initialize_db() -> None:  # TODO run directly in file instead of calling function?
     """
     Initialize the database enigne.
     """
@@ -57,6 +63,7 @@ async def initialize_db() -> None:
         bind=engine, expire_on_commit=False
     )
 
+
 def get_db_engine_and_sessionmaker() -> tuple[AsyncEngine, async_sessionmaker]:
     """
     Get the db engine and sessionmaker instances.
@@ -65,6 +72,7 @@ def get_db_engine_and_sessionmaker() -> tuple[AsyncEngine, async_sessionmaker]:
     if engine is None or async_sessionmaker_instance is None:
         raise Exception("Database not initialized. Call initialize_db() first.")
     return engine, async_sessionmaker_instance
+
 
 class Request(Base):
     class Config:
@@ -78,14 +86,15 @@ class Request(Base):
     policy_id = Column(String, nullable=False)
     revoke = Column(Boolean, default=False, nullable=False)
     status = Column(String, nullable=False)
-    # created_time = Column(DateTime, default=datetime.utcnow, nullable=False)
-    # updated_time = Column(DateTime, default=datetime.utcnow, nullable=False)
-    # TODO fix sqlalchemy.exc.DBAPIError can't subtract offset-naive and offset-aware datetimes <= nvm
     created_time = Column(
-        DateTime(timezone=True), default=datetime.now(timezone.utc), nullable=False
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
     )
     updated_time = Column(
-        DateTime(timezone=True), default=datetime.now(timezone.utc), nullable=False
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
     )
 
     # keep for backwards compatibility:
@@ -93,9 +102,12 @@ class Request(Base):
     resource_display_name = Column(String)
 
     def to_dict(self):
-        return {
+        d = {
             column.name: getattr(self, column.name) for column in self.__table__.columns
         }
+        if hasattr(self, "redirect_url"):
+            d["redirect_url"] = self.redirect_url
+        return d
 
 
 class DataAccessLayer:

@@ -15,6 +15,11 @@ from requestor.app import app_init
 CURRENT_DIR = os.path.dirname(os.path.realpath(__file__))
 
 
+# TODO get run.py working
+#   File "/Users/paulineribeyre/Projects/requestor/src/requestor/models.py", line 119, in get_data_access_layer
+#     async with async_sessionmaker_instance() as session:
+#                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+# TypeError: 'NoneType' object is not callable
 if __name__ == "__main__":
     if sys.argv[-1] == "openapi":
         schema = app_init().openapi()

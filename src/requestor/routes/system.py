@@ -1,6 +1,7 @@
-from fastapi import APIRouter, FastAPI, Request
+from fastapi import APIRouter, Depends, FastAPI, Request
+from sqlalchemy import text
 
-from ..models import Request as RequestModel
+from ..models import Request as RequestModel, DataAccessLayer, get_data_access_layer
 
 
 router = APIRouter()
@@ -12,8 +13,10 @@ def get_version(request: Request) -> dict:
 
 
 @router.get("/_status")
-async def get_status() -> dict:
-    await RequestModel.query.gino.first()
+async def get_status(
+    data_access_layer: DataAccessLayer = Depends(get_data_access_layer),
+) -> dict:
+    await data_access_layer.db_session.execute(text("SELECT 1;"))
     return dict(status="OK")
 
 
