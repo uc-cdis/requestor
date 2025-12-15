@@ -38,8 +38,8 @@ asyncpg = "*"
 
 [tool.poetry.group.dev.dependencies]
 mock = "^4.0.3"
-pytest = "^6.0.1"
-pytest-asyncio = "^0.16.0"
+pytest = ">=9"
+pytest-asyncio = "*"
 pytest-cov = "^2.8"
 deptry = "^0.24.0"
 

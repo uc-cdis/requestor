@@ -10,6 +10,7 @@ from starlette.status import (
     HTTP_200_OK,
     HTTP_201_CREATED,
     HTTP_400_BAD_REQUEST,
+    HTTP_404_NOT_FOUND,
     HTTP_409_CONFLICT,
     HTTP_500_INTERNAL_SERVER_ERROR,
 )
@@ -22,6 +23,8 @@ from ..models import Request as RequestModel, DataAccessLayer, get_data_access_l
 from ..request_utils import post_status_update
 
 
+# TODO all replacements of gino `first_or_404` should return 404 if:
+# `.one()` => `sqlalchemy.exc.NoResultFound: No row was found when one was required``
 router = APIRouter()
 
 
@@ -243,7 +246,7 @@ async def create_request(
         except UniqueViolationError:
             raise HTTPException(
                 HTTP_409_CONFLICT,
-                "request_id already exists. Please try again",
+                "request_id already exists. Please try again",  # TODO test this is still how it works
             )
 
 
@@ -255,9 +258,9 @@ async def create_request(
 
     if request.status in config["UPDATE_ACCESS_STATUSES"]:
         # the access request is approved: grant/revoke access
-        action = "revoke" if request["revoke"] else "grant"
+        action = "revoke" if request.revoke else "grant"
         logger.debug(
-            f"Status '{request["status"]}' is one of UPDATE_ACCESS_STATUSES {config['UPDATE_ACCESS_STATUSES']}, attempting to {action} access in Arborist"
+            f"Status '{request.status}' is one of UPDATE_ACCESS_STATUSES {config['UPDATE_ACCESS_STATUSES']}, attempting to {action} access in Arborist"
         )
         await grant_or_revoke_arborist_policy(
             api_request.app.arborist_client,
@@ -304,6 +307,7 @@ async def update_request(
     request_id: uuid.UUID,
     status: str = Body(..., embed=True),
     auth=Depends(Auth),
+    data_access_layer: DataAccessLayer = Depends(get_data_access_layer),
 ) -> dict:
     """
     Update an access request with a new "status".
@@ -314,59 +318,70 @@ async def update_request(
         api_request.app.arborist_client, expand=True
     )
 
+    query = select(RequestModel).where(
+        RequestModel.request_id == request_id,
+    )
+    result = await data_access_layer.db_session.execute(query)
+    request = result.scalars().one()
+
+    # TODO:
     # only allow 1 update request at a time on the same row
-    async with db.transaction():
-        request = (
-            await RequestModel.query.where(RequestModel.request_id == request_id)
-            # lock the row by using FOR UPDATE clause
-            .execution_options(populate_existing=True)
-            .with_for_update()
-            .gino.first_or_404()
+    # async with db.transaction():
+        # request = (
+        #     await RequestModel.query.where(RequestModel.request_id == request_id)
+        #     # lock the row by using FOR UPDATE clause
+        #     .execution_options(populate_existing=True)
+        #     .with_for_update()
+        #     .gino.first_or_404()
+        # )
+
+    resource_paths = arborist.get_resource_paths_for_policy(
+        existing_policies["policies"], request.policy_id
+    )
+    await auth.authorize(
+        "update",
+        resource_paths,
+    )
+
+    if request.status == status:
+        logger.debug(f"Request '{request_id}' already has status '{status}'")
+        return request.to_dict()
+
+    allowed_statuses = config["ALLOWED_REQUEST_STATUSES"]
+    if status not in allowed_statuses:
+        raise HTTPException(
+            HTTP_400_BAD_REQUEST,
+            f"Status '{status}' is not an allowed request status ({allowed_statuses})",
         )
 
-        resource_paths = arborist.get_resource_paths_for_policy(
-            existing_policies["policies"], request.policy_id
+    if status in config["UPDATE_ACCESS_STATUSES"]:
+        # the access request is approved: grant/revoke access
+        action = "revoke" if request.revoke else "grant"
+        logger.debug(
+            f"Status '{status}' is one of UPDATE_ACCESS_STATUSES {config['UPDATE_ACCESS_STATUSES']}, attempting to {action} access in Arborist"
         )
-        await auth.authorize(
-            "update",
-            resource_paths,
+        await grant_or_revoke_arborist_policy(
+            api_request.app.arborist_client,
+            request.policy_id,
+            request.username,
+            request.revoke,
         )
 
-        if request.status == status:
-            logger.debug(f"Request '{request_id}' already has status '{status}'")
-            return request.to_dict()
-
-        allowed_statuses = config["ALLOWED_REQUEST_STATUSES"]
-        if status not in allowed_statuses:
-            raise HTTPException(
-                HTTP_400_BAD_REQUEST,
-                f"Status '{status}' is not an allowed request status ({allowed_statuses})",
-            )
-
-        if status in config["UPDATE_ACCESS_STATUSES"]:
-            # the access request is approved: grant/revoke access
-            action = "revoke" if request.revoke else "grant"
-            logger.debug(
-                f"Status '{status}' is one of UPDATE_ACCESS_STATUSES {config['UPDATE_ACCESS_STATUSES']}, attempting to {action} access in Arborist"
-            )
-            await grant_or_revoke_arborist_policy(
-                api_request.app.arborist_client,
-                request.policy_id,
-                request.username,
-                request.revoke,
-            )
-
-        old_status = request.status
-        request = await (
-            RequestModel.update.where(RequestModel.request_id == request_id)
-            .values(status=status, updated_time=datetime.now(timezone.utc))
-            .returning(*RequestModel)
-            .gino.first()
-        )
+    old_status = request.status
+    # request = (await data_access_layer.db_session.scalars(update(RequestModel).values(status=status).returning(RequestModel))).one()
+    request.status = status
+    request.updated_time = datetime.now(timezone.utc)
+    data_access_layer.db_session.commit()
+    # request = await (
+    #     RequestModel.update.where(RequestModel.request_id == request_id)
+    #     .values(status=status, updated_time=datetime.now(timezone.utc))
+    #     .returning(*RequestModel)
+    #     .gino.first()
+    # )
 
     # release the connection early, `post_status_update` could take time
     # https://python-gino.org/docs/en/1.0/reference/extensions/starlette.html#lazy-connection
-    await api_request["connection"].release(permanent=False)
+    # await api_request["connection"].release(permanent=False)
 
     res = request.to_dict()
 
@@ -407,6 +422,7 @@ async def delete_request(
     api_request: Request,
     request_id: uuid.UUID,
     auth=Depends(Auth),
+    data_access_layer: DataAccessLayer = Depends(get_data_access_layer),
 ) -> dict:
     """
     Delete an access request.
@@ -419,21 +435,39 @@ async def delete_request(
         api_request.app.arborist_client, expand=True
     )
 
-    async with db.transaction():
-        request = (
-            await RequestModel.delete.where(RequestModel.request_id == request_id)
-            .returning(*RequestModel)
-            .gino.first_or_404()
+    query = select(RequestModel).where(RequestModel.request_id == request_id)
+    result = await data_access_layer.db_session.execute(query)
+    request = result.scalar()
+    if not request:
+        raise HTTPException(
+            HTTP_404_NOT_FOUND,
+            "Not found",
         )
 
-        # if not authorized, the exception raised by `auth.authorize`
-        # triggers a transaction rollback, so we don't delete
-        await auth.authorize(
-            "delete",
-            arborist.get_resource_paths_for_policy(
-                existing_policies["policies"], request.policy_id
-            ),
-        )
+    await auth.authorize(
+        "delete",
+        arborist.get_resource_paths_for_policy(
+            existing_policies["policies"], request.policy_id
+        ),
+    )
+
+    await data_access_layer.db_session.execute(delete(RequestModel).where(RequestModel.request_id == request_id))
+
+    # async with db.transaction():
+    #     request = (
+    #         await RequestModel.delete.where(RequestModel.request_id == request_id)
+    #         .returning(*RequestModel)
+    #         .gino.first_or_404()
+    #     )
+
+    #     # if not authorized, the exception raised by `auth.authorize`
+    #     # triggers a transaction rollback, so we don't delete
+    #     await auth.authorize(
+    #         "delete",
+    #         arborist.get_resource_paths_for_policy(
+    #             existing_policies["policies"], request.policy_id
+    #         ),
+    #     )
 
     return {"request_id": request_id}
 

@@ -3,21 +3,27 @@ from alembic.config import main as alembic_main
 import copy
 import os
 import pytest
+import pytest_asyncio
 import requests
+from sqlalchemy.ext.asyncio import (
+    async_sessionmaker,
+    create_async_engine,
+    # async_scoped_session,
+)
 from starlette.config import environ
 from starlette.testclient import TestClient
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from requestor.arborist import get_auto_policy_id
-
-
-# Set REQUESTOR_CONFIG_PATH *before* loading the configuration
+# Set REQUESTOR_CONFIG_PATH *before* loading requestor modules
 CURRENT_DIR = os.path.dirname(os.path.realpath(__file__))
 environ["REQUESTOR_CONFIG_PATH"] = os.path.join(
     CURRENT_DIR, "test-requestor-config.yaml"
 )
+
 from requestor.app import app_init
+from requestor.arborist import get_auto_policy_id
 from requestor.config import config
+from requestor.models import Base, get_db_engine_and_sessionmaker, initialize_db
 
 
 @pytest.fixture(scope="session")
@@ -26,27 +32,91 @@ def app():
     return app
 
 
-@pytest.fixture(autouse=True, scope="session")
-def setup_test_database():
+@pytest_asyncio.fixture(autouse=True, scope="session")
+async def setup_test_database(): # TODO rename
     """
     At teardown, restore original config and reset test DB.
     """
     saved_config = copy.deepcopy(config._configs)
 
-    alembic_main(["--raiseerr", "upgrade", "head"])
+    # loop = asyncio.get_running_loop()
+    # await loop.run_in_executor(None, alembic_main, ["--raiseerr", "upgrade", "head"])
 
     yield
 
     # restore old configs
     config.update(saved_config)
 
-    if not config["TEST_KEEP_DB"]:
-        alembic_main(["--raiseerr", "downgrade", "base"])
+    # if not config["TEST_KEEP_DB"]:
+    #     await loop.run_in_executor(
+    #         None, alembic_main, ["--raiseerr", "downgrade", "base"]
+    #     )
 
 
-@pytest.fixture()
-def client():
-    with TestClient(app_init()) as client:
+# @pytest_asyncio.fixture(scope="function")
+# async def engine():
+#     """
+#     Non-session scoped engine which recreates the database, yields, then drops the tables
+#     """
+#     engine = create_async_engine(config["DB_URL"], echo=False, future=True)
+
+#     async with engine.begin() as conn:
+#         await conn.run_sync(Base.metadata.drop_all)
+#         await conn.run_sync(Base.metadata.create_all)
+
+#     yield engine
+
+#     async with engine.begin() as conn:
+#         await conn.run_sync(Base.metadata.drop_all)
+
+#     await engine.dispose()
+
+
+# @pytest_asyncio.fixture()
+# async def db_session(engine):
+#     """
+#     Database session which utilizes the above engine and event loop and sets up a nested transaction before yielding.
+#     It rolls back the nested transaction after yield.
+#     """
+#     event_loop = asyncio.get_running_loop()
+#     session_maker = async_sessionmaker(
+#         engine, expire_on_commit=False, autocommit=False, autoflush=False
+#     )
+
+#     async with engine.connect() as conn:
+#         transaction = await conn.begin()
+#         async with session_maker(bind=conn) as session:
+#             yield session
+
+#             await transaction.rollback()
+
+
+@pytest_asyncio.fixture(scope="function")
+async def db_session():
+    """
+    Creates a new async DB session.
+    """
+    engine = create_async_engine(config["DB_URL"], echo=False, future=True)
+
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+        await conn.run_sync(Base.metadata.create_all)
+
+    await initialize_db()
+    _, session_maker_instance = get_db_engine_and_sessionmaker()
+
+    async with session_maker_instance() as session:
+        yield session
+
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+
+    await engine.dispose()
+
+
+@pytest.fixture
+def client(app, db_session):
+    with TestClient(app) as client:
         yield client
 
 
@@ -215,25 +285,25 @@ def access_token_user_only_patcher(client, request):
     access_token_patch.stop()
 
 
-@pytest.fixture(autouse=True)
-def clean_db():
-    """
-    Before each test, delete all existing requests from the DB
-    """
-    # The code below doesn't work because of this issue
-    # https://github.com/encode/starlette/issues/440, so for now reset
-    # using alembic.
-    # pytest-asyncio = "^0.14.0"
-    # from requestor.models import Request as RequestModel
-    # @pytest.mark.asyncio
-    # async def clean_db():
-    #     await RequestModel.delete.gino.all()
-    #     yield
+# @pytest.fixture(autouse=True)
+# def clean_db():
+#     """
+#     Before each test, delete all existing requests from the DB
+#     """
+#     # The code below doesn't work because of this issue
+#     # https://github.com/encode/starlette/issues/440, so for now reset
+#     # using alembic.
+#     # pytest-asyncio = "^0.14.0"
+#     # from requestor.models import Request as RequestModel
+#     # @pytest.mark.asyncio
+#     # async def clean_db():
+#     #     await RequestModel.delete.gino.all()
+#     #     yield
 
-    alembic_main(["--raiseerr", "downgrade", "base"])
-    alembic_main(["--raiseerr", "upgrade", "head"])
+#     alembic_main(["--raiseerr", "downgrade", "base"])
+#     alembic_main(["--raiseerr", "upgrade", "head"])
 
-    yield
+#     yield
 
 
 @pytest.fixture(scope="function")

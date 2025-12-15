@@ -1,13 +1,13 @@
 from alembic import context
 import asyncio
 from logging.config import fileConfig
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
+from requestor.app import load_modules
 from requestor.config import config
 from requestor.models import Base
-from requestor.app import load_modules
 
 
 # TODO alembic downgrade base fails because requestor config is not initialized yet
@@ -53,9 +53,7 @@ async def run_async_migrations() -> None:
     and associate a connection with the context.
 
     """
-    # THIS WAS MODIFIED FROM THE DEFAULT ALEMBIC ASYNC SETUP TO PULL
-    # CONFIGURATION FROM THE APP CONFIG
-    alembic_config.set_main_option("sqlalchemy.url", str(config["DB_URL"]))
+    alembic_config.set_main_option("sqlalchemy.url", config["DB_URL"])
     connectable = async_engine_from_config(
         alembic_config.get_section(alembic_config.config_ini_section, {}),
         prefix="sqlalchemy.",

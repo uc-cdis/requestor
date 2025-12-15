@@ -1,7 +1,7 @@
 from itertools import chain
 from jsonschema import validate
 import os
-from sqlalchemy.engine.url import make_url, URL
+# from sqlalchemy.engine.url import make_url, URL
 
 from gen3config import Config
 
@@ -36,7 +36,9 @@ class RequestorConfig(Config):
         #     ),
         # )
         # TODO: f"{DB_DRIVER}://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_DATABASE}"
-        self["DB_URL"] = "postgresql+asyncpg://postgres:postgres@localhost:5432/requestor_test"
+        self[
+            "DB_URL"
+        ] = "postgresql+asyncpg://postgres:postgres@localhost:5432/requestor_test"
         # print('self["DB_URL"]', self["DB_URL"])
 
     def validate(self) -> None:
@@ -247,3 +249,17 @@ class RequestorConfig(Config):
 
 
 config = RequestorConfig(DEFAULT_CFG_PATH)
+try:
+    if os.environ.get("REQUESTOR_CONFIG_PATH"):
+        config.load(config_path=os.environ["REQUESTOR_CONFIG_PATH"])
+    else:
+        CONFIG_SEARCH_FOLDERS = [
+            "/src",
+            "{}/.gen3/requestor".format(os.path.expanduser("~")),
+        ]
+        print('CONFIG_SEARCH_FOLDERS', CONFIG_SEARCH_FOLDERS)
+        config.load(search_folders=CONFIG_SEARCH_FOLDERS)
+        print('config', config)
+except Exception:
+    logger.warning("Unable to load config, using default config...", exc_info=True)
+    config.load(config_path=DEFAULT_CFG_PATH)
