@@ -1,6 +1,5 @@
 import uuid
 
-from asyncpg.exceptions import UniqueViolationError
 from datetime import datetime, timezone
 from fastapi import APIRouter, Body, Depends, FastAPI, HTTPException
 from pydantic import BaseModel

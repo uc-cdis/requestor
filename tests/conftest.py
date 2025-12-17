@@ -1,15 +1,9 @@
 import asyncio
-from alembic.config import main as alembic_main
-import copy
 import os
 import pytest
 import pytest_asyncio
 import requests
-from sqlalchemy.ext.asyncio import (
-    async_sessionmaker,
-    create_async_engine,
-    # async_scoped_session,
-)
+from sqlalchemy.ext.asyncio import create_async_engine
 from starlette.config import environ
 from starlette.testclient import TestClient
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -32,69 +26,10 @@ def app():
     return app
 
 
-@pytest_asyncio.fixture(autouse=True, scope="session")
-async def setup_test_database():  # TODO rename
-    """
-    At teardown, restore original config and reset test DB.
-    """
-    saved_config = copy.deepcopy(config._configs)
-
-    # loop = asyncio.get_running_loop()
-    # await loop.run_in_executor(None, alembic_main, ["--raiseerr", "upgrade", "head"])
-
-    yield
-
-    # restore old configs
-    config.update(saved_config)
-
-    # if not config["TEST_KEEP_DB"]:
-    #     await loop.run_in_executor(
-    #         None, alembic_main, ["--raiseerr", "downgrade", "base"]
-    #     )
-
-
-# @pytest_asyncio.fixture(scope="function")
-# async def engine():
-#     """
-#     Non-session scoped engine which recreates the database, yields, then drops the tables
-#     """
-#     engine = create_async_engine(config["DB_URL"], echo=False, future=True)
-
-#     async with engine.begin() as conn:
-#         await conn.run_sync(Base.metadata.drop_all)
-#         await conn.run_sync(Base.metadata.create_all)
-
-#     yield engine
-
-#     async with engine.begin() as conn:
-#         await conn.run_sync(Base.metadata.drop_all)
-
-#     await engine.dispose()
-
-
-# @pytest_asyncio.fixture()
-# async def db_session(engine):
-#     """
-#     Database session which utilizes the above engine and event loop and sets up a nested transaction before yielding.
-#     It rolls back the nested transaction after yield.
-#     """
-#     event_loop = asyncio.get_running_loop()
-#     session_maker = async_sessionmaker(
-#         engine, expire_on_commit=False, autocommit=False, autoflush=False
-#     )
-
-#     async with engine.connect() as conn:
-#         transaction = await conn.begin()
-#         async with session_maker(bind=conn) as session:
-#             yield session
-
-#             await transaction.rollback()
-
-
 @pytest_asyncio.fixture(scope="function")
 async def db_session():
     """
-    Creates a new async DB session.
+    Creates a new async DB session. Reset the test DB before and after every test.
     """
     engine = create_async_engine(config["DB_URL"], echo=False, future=True)
 
