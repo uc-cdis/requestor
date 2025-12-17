@@ -1,9 +1,6 @@
 from collections.abc import AsyncIterable
 from datetime import datetime, timezone
 
-# from pydantic import BaseModel
-
-# from gino.ext.starlette import Gino
 from sqlalchemy import Column, DateTime, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.asyncio import (
@@ -21,34 +18,16 @@ from .config import config
 Base = declarative_base()
 # TODO rename to 'db.py'?
 
-# db = Gino(
-#     dsn=config["DB_URL"],
-#     pool_min_size=config["DB_POOL_MIN_SIZE"],
-#     pool_max_size=config["DB_POOL_MAX_SIZE"],
-#     echo=config["DB_ECHO"],
-#     ssl=config["DB_SSL"],
-#     use_connection_for_request=config["DB_USE_CONNECTION_FOR_REQUEST"],
-#     retry_limit=config["DB_RETRY_LIMIT"],
-#     retry_interval=config["DB_RETRY_INTERVAL"],
-# )
-
-
-# engine = create_async_engine(config["DB_URL"], echo=True)
-
-# # creates AsyncSession instances
-# async_sessionmaker = async_sessionmaker(engine, expire_on_commit=False)
-
 
 engine = None
 async_sessionmaker_instance = None
 
 
-async def initialize_db() -> None:  # TODO run directly in file instead of calling function?
+def initialize_db() -> None:
     """
     Initialize the database enigne.
     """
     global engine, async_sessionmaker_instance
-    # logger.info(f"DB_URL: {config['DB_URL']}")
     engine = create_async_engine(
         url=config["DB_URL"],
         pool_size=config.get("DB_POOL_MIN_SIZE", 15),
@@ -76,7 +55,8 @@ def get_db_engine_and_sessionmaker() -> tuple[AsyncEngine, async_sessionmaker]:
 
 class Request(Base):
     class Config:
-        # Fix: no validator found for <class 'sqlalchemy.sql.schema.Column'>, see `arbitrary_types_allowed` in Config
+        # Fix for error: no validator found for <class 'sqlalchemy.sql.schema.Column'>,
+        # see `arbitrary_types_allowed` in Config
         arbitrary_types_allowed = True
 
     __tablename__ = "requests"

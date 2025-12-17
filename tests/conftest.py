@@ -102,7 +102,7 @@ async def db_session():
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
 
-    await initialize_db()
+    initialize_db()
     _, session_maker_instance = get_db_engine_and_sessionmaker()
 
     async with session_maker_instance() as session:
