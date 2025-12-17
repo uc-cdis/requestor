@@ -10,7 +10,6 @@ from requestor.config import config
 from requestor.models import Base
 
 
-# TODO alembic downgrade base fails because requestor config is not initialized yet
 alembic_config = context.config
 fileConfig(alembic_config.config_file_name)
 load_modules()

@@ -5,7 +5,6 @@ Utils to interact with Arborist
 
 from functools import wraps
 import inspect
-import sniffio
 
 from gen3authz.client.arborist.async_client import ArboristClient
 from gen3authz.client.arborist.errors import ArboristError
@@ -22,12 +21,18 @@ def maybe_sync(m):
 
     @wraps(m)
     def _wrapper(*args, **kwargs):
-        coro = m(*args, **kwargs)
         try:
-            sniffio.current_async_library()
-        except sniffio.AsyncLibraryNotFoundError:
-            pass
-        else:
+            from alembic import context
+
+            # If this import succeeds and the context has a config, we are likely in a migration.
+            # Accessing an attribute like 'config' on the context will raise an error if it hasn't
+            # been set up by the EnvironmentContext.
+            is_alembic_migration = bool(context.config)
+        except Exception:
+            is_alembic_migration = False
+
+        coro = m(*args, **kwargs)
+        if not is_alembic_migration:
             return coro
 
         result = None
