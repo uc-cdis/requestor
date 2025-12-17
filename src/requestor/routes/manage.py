@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Body, Depends, FastAPI, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import delete, insert, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio.session import AsyncSession
 from starlette.requests import Request
 from starlette.status import (
@@ -24,8 +25,6 @@ from ..db import Request as RequestModel, get_db_session
 from ..request_utils import post_status_update
 
 
-# TODO all replacements of gino `first_or_404` should return 404 if:
-# `.one()` => `sqlalchemy.exc.NoResultFound: No row was found when one was required``
 router = APIRouter()
 
 
@@ -249,11 +248,13 @@ async def create_request(
                     insert(RequestModel).values(**data).returning(RequestModel)
                 )
             ).one()
-        except UniqueViolationError:
-            raise HTTPException(
-                HTTP_409_CONFLICT,
-                "request_id already exists. Please try again",  # TODO test this is still how it works
-            )
+        except IntegrityError as e:
+            if "asyncpg.exceptions.UniqueViolationError" in str(e):
+                raise HTTPException(
+                    HTTP_409_CONFLICT,
+                    "request_id already exists. Please try again",
+                )
+            raise
 
     if request.status in config["UPDATE_ACCESS_STATUSES"]:
         # the access request is approved: grant/revoke access
@@ -321,7 +322,12 @@ async def update_request(
         RequestModel.request_id == request_id,
     )
     result = await db_session.execute(query)
-    request = result.scalars().one()
+    request = result.scalar()
+    if not request:
+        raise HTTPException(
+            HTTP_404_NOT_FOUND,
+            "Not found",
+        )
 
     # TODO: replace this old Gino code:
     # only allow 1 update request at a time on the same row
