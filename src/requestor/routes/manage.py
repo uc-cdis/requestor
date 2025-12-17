@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Body, Depends, FastAPI, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import delete, insert, select
+from sqlalchemy.ext.asyncio.session import AsyncSession
 from starlette.requests import Request
 from starlette.status import (
     HTTP_200_OK,
@@ -19,7 +20,7 @@ import traceback
 from .. import logger, arborist
 from ..auth import Auth
 from ..config import config
-from ..models import Request as RequestModel, DataAccessLayer, get_data_access_layer
+from ..db import Request as RequestModel, get_db_session
 from ..request_utils import post_status_update
 
 
@@ -71,7 +72,7 @@ async def create_request(
     api_request: Request,
     body: CreateRequestInput,
     auth=Depends(Auth),
-    data_access_layer: DataAccessLayer = Depends(get_data_access_layer),
+    db_session: AsyncSession = Depends(get_db_session),
 ) -> dict:
     """
     Create a new access request.
@@ -211,7 +212,7 @@ async def create_request(
             RequestModel.status.notin_(config["FINAL_STATUSES"]),
         )
     )
-    result = await data_access_layer.db_session.execute(query)
+    result = await db_session.execute(query)
     previous_requests = list(result.scalars().all())
     draft_previous_requests = [
         r for r in previous_requests if r.status in config["DRAFT_STATUSES"]
@@ -244,7 +245,7 @@ async def create_request(
         data = {"request_id": request_id, **data}
         try:
             request = (
-                await data_access_layer.db_session.scalars(
+                await db_session.scalars(
                     insert(RequestModel).values(**data).returning(RequestModel)
                 )
             ).one()
@@ -275,7 +276,7 @@ async def create_request(
         logger.error("Something went wrong during post-status-update actions")
         if not draft_previous_requests:
             logger.warning(f"Deleting the request that was just created ({request_id})")
-            await data_access_layer.db_session.execute(
+            await db_session.execute(
                 delete(RequestModel).where(RequestModel.request_id == request_id)
             )
         if request.status in config["UPDATE_ACCESS_STATUSES"]:
@@ -305,7 +306,7 @@ async def update_request(
     request_id: uuid.UUID,
     status: str = Body(..., embed=True),
     auth=Depends(Auth),
-    data_access_layer: DataAccessLayer = Depends(get_data_access_layer),
+    db_session: AsyncSession = Depends(get_db_session),
 ) -> dict:
     """
     Update an access request with a new "status".
@@ -319,7 +320,7 @@ async def update_request(
     query = select(RequestModel).where(
         RequestModel.request_id == request_id,
     )
-    result = await data_access_layer.db_session.execute(query)
+    result = await db_session.execute(query)
     request = result.scalars().one()
 
     # TODO: replace this old Gino code:
@@ -368,7 +369,7 @@ async def update_request(
     old_status = request.status
     request.status = status
     request.updated_time = datetime.now(timezone.utc)
-    data_access_layer.db_session.commit()
+    db_session.commit()
 
     # TODO: replace this old Gino code:
     # release the connection early, `post_status_update` could take time
@@ -384,7 +385,7 @@ async def update_request(
         logger.warning(f"Reverting to the previous status: {old_status}")
         request.status = old_status
         request.updated_time = datetime.now(timezone.utc)
-        data_access_layer.db_session.commit()
+        db_session.commit()
         if status in config["UPDATE_ACCESS_STATUSES"]:
             logger.warning(f"Reverting the previous access {action} action")
             await grant_or_revoke_arborist_policy(
@@ -411,7 +412,7 @@ async def delete_request(
     api_request: Request,
     request_id: uuid.UUID,
     auth=Depends(Auth),
-    data_access_layer: DataAccessLayer = Depends(get_data_access_layer),
+    db_session: AsyncSession = Depends(get_db_session),
 ) -> dict:
     """
     Delete an access request.
@@ -425,7 +426,7 @@ async def delete_request(
     )
 
     query = select(RequestModel).where(RequestModel.request_id == request_id)
-    result = await data_access_layer.db_session.execute(query)
+    result = await db_session.execute(query)
     request = result.scalar()
     if not request:
         raise HTTPException(
@@ -440,7 +441,7 @@ async def delete_request(
         ),
     )
 
-    await data_access_layer.db_session.execute(
+    await db_session.execute(
         delete(RequestModel).where(RequestModel.request_id == request_id)
     )
 

@@ -3,7 +3,6 @@ from datetime import datetime
 import pytest
 
 from requestor.arborist import get_auto_policy_id
-# from requestor.models import db
 
 
 # TODO update this now that we removed Gino

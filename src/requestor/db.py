@@ -16,41 +16,10 @@ from .config import config
 
 
 Base = declarative_base()
-# TODO rename to 'db.py'?
 
 
 engine = None
 async_sessionmaker_instance = None
-
-
-def initialize_db() -> None:
-    """
-    Initialize the database enigne.
-    """
-    global engine, async_sessionmaker_instance
-    engine = create_async_engine(
-        url=config["DB_URL"],
-        pool_size=config.get("DB_POOL_MIN_SIZE", 15),
-        max_overflow=config["DB_POOL_MAX_SIZE"] - config["DB_POOL_MIN_SIZE"],
-        echo=config["DB_ECHO"],
-        connect_args={"ssl": config["DB_SSL"]} if config["DB_SSL"] else {},
-        pool_pre_ping=True,
-    )
-
-    # creates AsyncSession instances
-    async_sessionmaker_instance = async_sessionmaker(
-        bind=engine, expire_on_commit=False
-    )
-
-
-def get_db_engine_and_sessionmaker() -> tuple[AsyncEngine, async_sessionmaker]:
-    """
-    Get the db engine and sessionmaker instances.
-    """
-    global engine, async_sessionmaker_instance
-    if engine is None or async_sessionmaker_instance is None:
-        raise Exception("Database not initialized. Call initialize_db() first.")
-    return engine, async_sessionmaker_instance
 
 
 class Request(Base):
@@ -90,24 +59,44 @@ class Request(Base):
         return d
 
 
-class DataAccessLayer:
+def initialize_db() -> None:
     """
-    Defines an abstract interface to manipulate the database. Instances are given a session to
-    act within.
+    Initialize the database enigne.
     """
+    global engine, async_sessionmaker_instance
+    engine = create_async_engine(
+        url=config["DB_URL"],
+        pool_size=config.get("DB_POOL_MIN_SIZE", 15),
+        max_overflow=config["DB_POOL_MAX_SIZE"] - config["DB_POOL_MIN_SIZE"],
+        echo=config["DB_ECHO"],
+        connect_args={"ssl": config["DB_SSL"]} if config["DB_SSL"] else {},
+        pool_pre_ping=True,
+    )
 
-    def __init__(self, db_session: AsyncSession):
-        self.db_session = db_session
+    # creates AsyncSession instances
+    async_sessionmaker_instance = async_sessionmaker(
+        bind=engine, expire_on_commit=False
+    )
 
 
-# TODO rename to "db"? in injected function params
-async def get_data_access_layer() -> AsyncIterable[DataAccessLayer]:
+def get_db_engine_and_sessionmaker() -> tuple[AsyncEngine, async_sessionmaker]:
+    """
+    Get the db engine and sessionmaker instances.
+    """
+    global engine, async_sessionmaker_instance
+    if engine is None or async_sessionmaker_instance is None:
+        raise Exception("Database not initialized. Call initialize_db() first.")
+    return engine, async_sessionmaker_instance
+
+
+async def get_db_session() -> AsyncIterable[AsyncSession]:
     """
     Create an AsyncSession and yield an instance of the Data Access Layer,
     which acts as an abstract interface to manipulate the database.
 
     Can be injected as a dependency in FastAPI endpoints.
     """
+    _, async_sessionmaker_instance = get_db_engine_and_sessionmaker()
     async with async_sessionmaker_instance() as session:
         async with session.begin():
-            yield DataAccessLayer(session)
+            yield session

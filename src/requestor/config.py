@@ -29,7 +29,7 @@ class RequestorConfig(Config):
         """
         logger.info("Validating configuration")
 
-        from .models import Request as RequestModel
+        from .db import Request as RequestModel
 
         self.allowed_params_from_db = [
             column.key for column in RequestModel.__table__.columns

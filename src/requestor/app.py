@@ -10,7 +10,7 @@ from gen3authz.client.arborist.async_client import ArboristClient
 
 from . import logger
 from .config import config
-from .models import initialize_db
+from .db import initialize_db
 
 
 def load_modules(app: FastAPI = None) -> None:

@@ -23,7 +23,7 @@ environ["REQUESTOR_CONFIG_PATH"] = os.path.join(
 from requestor.app import app_init
 from requestor.arborist import get_auto_policy_id
 from requestor.config import config
-from requestor.models import Base, get_db_engine_and_sessionmaker, initialize_db
+from requestor.db import Base, get_db_engine_and_sessionmaker, initialize_db
 
 
 @pytest.fixture(scope="session")
@@ -283,27 +283,6 @@ def access_token_user_only_patcher(client, request):
     yield access_token_mock
 
     access_token_patch.stop()
-
-
-# @pytest.fixture(autouse=True)
-# def clean_db():
-#     """
-#     Before each test, delete all existing requests from the DB
-#     """
-#     # The code below doesn't work because of this issue
-#     # https://github.com/encode/starlette/issues/440, so for now reset
-#     # using alembic.
-#     # pytest-asyncio = "^0.14.0"
-#     # from requestor.models import Request as RequestModel
-#     # @pytest.mark.asyncio
-#     # async def clean_db():
-#     #     await RequestModel.delete.gino.all()
-#     #     yield
-
-#     alembic_main(["--raiseerr", "downgrade", "base"])
-#     alembic_main(["--raiseerr", "upgrade", "head"])
-
-#     yield
 
 
 @pytest.fixture(scope="function")
