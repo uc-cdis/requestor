@@ -2,6 +2,7 @@ import os
 
 from alembic import command
 from alembic.config import Config
+from asyncpg.exceptions import UndefinedTableError
 from sqlalchemy import text
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -23,10 +24,11 @@ async def reset(db_session):
     try:
         await db_session.execute(text("DELETE FROM alembic_version"))
         await db_session.commit()
-    except ProgrammingError as e:
+    except (ProgrammingError, UndefinedTableError) as e:
         if "UndefinedTableError" in str(e):
             await db_session.rollback()
-        raise
+        else:
+            raise
 
 
 class MigrationRunner:
