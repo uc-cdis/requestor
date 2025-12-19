@@ -1,12 +1,13 @@
-import asyncio
-from fastapi import FastAPI
-import httpx
+from contextlib import asynccontextmanager
 import importlib
 from importlib.metadata import entry_points
 import os
 
+import asyncio
 from cdislogging import get_logger
+from fastapi import FastAPI
 from gen3authz.client.arborist.async_client import ArboristClient
+import httpx
 
 from . import logger
 from .config import config
@@ -54,15 +55,26 @@ def app_init() -> FastAPI:
             logger=get_logger("requestor.gen3authz", log_level="debug"),
         )
 
-    initialize_db()
     load_modules(app)
 
-    @app.on_event("shutdown")
-    async def shutdown_event():
-        logger.debug("Closing async client.")
-        await app.async_client.aclose()
-
     return app
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    This is FastAPI's way of dealing with startup logic before the app
+    starts receiving requests.
+    https://fastapi.tiangolo.com/advanced/events/#lifespan
+    """
+    # startup
+    await initialize_db()
+
+    yield
+
+    # teardown
+    logger.debug("Closing async client")
+    await app.async_client.aclose()
 
 
 class ClientDisconnectMiddleware:
