@@ -317,8 +317,12 @@ async def update_request(
         api_request.app.arborist_client, expand=True
     )
 
-    query = select(RequestModel).where(
-        RequestModel.request_id == request_id,
+    # selecting the row with a lock (`with_for_update`) only allows 1 update request at a time
+    # on the same row
+    query = (
+        select(RequestModel)
+        .where(RequestModel.request_id == request_id)
+        .with_for_update()
     )
     result = await db_session.execute(query)
     request = result.scalar()
@@ -327,17 +331,6 @@ async def update_request(
             HTTP_404_NOT_FOUND,
             "Not found",
         )
-
-    # TODO: replace this old Gino code:
-    # only allow 1 update request at a time on the same row
-    # async with db.transaction():
-    #     request = (
-    #         await RequestModel.query.where(RequestModel.request_id == request_id)
-    #         # lock the row by using FOR UPDATE clause
-    #         .execution_options(populate_existing=True)
-    #         .with_for_update()
-    #         .gino.first_or_404()
-    #     )
 
     resource_paths = arborist.get_resource_paths_for_policy(
         existing_policies["policies"], request.policy_id
@@ -374,12 +367,8 @@ async def update_request(
     old_status = request.status
     request.status = status
     request.updated_time = datetime.now(timezone.utc)
+    # commit the transaction, releasing the lock - `post_status_update` could take time
     db_session.commit()
-
-    # TODO: replace this old Gino code:
-    # release the connection early, `post_status_update` could take time
-    # https://python-gino.org/docs/en/1.0/reference/extensions/starlette.html#lazy-connection
-    # await api_request["connection"].release(permanent=False)
 
     res = request.to_dict()
 
