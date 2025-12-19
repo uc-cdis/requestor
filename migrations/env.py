@@ -1,17 +1,20 @@
+from logging.config import fileConfig
+
 from alembic import context
 import asyncio
-from logging.config import fileConfig
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from requestor.app import load_modules
-from requestor.config import config
+from requestor.config import config as requestor_config
 from requestor.db import Base
 
 
-alembic_config = context.config
-fileConfig(alembic_config.config_file_name)
+config = context.config
+if config.config_file_name is not None:
+    fileConfig(config.config_file_name)
+config.set_main_option("sqlalchemy.url", requestor_config["DB_URL"])
 load_modules()
 target_metadata = Base.metadata
 
@@ -28,7 +31,7 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url = alembic_config.get_main_option("sqlalchemy.url")
+    url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -50,11 +53,9 @@ def do_run_migrations(connection: Connection) -> None:
 async def run_async_migrations() -> None:
     """In this scenario we need to create an Engine
     and associate a connection with the context.
-
     """
-    alembic_config.set_main_option("sqlalchemy.url", config["DB_URL"])
     connectable = async_engine_from_config(
-        alembic_config.get_section(alembic_config.config_ini_section, {}),
+        config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
@@ -67,8 +68,11 @@ async def run_async_migrations() -> None:
 
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
-
-    asyncio.run(run_async_migrations())
+    connectable = context.config.attributes.get("connection", None)
+    if connectable is None:
+        asyncio.run(run_async_migrations())
+    else:
+        do_run_migrations(connectable)  # to support running migrations in unit tests
 
 
 if context.is_offline_mode():

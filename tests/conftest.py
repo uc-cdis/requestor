@@ -173,17 +173,32 @@ def list_roles_patcher():
     role_patch.stop()
 
 
-@pytest.fixture(autouse=True, scope="function", params=["user_token", "client_token"])
-def access_token_user_client_patcher(client, request):
+def pytest_generate_tests(metafunc):
+    # set the `access_token_patcher` auto-fixture parameter depending on
+    # whether `access_token_user_only_patcher` is used.
+    access_token_patcher_param = ["user_token", "client_token"]
+    if "access_token_user_only_patcher" in metafunc.fixturenames:
+        access_token_patcher_param = ["user_token"]
+    metafunc.parametrize("access_token_patcher_param", access_token_patcher_param)
+
+
+@pytest.fixture(autouse=True, scope="function")
+def access_token_patcher(client, request, access_token_patcher_param):
     """
-    The `access_token` function will return first a token linked to a test
-    user, then a token linked to a test client.
+    Patch the `access_token` function. By default, this fixture is parametrized to return
+    first a token linked to a test user, then a token linked to a test client.
+
+    The `access_token_user_only_patcher` fixture should be used explicitely instead of this
+    automatic fixture for endpoints that do not support client tokens OR for tests that don't
+    need to run multiple times, testing each type of token.
+
+    The `access_token_patcher_param` parameter is set up by `pytest_generate_tests`.
     """
 
     async def get_access_token(*args, **kwargs):
-        if request.param == "user_token":
+        if access_token_patcher_param == "user_token":
             return {"sub": "1", "context": {"user": {"name": "requestor_user"}}}
-        if request.param == "client_token":
+        if access_token_patcher_param == "client_token":
             return {"context": {}, "azp": "test-client-id"}
 
     access_token_mock = MagicMock()
@@ -198,26 +213,11 @@ def access_token_user_client_patcher(client, request):
 
 
 @pytest.fixture(scope="function")
-def access_token_user_only_patcher(client, request):
+def access_token_user_only_patcher():
     """
-    The `access_token` function will return a token linked to a test user.
-    This fixture should be used explicitely instead of the automatic
-    `access_token_user_client_patcher` fixture for endpoints that do not
-    support client tokens.
+    See `access_token_patcher` docstring
     """
-
-    async def get_access_token(*args, **kwargs):
-        return {"sub": "1", "context": {"user": {"name": "requestor_user"}}}
-
-    access_token_mock = MagicMock()
-    access_token_mock.return_value = get_access_token
-
-    access_token_patch = patch("requestor.auth.access_token", access_token_mock)
-    access_token_patch.start()
-
-    yield access_token_mock
-
-    access_token_patch.stop()
+    yield
 
 
 @pytest.fixture(scope="function")

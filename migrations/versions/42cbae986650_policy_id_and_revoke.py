@@ -78,7 +78,9 @@ def upgrade():
                 )
                 existing_policies["policies"].append(created_policy_id)
             connection.execute(
-                f"UPDATE requests SET policy_id='{escape(policy_id)}', revoke=False WHERE resource_path='{escape(resource_path)}'"
+                sa.text(
+                    f"UPDATE requests SET policy_id='{escape(policy_id)}', revoke=False WHERE resource_path='{escape(resource_path)}'"
+                )
             )
 
         # Grab another batch of rows
