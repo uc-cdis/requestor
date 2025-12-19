@@ -24,8 +24,8 @@ async_sessionmaker_instance = None
 
 class Request(Base):
     class Config:
-        # Fix for error: no validator found for <class 'sqlalchemy.sql.schema.Column'>,
-        # see `arbitrary_types_allowed` in Config
+        # Fix for error: `no validator found for <class 'sqlalchemy.sql.schema.Column'>,
+        # see `arbitrary_types_allowed` in Config`
         arbitrary_types_allowed = True
 
     __tablename__ = "requests"

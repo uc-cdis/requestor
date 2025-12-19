@@ -1,6 +1,5 @@
 from contextlib import asynccontextmanager
-import importlib
-from importlib.metadata import entry_points
+from importlib.metadata import entry_points, version
 import os
 
 import asyncio
@@ -31,7 +30,7 @@ def app_init() -> FastAPI:
     debug = config["DEBUG"]
     app = FastAPI(
         title="Requestor",
-        version=importlib.metadata.version("requestor"),
+        version=version("requestor"),
         debug=debug,
         root_path=config["DOCS_URL_PREFIX"],
     )

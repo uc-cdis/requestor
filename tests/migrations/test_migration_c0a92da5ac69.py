@@ -13,9 +13,8 @@ async def test_c0a92da5ac69_upgrade(db_session, access_token_user_only_patcher):
     await migration_runner.downgrade("base")
 
     # the requests table should not exist
-    query = select(Request)
     with pytest.raises(ProgrammingError, match='relation "requests" does not exist'):
-        await db_session.execute(query)
+        await db_session.execute(text("SELECT * FROM requests"))
     await db_session.commit()
 
     # run the migration
