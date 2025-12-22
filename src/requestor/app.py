@@ -33,6 +33,7 @@ def app_init() -> FastAPI:
         version=version("requestor"),
         debug=debug,
         root_path=config["DOCS_URL_PREFIX"],
+        lifespan=lifespan,
     )
     app.add_middleware(ClientDisconnectMiddleware)
     app.async_client = httpx.AsyncClient()
@@ -67,7 +68,7 @@ async def lifespan(app: FastAPI):
     https://fastapi.tiangolo.com/advanced/events/#lifespan
     """
     # startup
-    await initialize_db()
+    initialize_db()
 
     yield
 

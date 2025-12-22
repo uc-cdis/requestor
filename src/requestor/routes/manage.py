@@ -411,7 +411,7 @@ async def delete_request(
     """
     Delete an access request.
 
-    /!\ Note that deleting an access request that has already been approved does NOT revoke the access
+    WARNING: deleting an access request that has already been approved does NOT revoke the access
     that has been granted. It only removes the trace of that access request from the database.
     """
     logger.info(f"Deleting request '{request_id}'")
