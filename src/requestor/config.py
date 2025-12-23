@@ -28,7 +28,7 @@ class RequestorConfig(Config):
             username=os.environ.get("DB_USER", self["DB_USER"]),
             password=os.environ.get("DB_PASSWORD", self["DB_PASSWORD"]),
             database=os.environ.get("DB_DATABASE", self["DB_DATABASE"]),
-        )
+        ).render_as_string(hide_password=False)
 
     def validate(self) -> None:
         """
