@@ -67,7 +67,7 @@ def populate_filters_from_query_params(query_params):
         elif not value:
             raise HTTPException(
                 HTTP_400_BAD_REQUEST,
-                f"The param '{param}' must have a non-empty value",
+                f"The parameter '{param}' must have a non-empty value",
             )
         else:
             try:

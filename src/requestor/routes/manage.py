@@ -248,6 +248,7 @@ async def create_request(
                 )
             ).one()
         except IntegrityError as e:
+            # TODO: a better user experience would be to retry instead of returning a 4XX error
             if "asyncpg.exceptions.UniqueViolationError" in str(e):
                 raise HTTPException(
                     HTTP_409_CONFLICT,

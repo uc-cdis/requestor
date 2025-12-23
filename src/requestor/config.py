@@ -3,6 +3,7 @@ from jsonschema import validate
 import os
 
 from gen3config import Config
+from sqlalchemy.engine.url import URL
 
 from . import logger
 
@@ -19,9 +20,15 @@ class RequestorConfig(Config):
         super(RequestorConfig, self).__init__(*args, **kwargs)
 
     def post_process(self) -> None:
-        self[
-            "DB_URL"
-        ] = f'{os.environ.get("DB_DRIVER", self["DB_DRIVER"])}://{os.environ.get("DB_USER", self["DB_USER"])}:{os.environ.get("DB_PASSWORD", self["DB_PASSWORD"])}@{os.environ.get("DB_HOST", self["DB_HOST"])}:{os.environ.get("DB_PORT", self["DB_PORT"])}/{os.environ.get("DB_DATABASE", self["DB_DATABASE"])}'
+        # generate DB_URL from DB configs or env vars
+        self["DB_URL"] = URL.create(
+            os.environ.get("DB_DRIVER", self["DB_DRIVER"]),
+            host=os.environ.get("DB_HOST", self["DB_HOST"]),
+            port=os.environ.get("DB_PORT", self["DB_PORT"]),
+            username=os.environ.get("DB_USER", self["DB_USER"]),
+            password=os.environ.get("DB_PASSWORD", self["DB_PASSWORD"]),
+            database=os.environ.get("DB_DATABASE", self["DB_DATABASE"]),
+        )
 
     def validate(self) -> None:
         """
