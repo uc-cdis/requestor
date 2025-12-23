@@ -1,14 +1,17 @@
 import uuid
 
-from asyncpg.exceptions import UniqueViolationError
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, Body, Depends, FastAPI, HTTPException
 from pydantic import BaseModel
+from sqlalchemy import delete, insert, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio.session import AsyncSession
 from starlette.requests import Request
 from starlette.status import (
     HTTP_200_OK,
     HTTP_201_CREATED,
     HTTP_400_BAD_REQUEST,
+    HTTP_404_NOT_FOUND,
     HTTP_409_CONFLICT,
     HTTP_500_INTERNAL_SERVER_ERROR,
 )
@@ -17,7 +20,7 @@ import traceback
 from .. import logger, arborist
 from ..auth import Auth
 from ..config import config
-from ..models import db, Request as RequestModel
+from ..db import Request as RequestModel, get_db_session
 from ..request_utils import post_status_update
 
 
@@ -67,6 +70,7 @@ async def create_request(
     api_request: Request,
     body: CreateRequestInput,
     auth=Depends(Auth),
+    db_session: AsyncSession = Depends(get_db_session),
 ) -> dict:
     """
     Create a new access request.
@@ -191,24 +195,23 @@ async def create_request(
 
     # get requests for this (username, policy_id) for which the status is
     # not in FINAL_STATUSES. users can only request access to a resource once.
-    previous_requests = [
-        r
-        for r in (
-            await RequestModel.query.where(
-                RequestModel.username == data["username"],
-            )
-            .where(
-                RequestModel.policy_id == data["policy_id"],
-            )
-            .where(
-                RequestModel.revoke == data.get("revoke", False),
-            )
-            .where(
-                RequestModel.status.notin_(config["FINAL_STATUSES"]),
-            )
-            .gino.all()
+    query = (
+        select(RequestModel)
+        .where(
+            RequestModel.username == data["username"],
         )
-    ]
+        .where(
+            RequestModel.policy_id == data["policy_id"],
+        )
+        .where(
+            RequestModel.revoke == data.get("revoke", False),
+        )
+        .where(
+            RequestModel.status.notin_(config["FINAL_STATUSES"]),
+        )
+    )
+    result = await db_session.execute(query)
+    previous_requests = list(result.scalars().all())
     draft_previous_requests = [
         r for r in previous_requests if r.status in config["DRAFT_STATUSES"]
     ]
@@ -237,14 +240,21 @@ async def create_request(
         request = draft_previous_requests[0]
     else:
         # create a new request
+        data = {"request_id": request_id, **data}
         try:
-            request = await RequestModel.create(request_id=request_id, **data)
-        except UniqueViolationError:
-            raise HTTPException(
-                HTTP_409_CONFLICT,
-                "request_id already exists. Please try again",
-            )
-    res = request.to_dict()
+            request = (
+                await db_session.scalars(
+                    insert(RequestModel).values(**data).returning(RequestModel)
+                )
+            ).one()
+        except IntegrityError as e:
+            # TODO: a better user experience would be to retry instead of returning a 4XX error
+            if "asyncpg.exceptions.UniqueViolationError" in str(e):
+                raise HTTPException(
+                    HTTP_409_CONFLICT,
+                    "request_id already exists. Please try again",
+                )
+            raise
 
     if request.status in config["UPDATE_ACCESS_STATUSES"]:
         # the access request is approved: grant/revoke access
@@ -260,14 +270,16 @@ async def create_request(
         )
 
     try:
-        redirect_url = post_status_update(request.status, res, resource_paths)
+        redirect_url = post_status_update(
+            request.status, request.to_dict(), resource_paths
+        )
     except Exception:  # if external calls or other actions fail: revert
         logger.error("Something went wrong during post-status-update actions")
         if not draft_previous_requests:
             logger.warning(f"Deleting the request that was just created ({request_id})")
-            await RequestModel.delete.where(
-                RequestModel.request_id == request_id
-            ).gino.status()
+            await db_session.execute(
+                delete(RequestModel).where(RequestModel.request_id == request_id)
+            )
         if request.status in config["UPDATE_ACCESS_STATUSES"]:
             logger.warning(f"Reverting the previous access {action} action")
             await grant_or_revoke_arborist_policy(
@@ -284,9 +296,9 @@ async def create_request(
 
     # CORS limits redirections, so we redirect on the client side
     if redirect_url:
-        res["redirect_url"] = redirect_url
+        request.redirect_url = redirect_url
 
-    return res
+    return request.to_dict()
 
 
 @router.put("/request/{request_id}", status_code=HTTP_200_OK)
@@ -295,6 +307,7 @@ async def update_request(
     request_id: uuid.UUID,
     status: str = Body(..., embed=True),
     auth=Depends(Auth),
+    db_session: AsyncSession = Depends(get_db_session),
 ) -> dict:
     """
     Update an access request with a new "status".
@@ -305,59 +318,58 @@ async def update_request(
         api_request.app.arborist_client, expand=True
     )
 
-    # only allow 1 update request at a time on the same row
-    async with db.transaction():
-        request = (
-            await RequestModel.query.where(RequestModel.request_id == request_id)
-            # lock the row by using FOR UPDATE clause
-            .execution_options(populate_existing=True)
-            .with_for_update()
-            .gino.first_or_404()
+    # selecting the row with a lock (`with_for_update`) only allows 1 update request at a time
+    # on the same row
+    query = (
+        select(RequestModel)
+        .where(RequestModel.request_id == request_id)
+        .with_for_update()
+    )
+    result = await db_session.execute(query)
+    request = result.scalar()
+    if not request:
+        raise HTTPException(
+            HTTP_404_NOT_FOUND,
+            "Not found",
         )
 
-        resource_paths = arborist.get_resource_paths_for_policy(
-            existing_policies["policies"], request.policy_id
-        )
-        await auth.authorize(
-            "update",
-            resource_paths,
-        )
+    resource_paths = arborist.get_resource_paths_for_policy(
+        existing_policies["policies"], request.policy_id
+    )
+    await auth.authorize(
+        "update",
+        resource_paths,
+    )
 
-        if request.status == status:
-            logger.debug(f"Request '{request_id}' already has status '{status}'")
-            return request.to_dict()
+    if request.status == status:
+        logger.debug(f"Request '{request_id}' already has status '{status}'")
+        return request.to_dict()
 
-        allowed_statuses = config["ALLOWED_REQUEST_STATUSES"]
-        if status not in allowed_statuses:
-            raise HTTPException(
-                HTTP_400_BAD_REQUEST,
-                f"Status '{status}' is not an allowed request status ({allowed_statuses})",
-            )
-
-        if status in config["UPDATE_ACCESS_STATUSES"]:
-            # the access request is approved: grant/revoke access
-            action = "revoke" if request.revoke else "grant"
-            logger.debug(
-                f"Status '{status}' is one of UPDATE_ACCESS_STATUSES {config['UPDATE_ACCESS_STATUSES']}, attempting to {action} access in Arborist"
-            )
-            await grant_or_revoke_arborist_policy(
-                api_request.app.arborist_client,
-                request.policy_id,
-                request.username,
-                request.revoke,
-            )
-
-        old_status = request.status
-        request = await (
-            RequestModel.update.where(RequestModel.request_id == request_id)
-            .values(status=status, updated_time=datetime.utcnow())
-            .returning(*RequestModel)
-            .gino.first()
+    allowed_statuses = config["ALLOWED_REQUEST_STATUSES"]
+    if status not in allowed_statuses:
+        raise HTTPException(
+            HTTP_400_BAD_REQUEST,
+            f"Status '{status}' is not an allowed request status ({allowed_statuses})",
         )
 
-    # release the connection early, `post_status_update` could take time
-    # https://python-gino.org/docs/en/1.0/reference/extensions/starlette.html#lazy-connection
-    await api_request["connection"].release(permanent=False)
+    if status in config["UPDATE_ACCESS_STATUSES"]:
+        # the access request is approved: grant/revoke access
+        action = "revoke" if request.revoke else "grant"
+        logger.debug(
+            f"Status '{status}' is one of UPDATE_ACCESS_STATUSES {config['UPDATE_ACCESS_STATUSES']}, attempting to {action} access in Arborist"
+        )
+        await grant_or_revoke_arborist_policy(
+            api_request.app.arborist_client,
+            request.policy_id,
+            request.username,
+            request.revoke,
+        )
+
+    old_status = request.status
+    request.status = status
+    request.updated_time = datetime.now(timezone.utc)
+    # commit the transaction, releasing the lock - `post_status_update` could take time
+    db_session.commit()
 
     res = request.to_dict()
 
@@ -366,12 +378,9 @@ async def update_request(
     except Exception:  # if external calls or other actions fail: revert
         logger.error("Something went wrong during post-status-update actions")
         logger.warning(f"Reverting to the previous status: {old_status}")
-        request = await (
-            RequestModel.update.where(RequestModel.request_id == request_id)
-            .values(status=old_status, updated_time=datetime.utcnow())
-            .returning(*RequestModel)
-            .gino.first()
-        )
+        request.status = old_status
+        request.updated_time = datetime.now(timezone.utc)
+        db_session.commit()
         if status in config["UPDATE_ACCESS_STATUSES"]:
             logger.warning(f"Reverting the previous access {action} action")
             await grant_or_revoke_arborist_policy(
@@ -398,11 +407,12 @@ async def delete_request(
     api_request: Request,
     request_id: uuid.UUID,
     auth=Depends(Auth),
+    db_session: AsyncSession = Depends(get_db_session),
 ) -> dict:
     """
     Delete an access request.
 
-    /!\ Note that deleting an access request that has already been approved does NOT revoke the access
+    WARNING: deleting an access request that has already been approved does NOT revoke the access
     that has been granted. It only removes the trace of that access request from the database.
     """
     logger.info(f"Deleting request '{request_id}'")
@@ -410,21 +420,25 @@ async def delete_request(
         api_request.app.arborist_client, expand=True
     )
 
-    async with db.transaction():
-        request = (
-            await RequestModel.delete.where(RequestModel.request_id == request_id)
-            .returning(*RequestModel)
-            .gino.first_or_404()
+    query = select(RequestModel).where(RequestModel.request_id == request_id)
+    result = await db_session.execute(query)
+    request = result.scalar()
+    if not request:
+        raise HTTPException(
+            HTTP_404_NOT_FOUND,
+            "Not found",
         )
 
-        # if not authorized, the exception raised by `auth.authorize`
-        # triggers a transaction rollback, so we don't delete
-        await auth.authorize(
-            "delete",
-            arborist.get_resource_paths_for_policy(
-                existing_policies["policies"], request.policy_id
-            ),
-        )
+    await auth.authorize(
+        "delete",
+        arborist.get_resource_paths_for_policy(
+            existing_policies["policies"], request.policy_id
+        ),
+    )
+
+    await db_session.execute(
+        delete(RequestModel).where(RequestModel.request_id == request_id)
+    )
 
     return {"request_id": request_id}
 

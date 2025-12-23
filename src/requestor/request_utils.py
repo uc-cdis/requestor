@@ -65,7 +65,7 @@ def get_redirect_url(action_id: str, data: dict) -> str:
     redirect_url = conf["redirect_url"]
     base_query_params = parse_qsl(urlparse(redirect_url).query, keep_blank_values=True)
     redirect_query_params = [
-        (key, str(data[key])) for key in conf.get("params", []) if data.get(key)
+        (key, data[key]) for key in conf.get("params", []) if data.get(key)
     ]
     final_query_params = urlencode(base_query_params + redirect_query_params)
     final_redirect_url = redirect_url.split("?")[0] + "?" + final_query_params

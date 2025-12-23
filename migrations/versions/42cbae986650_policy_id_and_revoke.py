@@ -61,7 +61,7 @@ def upgrade():
     offset = 0
     limit = 500
     query = f"SELECT resource_path FROM requests ORDER by resource_path LIMIT {limit} OFFSET {offset}"
-    results = connection.execute(query).fetchall()
+    results = connection.execute(sa.text(query)).fetchall()
 
     # add the `policy_id` corresponding to each row's `resource_path`
     # and default `revoke` to False
@@ -78,13 +78,15 @@ def upgrade():
                 )
                 existing_policies["policies"].append(created_policy_id)
             connection.execute(
-                f"UPDATE requests SET policy_id='{escape(policy_id)}', revoke=False WHERE resource_path='{escape(resource_path)}'"
+                sa.text(
+                    f"UPDATE requests SET policy_id='{escape(policy_id)}', revoke=False WHERE resource_path='{escape(resource_path)}'"
+                )
             )
 
         # Grab another batch of rows
         offset += limit
         query = f"SELECT resource_path FROM requests ORDER by resource_path LIMIT {limit} OFFSET {offset}"
-        results = connection.execute(query).fetchall()
+        results = connection.execute(sa.text(query)).fetchall()
 
     # now that there are no null values, make the columns non-nullable
     op.alter_column("requests", "policy_id", nullable=False)
@@ -107,7 +109,7 @@ def downgrade():
     offset = 0
     limit = 500
     query = f"SELECT policy_id FROM requests ORDER by policy_id LIMIT {limit} OFFSET {offset}"
-    results = connection.execute(query).fetchall()
+    results = connection.execute(sa.text(query)).fetchall()
 
     while results:
         for policy_id in set(r[0] for r in results):
@@ -124,13 +126,15 @@ def downgrade():
             # use the first item in the policy’s list of resources, because this
             # schema only allows 1 resource_path
             connection.execute(
-                f"UPDATE requests SET resource_path='{escape(resource_paths[0])}' WHERE policy_id='{escape(policy_id)}'"
+                sa.text(
+                    f"UPDATE requests SET resource_path='{escape(resource_paths[0])}' WHERE policy_id='{escape(policy_id)}'"
+                )
             )
 
         # get another batch of rows
         offset += limit
         query = f"SELECT policy_id FROM requests ORDER by policy_id LIMIT {limit} OFFSET {offset}"
-        results = connection.execute(query).fetchall()
+        results = connection.execute(sa.text(query)).fetchall()
 
     # now that there are no null values, make the column non-nullable
     op.alter_column("requests", "resource_path", nullable=False)

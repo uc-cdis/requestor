@@ -1,6 +1,8 @@
 import uuid
 from datetime import datetime
 from fastapi import APIRouter, Body, Depends, FastAPI, HTTPException
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio.session import AsyncSession
 from starlette.requests import Request
 from starlette.status import (
     HTTP_200_OK,
@@ -13,14 +15,18 @@ from starlette.status import (
 from .. import logger, arborist
 from ..auth import Auth
 from ..config import config
-from ..models import Request as RequestModel
+from ..db import Request as RequestModel, get_db_session
 
 
 router = APIRouter()
 
 
 async def get_filtered_requests(
-    username: str = None, draft: bool = True, final: bool = True, filters: dict = {}
+    db_session,
+    username: str = None,
+    draft: bool = True,
+    final: bool = True,
+    filters: dict = {},
 ) -> list:
     """
     If not None, gets all the requests made by user with given username.
@@ -28,7 +34,7 @@ async def get_filtered_requests(
     If only non-final requests are needed then set final=False.
     Add filters if neccessary as a dictionary of {param : <List of values>} to get filtered results
     """
-    query = RequestModel.query
+    query = select(RequestModel)
     if username:
         query = query.where(RequestModel.username == username)
     if not draft:
@@ -38,7 +44,8 @@ async def get_filtered_requests(
     for field, values in filters.items():
         query = query.where(getattr(RequestModel, field).in_(values))
 
-    return [r for r in (await query.gino.all())]
+    result = await db_session.execute(query)
+    return list(result.scalars().all())
 
 
 def populate_filters_from_query_params(query_params):
@@ -55,23 +62,27 @@ def populate_filters_from_query_params(query_params):
         elif not hasattr(RequestModel, param):
             raise HTTPException(
                 HTTP_400_BAD_REQUEST,
-                f"The parameter - '{param}' is invalid.",
+                f"The parameter '{param}' is invalid",
             )
         elif not value:
             raise HTTPException(
                 HTTP_400_BAD_REQUEST,
-                f"The param '{param}' must have a non-empty value.",
+                f"The parameter '{param}' must have a non-empty value",
             )
         else:
             try:
                 if getattr(RequestModel, param).type.python_type == bool:
                     value = value.lower() == "true"
                 elif getattr(RequestModel, param).type.python_type == datetime:
+                    # `multi_items()` interprets `+` as an encoded space, but in the case of a
+                    # datetime it's an actual `+` character. To support dates provided as input
+                    # as non-url-encoded strings, replace spaces with `+`.
+                    value = value.replace(" ", "+")
                     value = datetime.fromisoformat(value)
             except ValueError:
                 raise HTTPException(
                     HTTP_400_BAD_REQUEST,
-                    f"The value - '{value}' for '{param}' parameter is invalid.",
+                    f"The value '{value}' for '{param}' parameter is invalid.",
                 )
             filter_dict[param].add(value)
     return filter_dict, active
@@ -81,6 +92,7 @@ def populate_filters_from_query_params(query_params):
 async def list_requests(
     api_request: Request,
     auth=Depends(Auth),
+    db_session: AsyncSession = Depends(get_db_session),
 ) -> list:
     """
     List all the requests the current user has access to see.
@@ -103,7 +115,9 @@ async def list_requests(
     "policy_id=foo&revoke=False" means "the policy is foo and revoke is false" (different field names).
     """
     filter_dict, active = populate_filters_from_query_params(api_request.query_params)
-    requests = await get_filtered_requests(final=(not active), filters=filter_dict)
+    requests = await get_filtered_requests(
+        db_session, final=(not active), filters=filter_dict
+    )
 
     # get the resources the current user has access to see
     token_claims = await auth.get_token_claims()
@@ -159,7 +173,11 @@ async def list_requests(
 
 
 @router.get("/request/user", status_code=HTTP_200_OK)
-async def list_user_requests(api_request: Request, auth=Depends(Auth)) -> list:
+async def list_user_requests(
+    api_request: Request,
+    auth=Depends(Auth),
+    db_session: AsyncSession = Depends(get_db_session),
+) -> list:
     """
     List current user's requests.
 
@@ -192,8 +210,9 @@ async def list_user_requests(api_request: Request, auth=Depends(Auth)) -> list:
         )
     logger.debug(f"Getting requests for user '{username}' with active = '{active}'")
     user_requests = await get_filtered_requests(
-        # if we only want active requests, filter out requests in a final status
+        db_session,
         username,
+        # if we only want active requests, filter out requests in a final status:
         final=(not active),
         filters=filter_dict,
     )
@@ -205,12 +224,18 @@ async def get_request(
     api_request: Request,
     request_id: uuid.UUID,
     auth=Depends(Auth),
+    db_session: AsyncSession = Depends(get_db_session),
 ) -> dict:
     logger.debug(f"Getting request '{request_id}'")
 
-    request = await RequestModel.query.where(
-        RequestModel.request_id == request_id
-    ).gino.first()
+    query = select(RequestModel).where(RequestModel.request_id == request_id)
+    result = await db_session.execute(query)
+    request = result.scalar()
+    if not request:
+        raise HTTPException(
+            HTTP_404_NOT_FOUND,
+            "Not found",
+        )
     existing_policies = await arborist.list_policies(
         api_request.app.arborist_client, expand=True
     )
@@ -241,6 +266,7 @@ async def check_user_resource_paths(
     resource_paths: list = Body(..., embed=True),
     permissions: list = Body(None, embed=True),
     auth=Depends(Auth),
+    db_session: AsyncSession = Depends(get_db_session),
 ) -> dict:
     """
     Return whether the current user has already requested access to the
@@ -261,7 +287,9 @@ async def check_user_resource_paths(
             HTTP_403_FORBIDDEN,
             "This endpoint does not support tokens that are not linked to a user",
         )
-    user_requests = await get_filtered_requests(username, draft=False, final=False)
+    user_requests = await get_filtered_requests(
+        db_session, username, draft=False, final=False
+    )
     positive_requests = [r for r in user_requests if not r.revoke]
     existing_policies = await arborist.list_policies(
         api_request.app.arborist_client, expand=True

@@ -1,37 +1,20 @@
-import asyncio
-from fastapi import FastAPI
-from fastapi.routing import APIRoute
-import httpx
+from contextlib import asynccontextmanager
 from importlib.metadata import entry_points, version
 import os
 
+import asyncio
 from cdislogging import get_logger
+from fastapi import FastAPI
 from gen3authz.client.arborist.async_client import ArboristClient
+import httpx
 
 from . import logger
-from .config import config, DEFAULT_CFG_PATH
-
-# Load the configuration *before* importing models
-try:
-    if os.environ.get("REQUESTOR_CONFIG_PATH"):
-        config.load(config_path=os.environ["REQUESTOR_CONFIG_PATH"])
-    else:
-        CONFIG_SEARCH_FOLDERS = [
-            "/src",
-            "{}/.gen3/requestor".format(os.path.expanduser("~")),
-        ]
-        config.load(search_folders=CONFIG_SEARCH_FOLDERS)
-except Exception:
-    logger.warning("Unable to load config, using default config...", exc_info=True)
-    config.load(config_path=DEFAULT_CFG_PATH)
-
-from .models import db
+from .config import config
+from .db import initialize_db
 
 
 def load_modules(app: FastAPI = None) -> None:
-    # FIXME: Identify the cause for duplicate entry points (PXP-8443)
-    # Added a set on entry points to dodge the intermittent duplicate modules issue
-    for ep in set(entry_points()["requestor.modules"]):
+    for ep in entry_points(group="requestor.modules"):
         logger.info(f"Loading module: {ep.name}")
         mod = ep.load()
         if app:
@@ -50,6 +33,7 @@ def app_init() -> FastAPI:
         version=version("requestor"),
         debug=debug,
         root_path=config["DOCS_URL_PREFIX"],
+        lifespan=lifespan,
     )
     app.add_middleware(ClientDisconnectMiddleware)
     app.async_client = httpx.AsyncClient()
@@ -71,15 +55,26 @@ def app_init() -> FastAPI:
             logger=get_logger("requestor.gen3authz", log_level="debug"),
         )
 
-    db.init_app(app)
     load_modules(app)
 
-    @app.on_event("shutdown")
-    async def shutdown_event():
-        logger.info("Closing async client.")
-        await app.async_client.aclose()
-
     return app
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    This is FastAPI's way of dealing with startup logic before the app
+    starts receiving requests.
+    https://fastapi.tiangolo.com/advanced/events/#lifespan
+    """
+    # startup
+    initialize_db()
+
+    yield
+
+    # teardown
+    logger.debug("Closing async client")
+    await app.async_client.aclose()
 
 
 class ClientDisconnectMiddleware:

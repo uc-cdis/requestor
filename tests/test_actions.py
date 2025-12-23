@@ -83,6 +83,8 @@ def test_create_request_with_external_calls(client):
     }
     with mock.patch("requestor.request_utils.requests") as mock_requests:
         res = client.post("/request", json=data)
+        assert res.status_code == 201, res.text
+
         mock_requests.post.assert_called_once_with(
             "https://abc_system/access",
             data={"dataset": data["resource_id"], "username": data["username"]},
@@ -92,7 +94,6 @@ def test_create_request_with_external_calls(client):
             "https://xyz_system/access", data=None, headers={}
         )
 
-    assert res.status_code == 201, res.text
     request_data = res.json()
     request_id = request_data.get("request_id")
     assert request_id, "POST /request did not return a request_id"
@@ -126,6 +127,8 @@ def test_update_request_with_external_calls(client):
     with mock.patch("requestor.request_utils.requests") as mock_requests:
         # update the request status
         res = client.put(f"/request/{request_id}", json={"status": "APPROVED"})
+        assert res.status_code == 200, res.text
+
         mock_requests.post.assert_called_once_with(
             "https://abc_system/access",
             data={"dataset": data["resource_id"], "username": data["username"]},
@@ -135,7 +138,6 @@ def test_update_request_with_external_calls(client):
             "https://xyz_system/access", data=None, headers={}
         )
 
-    assert res.status_code == 200, res.text
     request_data = res.json()
     assert request_data["status"] == "APPROVED"
 
@@ -156,6 +158,7 @@ def test_create_request_with_authed_external_call(client):
             "access_token": mock_access_token
         }
         res = client.post("/request", json=data)
+        assert res.status_code == 201, res.text
 
         # call to get credentials
         mock_requests.post.assert_called_once_with(
@@ -171,7 +174,6 @@ def test_create_request_with_authed_external_call(client):
             headers={"authorization": f"bearer {mock_access_token}"},
         )
 
-    assert res.status_code == 201, res.text
     request_data = res.json()
     request_id = request_data.get("request_id")
     assert request_id, "POST /request did not return a request_id"
@@ -188,13 +190,14 @@ def test_create_request_with_redirect_and_external_call(client):
     }
     with mock.patch("requestor.request_utils.requests") as mock_requests:
         res = client.post("/request", json=data)
+        assert res.status_code == 201, res.text
+
         mock_requests.post.assert_called_once_with(
             "https://abc_system/access",
             data={"dataset": data["resource_id"], "username": data["username"]},
             headers={},
         )
 
-    assert res.status_code == 201, res.text
     request_data = res.json()
     request_id = request_data.get("request_id")
     assert request_id, "POST /request did not return a request_id"

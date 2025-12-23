@@ -1,23 +1,23 @@
 import asyncio
-from alembic.config import main as alembic_main
-import copy
 import os
 import pytest
+import pytest_asyncio
 import requests
+from sqlalchemy.ext.asyncio import create_async_engine
 from starlette.config import environ
 from starlette.testclient import TestClient
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from requestor.arborist import get_auto_policy_id
-
-
-# Set REQUESTOR_CONFIG_PATH *before* loading the configuration
+# Set REQUESTOR_CONFIG_PATH *before* loading requestor modules
 CURRENT_DIR = os.path.dirname(os.path.realpath(__file__))
 environ["REQUESTOR_CONFIG_PATH"] = os.path.join(
     CURRENT_DIR, "test-requestor-config.yaml"
 )
+
 from requestor.app import app_init
+from requestor.arborist import get_auto_policy_id
 from requestor.config import config
+from requestor.db import Base, get_db_engine_and_sessionmaker, initialize_db
 
 
 @pytest.fixture(scope="session")
@@ -26,27 +26,32 @@ def app():
     return app
 
 
-@pytest.fixture(autouse=True, scope="session")
-def setup_test_database():
+@pytest_asyncio.fixture(scope="function")
+async def db_session():
     """
-    At teardown, restore original config and reset test DB.
+    Creates a new async DB session. Reset the test DB before and after every test.
     """
-    saved_config = copy.deepcopy(config._configs)
+    engine = create_async_engine(config["DB_URL"], echo=False, future=True)
 
-    alembic_main(["--raiseerr", "upgrade", "head"])
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+        await conn.run_sync(Base.metadata.create_all)
 
-    yield
+    initialize_db()
+    _, session_maker_instance = get_db_engine_and_sessionmaker()
 
-    # restore old configs
-    config.update(saved_config)
+    async with session_maker_instance() as session:
+        yield session
 
-    if not config["TEST_KEEP_DB"]:
-        alembic_main(["--raiseerr", "downgrade", "base"])
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+
+    await engine.dispose()
 
 
-@pytest.fixture()
-def client():
-    with TestClient(app_init()) as client:
+@pytest.fixture
+def client(app, db_session):
+    with TestClient(app) as client:
         yield client
 
 
@@ -168,17 +173,32 @@ def list_roles_patcher():
     role_patch.stop()
 
 
-@pytest.fixture(autouse=True, scope="function", params=["user_token", "client_token"])
-def access_token_user_client_patcher(client, request):
+def pytest_generate_tests(metafunc):
+    # set the `access_token_patcher` auto-fixture parameter depending on
+    # whether `access_token_user_only_patcher` is used.
+    access_token_patcher_param = ["user_token", "client_token"]
+    if "access_token_user_only_patcher" in metafunc.fixturenames:
+        access_token_patcher_param = ["user_token"]
+    metafunc.parametrize("access_token_patcher_param", access_token_patcher_param)
+
+
+@pytest.fixture(autouse=True, scope="function")
+def access_token_patcher(client, request, access_token_patcher_param):
     """
-    The `access_token` function will return first a token linked to a test
-    user, then a token linked to a test client.
+    Patch the `access_token` function. By default, this fixture is parametrized to return
+    first a token linked to a test user, then a token linked to a test client.
+
+    The `access_token_user_only_patcher` fixture should be used explicitely instead of this
+    automatic fixture for endpoints that do not support client tokens OR for tests that don't
+    need to run multiple times, testing each type of token.
+
+    The `access_token_patcher_param` parameter is set up by `pytest_generate_tests`.
     """
 
     async def get_access_token(*args, **kwargs):
-        if request.param == "user_token":
+        if access_token_patcher_param == "user_token":
             return {"sub": "1", "context": {"user": {"name": "requestor_user"}}}
-        if request.param == "client_token":
+        if access_token_patcher_param == "client_token":
             return {"context": {}, "azp": "test-client-id"}
 
     access_token_mock = MagicMock()
@@ -193,46 +213,10 @@ def access_token_user_client_patcher(client, request):
 
 
 @pytest.fixture(scope="function")
-def access_token_user_only_patcher(client, request):
+def access_token_user_only_patcher():
     """
-    The `access_token` function will return a token linked to a test user.
-    This fixture should be used explicitely instead of the automatic
-    `access_token_user_client_patcher` fixture for endpoints that do not
-    support client tokens.
+    See `access_token_patcher` docstring
     """
-
-    async def get_access_token(*args, **kwargs):
-        return {"sub": "1", "context": {"user": {"name": "requestor_user"}}}
-
-    access_token_mock = MagicMock()
-    access_token_mock.return_value = get_access_token
-
-    access_token_patch = patch("requestor.auth.access_token", access_token_mock)
-    access_token_patch.start()
-
-    yield access_token_mock
-
-    access_token_patch.stop()
-
-
-@pytest.fixture(autouse=True)
-def clean_db():
-    """
-    Before each test, delete all existing requests from the DB
-    """
-    # The code below doesn't work because of this issue
-    # https://github.com/encode/starlette/issues/440, so for now reset
-    # using alembic.
-    # pytest-asyncio = "^0.14.0"
-    # from requestor.models import Request as RequestModel
-    # @pytest.mark.asyncio
-    # async def clean_db():
-    #     await RequestModel.delete.gino.all()
-    #     yield
-
-    alembic_main(["--raiseerr", "downgrade", "base"])
-    alembic_main(["--raiseerr", "upgrade", "head"])
-
     yield
 
 
@@ -268,6 +252,9 @@ def mock_arborist_requests(request):
                 "POST": ({}, 204 if authorized else 403)
             },
             "http://arborist-service/user/requestor_user/policy/test-policy": {
+                "DELETE": ({}, 204 if authorized else 403)
+            },
+            "http://arborist-service/user/requestor_user/policy/test-policy-with-external-calls": {
                 "DELETE": ({}, 204 if authorized else 403)
             },
             "http://arborist-service/policy/?expand": {
