@@ -221,7 +221,7 @@ async def create_request(
         msg = f'An open access request for username \'{data["username"]}\' and policy_id \'{data["policy_id"]}\' already exists. Users can only request access to a resource once.'
         logger.error(
             msg
-            + f" body: {body}. existing requests: {[r.request_id for r in previous_requests]}",
+            + f" body: {data}. existing requests: {[r.request_id for r in previous_requests]}",
             exc_info=True,
         )
         raise HTTPException(

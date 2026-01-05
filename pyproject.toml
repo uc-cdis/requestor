@@ -35,7 +35,7 @@ asyncpg = "*"
 mock = ">=4.0.3"
 pytest = ">=9"
 pytest-asyncio = "*"
-pytest-cov = ">=2.8"
+pytest-cov = "*"
 deptry = ">=0.24.0"
 
 [tool.poetry.plugins."requestor.modules"]
@@ -51,6 +51,11 @@ DEP002 = [
   "gunicorn",  # not imported but used in Dockerfile
   "psycopg2-binary",   # not imported but used by sqlalchemy
 ]
+
+[tool.coverage.run]
+# fix for coverage reporting when using sqlalchemy async sessions
+# (see https://stackoverflow.com/questions/74305054)
+concurrency = ["multiprocessing", "thread", "greenlet"]
 
 [build-system]
 requires = ["poetry>=1.0.0"]
