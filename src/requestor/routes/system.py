@@ -1,6 +1,8 @@
-from fastapi import APIRouter, FastAPI, Request
+from fastapi import APIRouter, Depends, FastAPI, Request
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio.session import AsyncSession
 
-from ..models import Request as RequestModel
+from ..db import get_db_session
 
 
 router = APIRouter()
@@ -12,8 +14,10 @@ def get_version(request: Request) -> dict:
 
 
 @router.get("/_status")
-async def get_status() -> dict:
-    await RequestModel.query.gino.first()
+async def get_status(
+    db_session: AsyncSession = Depends(get_db_session),
+) -> dict:
+    await db_session.execute(text("SELECT 1;"))
     return dict(status="OK")
 
 

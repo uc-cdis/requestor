@@ -1,11 +1,12 @@
 from itertools import chain
 from jsonschema import validate
 import os
-from sqlalchemy.engine.url import make_url, URL
 
 from gen3config import Config
+from sqlalchemy.engine.url import URL
 
 from . import logger
+
 
 DEFAULT_CFG_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "config-default.yaml"
@@ -20,16 +21,14 @@ class RequestorConfig(Config):
 
     def post_process(self) -> None:
         # generate DB_URL from DB configs or env vars
-        self["DB_URL"] = make_url(
-            URL(
-                drivername=os.environ.get("DB_DRIVER", self["DB_DRIVER"]),
-                host=os.environ.get("DB_HOST", self["DB_HOST"]),
-                port=os.environ.get("DB_PORT", self["DB_PORT"]),
-                username=os.environ.get("DB_USER", self["DB_USER"]),
-                password=os.environ.get("DB_PASSWORD", self["DB_PASSWORD"]),
-                database=os.environ.get("DB_DATABASE", self["DB_DATABASE"]),
-            ),
-        )
+        self["DB_URL"] = URL.create(
+            os.environ.get("DB_DRIVER", self["DB_DRIVER"]),
+            host=os.environ.get("DB_HOST", self["DB_HOST"]),
+            port=os.environ.get("DB_PORT", self["DB_PORT"]),
+            username=os.environ.get("DB_USER", self["DB_USER"]),
+            password=os.environ.get("DB_PASSWORD", self["DB_PASSWORD"]),
+            database=os.environ.get("DB_DATABASE", self["DB_DATABASE"]),
+        ).render_as_string(hide_password=False)
 
     def validate(self) -> None:
         """
@@ -37,7 +36,7 @@ class RequestorConfig(Config):
         """
         logger.info("Validating configuration")
 
-        from .models import Request as RequestModel
+        from .db import Request as RequestModel
 
         self.allowed_params_from_db = [
             column.key for column in RequestModel.__table__.columns
@@ -237,3 +236,15 @@ class RequestorConfig(Config):
 
 
 config = RequestorConfig(DEFAULT_CFG_PATH)
+try:
+    if os.environ.get("REQUESTOR_CONFIG_PATH"):
+        config.load(config_path=os.environ["REQUESTOR_CONFIG_PATH"])
+    else:
+        CONFIG_SEARCH_FOLDERS = [
+            "/src",
+            "{}/.gen3/requestor".format(os.path.expanduser("~")),
+        ]
+        config.load(search_folders=CONFIG_SEARCH_FOLDERS)
+except Exception:
+    logger.warning("Unable to load config, using default config...", exc_info=True)
+    config.load(config_path=DEFAULT_CFG_PATH)

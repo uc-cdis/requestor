@@ -92,7 +92,7 @@ components:
       type: http
 info:
   title: Requestor
-  version: 1.7.1
+  version: 2.0.0
 openapi: 3.1.0
 paths:
   /_status:
@@ -103,6 +103,7 @@ paths:
           content:
             application/json:
               schema:
+                additionalProperties: true
                 title: Response Get Status  Status Get
                 type: object
           description: Successful Response
@@ -117,6 +118,7 @@ paths:
           content:
             application/json:
               schema:
+                additionalProperties: true
                 title: Response Get Version  Version Get
                 type: object
           description: Successful Response
@@ -195,6 +197,7 @@ paths:
           content:
             application/json:
               schema:
+                additionalProperties: true
                 title: Response Create Request Request Post
                 type: object
           description: Successful Response
@@ -279,6 +282,7 @@ paths:
           content:
             application/json:
               schema:
+                additionalProperties: true
                 title: Response Check User Resource Paths Request User Resource Paths
                   Post
                 type: object
@@ -299,8 +303,8 @@ paths:
       description: 'Delete an access request.
 
 
-        /!\ Note that deleting an access request that has already been approved does
-        NOT revoke the access
+        WARNING: deleting an access request that has already been approved does NOT
+        revoke the access
 
         that has been granted. It only removes the trace of that access request from
         the database.'
@@ -318,6 +322,7 @@ paths:
           content:
             application/json:
               schema:
+                additionalProperties: true
                 title: Response Delete Request Request  Request Id  Delete
                 type: object
           description: Successful Response
@@ -347,6 +352,7 @@ paths:
           content:
             application/json:
               schema:
+                additionalProperties: true
                 title: Response Get Request Request  Request Id  Get
                 type: object
           description: Successful Response
@@ -383,6 +389,7 @@ paths:
           content:
             application/json:
               schema:
+                additionalProperties: true
                 title: Response Update Request Request  Request Id  Put
                 type: object
           description: Successful Response

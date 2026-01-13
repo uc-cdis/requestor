@@ -1,6 +1,6 @@
-ARG AZLINUX_BASE_VERSION=master
+ARG AZLINUX_BASE_VERSION=3.13-pythonnginx
 
-FROM quay.io/cdis/python-nginx-al:feat_python-nginx AS base
+FROM quay.io/cdis/amazonlinux-base:${AZLINUX_BASE_VERSION} AS base
 
 ENV appname=requestor
 
@@ -30,6 +30,7 @@ RUN poetry install --no-interaction --without dev
 FROM base
 
 COPY --from=builder /${appname} /${appname}
+COPY --from=builder /venv /venv
 
 # Switch to non-root user 'gen3' for the serving process
 USER gen3
