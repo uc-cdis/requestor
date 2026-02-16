@@ -4,15 +4,15 @@ FROM quay.io/cdis/amazonlinux-base:${AZLINUX_BASE_VERSION} AS base
 
 ENV appname=requestor
 
-USER root
-RUN chown -R gen3:gen3 /venv
-
 WORKDIR /${appname}
 
 RUN chown -R gen3:gen3 /${appname}
 
 # Builder stage
 FROM base AS builder
+
+USER root
+RUN chown -R gen3:gen3 /${appname} /venv
 
 USER gen3
 
