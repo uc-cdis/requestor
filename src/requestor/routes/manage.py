@@ -257,6 +257,12 @@ async def create_request(
             raise
 
     if request.status in config["UPDATE_ACCESS_STATUSES"]:
+        # This path is a shortcut that allows administrators to approve an access request during
+        # its creation. Access to "update" is required, just like if the request was created first
+        # and updated (approved) later. Without this authz check, anyone who can create an access
+        # request would also have access to approve it.
+        await auth.authorize("update", resource_paths)
+
         # the access request is approved: grant/revoke access
         action = "revoke" if request.revoke else "grant"
         logger.debug(
