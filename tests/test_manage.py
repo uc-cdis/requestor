@@ -87,6 +87,15 @@ def test_create_duplicate_request(client):
     new_request_id = request_data.get("request_id")
     assert new_request_id == request_id
 
+    # create a request with the same username and policy_id, but a new status.
+    # since the status does not match, it should fail.
+    res = client.post(
+        "/request",
+        json={**data, "status": "INTERMEDIATE_STATUS"},
+        headers={"Authorization": f"bearer {fake_jwt}"},
+    )
+    assert res.status_code == 409, res.text
+
     # update the orignal request's status to a non-final, non-draft status
     res = client.put(f"/request/{request_id}", json={"status": "INTERMEDIATE_STATUS"})
     assert res.status_code == 200, res.text
