@@ -14,7 +14,8 @@ from requestor.db import Base
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
-config.set_main_option("sqlalchemy.url", requestor_config["DB_URL"])
+db_url = requestor_config["DB_URL"].replace("%", "%%")
+config.set_main_option("sqlalchemy.url", db_url)
 load_modules()
 target_metadata = Base.metadata
 

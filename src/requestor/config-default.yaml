@@ -36,10 +36,10 @@ LOCAL_MIGRATION: false
 # requestor: existing behavior
 # rems: create/locate the matching REMS resource/catalogue item and return redirect_url
 # dual: run existing behavior and REMS adapter; useful for migration/testing
-REQUEST_BACKEND: requestor
+REQUEST_BACKEND: dual
 
 REMS:
-  ENABLED: false
+  ENABLED: true
   URL: ""
   API_KEY: ""
   USER_ID: requestor

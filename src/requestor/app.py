@@ -36,7 +36,10 @@ def app_init() -> FastAPI:
         lifespan=lifespan,
     )
     app.add_middleware(ClientDisconnectMiddleware)
-    app.async_client = httpx.AsyncClient()
+    app.async_client = httpx.AsyncClient(
+        cookies=None,  # don't store/resend REMS session cookies
+        follow_redirects=False,  # don't follow redirects (would drop auth headers)
+    )
 
     # Following will update logger level, propagate, and handlers
     get_logger("requestor", log_level="debug" if debug == True else "info")
