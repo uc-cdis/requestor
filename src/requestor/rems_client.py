@@ -14,8 +14,11 @@ class RemsClient:
     REMS uses headers for API authentication and user impersonation. The API key
     identifies this service; x-rems-user-id identifies the REMS actor for the
     current call. For admin catalogue/resource setup we use REMS.USER_ID. For
-    user-facing application creation, the service account creates the application
-    and then invites the actual applicant as a member.
+    user-facing application creation, the API key must be configured to allow
+    all users (via `api-key set-users <key>` with no user list) and the service
+    account must have the `user-owner` role (via `grant-role user-owner <userid>`).
+    This allows the single API key to create applications on behalf of any user
+    by setting x-rems-user-id to the applicant's userid.
     """
 
     def __init__(self, http_client: httpx.AsyncClient, rems_config: dict):
@@ -191,31 +194,19 @@ class RemsClient:
         return {"id": created["id"]}
 
     async def create_application(
-        self, *, catalogue_item_id: int
+        self, *, catalogue_item_id: int, applicant_user_id: str
     ) -> dict:
         """
-        Create a REMS application as the service account (USER_ID / administrator).
-        The API key is authorised for this user so REMS accepts the request
-        without a CSRF token.  The actual applicant is associated afterwards
-        via invite_member().
+        Create a REMS application on behalf of the actual applicant.
+
+        Requires the API key to be configured with no user restrictions
+        (`api-key set-users <key>` with no users = all users allowed) and
+        the service account to have the `user-owner` role
+        (`grant-role user-owner <service-userid>`).
         """
         return await self._request(
             "POST",
             "/api/applications/create",
-            # user_id intentionally omitted → defaults to self.service_user_id
+            user_id=applicant_user_id,
             json={"catalogue-item-ids": [catalogue_item_id]},
-        )
-
-    async def invite_member(
-        self, *, application_id: int, member_user_id: str
-    ) -> dict:
-        """
-        Invite the actual applicant as a member of an application that was
-        created by the service account.  REMS will notify the user and they
-        will see the application in their dashboard when they log in.
-        """
-        return await self._request(
-            "POST",
-            f"/api/applications/{application_id}/invite-member",
-            json={"userid": member_user_id},
         )
