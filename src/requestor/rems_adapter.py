@@ -2,6 +2,7 @@ from fastapi import HTTPException
 from starlette.status import HTTP_400_BAD_REQUEST, HTTP_502_BAD_GATEWAY
 
 from .config import config
+from . import logger
 from .rems_client import RemsClient
 
 
@@ -36,8 +37,6 @@ def build_rems_redirect_url(rems_config: dict, *, catalogue_item_id: int, applic
             catalogue_item_id=catalogue_item_id,
         )
 
-    # REMS deployments can customize frontend routes, so keep this configurable.
-    # This default sends the user to the catalogue with the relevant item id available.
     return f"{rems_config['URL'].rstrip('/')}/catalogue?items={catalogue_item_id}"
 
 
@@ -73,9 +72,12 @@ async def create_rems_request(api_request, data: dict, applicant_user_id: str) -
 
     application_id = None
     if rems_config.get("CREATE_APPLICATION", False):
+        # Step 1: create the application as the service account (administrator).
+        # The API key is scoped to this user so REMS accepts the POST without
+        # a CSRF token.  Creating as the end-user directly would require a
+        # per-user API key, which doesn't scale.
         application = await client.create_application(
             catalogue_item_id=catalogue_item["id"],
-            applicant_user_id=applicant_user_id,
         )
         if not application.get("success"):
             raise HTTPException(
@@ -83,6 +85,26 @@ async def create_rems_request(api_request, data: dict, applicant_user_id: str) -
                 f"REMS application creation failed: {application.get('errors')}",
             )
         application_id = application.get("application-id")
+
+        # Step 2: invite the actual applicant as a member so they can see
+        # and submit the application in the REMS UI.
+        if application_id and applicant_user_id:
+            try:
+                await client.invite_member(
+                    application_id=application_id,
+                    member_user_id=applicant_user_id,
+                )
+                logger.info(
+                    f"Invited {applicant_user_id} as member of REMS application {application_id}"
+                )
+            except Exception as exc:
+                # Non-fatal: the application exists, the user can still be
+                # added manually in the REMS UI.  Log and continue so the
+                # redirect_url is still returned to the portal.
+                logger.error(
+                    f"Failed to invite {applicant_user_id} to REMS application "
+                    f"{application_id}: {exc}"
+                )
 
     return {
         "backend": "rems",
