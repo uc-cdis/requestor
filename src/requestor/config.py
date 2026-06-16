@@ -121,6 +121,11 @@ class RequestorConfig(Config):
                 "CREATE_APPLICATION": {"type": "boolean"},
                 "CATALOGUE_ITEM_URL_TEMPLATE": {"type": "string"},
                 "APPLICATION_URL_TEMPLATE": {"type": "string"},
+                "DEFAULT_ACCESS_DURATION_DAYS": {"type": ["integer", "number"]},
+                "ENTITLEMENT_BACKEND": {"type": "string", "enum": ["arborist", "lambda"]},
+                "ENTITLEMENT_LAMBDA_NAME": {"type": "string"},
+                "GROUP_NAME_TEMPLATE": {"type": "string"},
+                "AUTH0_ROLE_TEMPLATE": {"type": "string"},
             },
         }
         validate(instance=rems, schema=schema)

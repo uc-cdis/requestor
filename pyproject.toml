@@ -30,6 +30,7 @@ sqlalchemy = { extras = ["asyncio"], version = ">=2" }
 pyyaml = ">=6"
 starlette = ">=0.50"
 asyncpg = "*"
+boto3 = ">=1.26.0"
 
 [tool.poetry.group.dev.dependencies]
 mock = ">=4.0.3"
@@ -42,6 +43,7 @@ deptry = ">=0.24.0"
 "system" = "requestor.routes.system"
 "manage" = "requestor.routes.manage"
 "query" = "requestor.routes.query"
+"rems_webhook" = "requestor.routes.rems_webhook"
 
 [tool.deptry]
 known_first_party = ["requestor"]
