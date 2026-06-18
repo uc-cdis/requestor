@@ -238,6 +238,18 @@ async def create_request(
             f"Found a draft request with request_id: {draft_previous_requests[0].request_id}"
         )
         request = draft_previous_requests[0]
+        if request.status != data["status"]:
+            msg = f'A draft access request for username \'{data["username"]}\' and policy_id \'{data["policy_id"]}\' in status \'{request.status}\' already exists. Use the update endpoint instead if you want to update the status to \'{data["status"]}\'.'
+            logger.error(
+                msg
+                + f" body: {data}. existing requests: {[r.request_id for r in previous_requests]}",
+                exc_info=True,
+            )
+            raise HTTPException(
+                HTTP_409_CONFLICT,
+                msg,
+            )
+
     else:
         # create a new request
         data = {"request_id": request_id, **data}
