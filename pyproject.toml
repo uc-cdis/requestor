@@ -13,7 +13,7 @@ include = [
 [tool.poetry.dependencies]
 python = ">=3.13,<4"
 alembic = ">=1"
-authutils = ">=6.2.1"
+authutils = ">=8.0.0"
 cdislogging = ">=1.0.0"
 fastapi = "<1"
 gen3authz = ">=2.1.0"
