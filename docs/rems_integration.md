@@ -19,9 +19,11 @@ User clicks "Request Access" in Gen3 portal
         │
         ▼
 POST /request  (Requestor)
-        │  creates REMS application, returns redirect URL
+        │  ensures REMS resource + catalogue item exist
+        │  optionally creates the application (REMS.CREATE_APPLICATION)
+        │  returns redirect_url in the response body
         ▼
-User redirected to REMS → completes application form
+Portal redirects user to REMS (client-side) → completes application form
         │
         ▼
 DAC reviews application in REMS
@@ -40,8 +42,9 @@ Requestor webhook handler
         └─ [lambda backend] ────────────────────────────────────────────┘
              invoke Lambda(action=grant, entitlement=acdc/program_project)
              Lambda → Auth0 Management API → assigns role
-             access_token_updater syncs Auth0 role → Arborist (≤30 min)
-             → user has access within 30 minutes
+             access_token_updater syncs Auth0 role → Arborist usr_grp row
+             (on its next scheduled run — latency is schedule-dependent)
+             → user has access once that sync completes
 ```
 
 ### Revoke flow
@@ -69,9 +72,12 @@ Requestor webhook handler
                      of which provider originally created it
                      (see Known Issues below)
              Step 3: verify via get_user() that group is gone
-             → access removed immediately (within token TTL ~20 min)
-             If Step 2 fails: Auth0 role already removed; Arborist
-             row expires naturally within 24h as fallback
+             → Arborist removal cuts off new authz immediately;
+               already-issued access tokens remain valid until they
+               expire (token TTL is a Fence setting)
+             BOTH steps must succeed. If either fails, the webhook
+             returns 500 so REMS re-drives the event (see
+             "Response and retry semantics" below)
 ```
 
 ---
@@ -145,10 +151,13 @@ location /requestor/api/v1/rems-webhook {
 Authentication is handled by the `x-rems-webhook-secret` shared secret
 header, which Requestor validates before processing any event.
 
-### user.yaml (arborist backend only)
+### user.yaml (both backends)
 
-For the `arborist` backend, Arborist groups must exist before the webhook
-can add users to them. Define them in `user.yaml` (fence helm values):
+Arborist groups and their policies must be defined in `user.yaml` (fence helm
+values) for **both** entitlement backends. Access is conferred by the policies
+bound to a group, and those come from `user.yaml` via usersync — a user added
+to an undefined or policy-less group has no access. The group name must match
+`GROUP_NAME_TEMPLATE`.
 
 ```yaml
 groups:
@@ -167,9 +176,41 @@ policies:
       - /programs/program1/projects/AusDiab
 ```
 
-For the `lambda` backend, groups are created by Fence's `access_token_updater`
-via Auth0 role sync — no `user.yaml` group definition is required, but
-matching Auth0 roles must exist in the tenant.
+The backends differ only in **how the membership row is written**, not in
+whether the group must be defined:
+
+- `arborist` — Requestor writes the `usr_grp` row directly, tagged
+  `authz_provider='requestor'`.
+- `lambda` — the Lambda assigns the Auth0 role, and Fence's
+  `access_token_updater` writes the `usr_grp` row on its next run, tagged
+  `authz_provider=NULL` (see [Known issues](#arborist-delete-provider-mismatch-lambda-backend)).
+  `access_token_updater` syncs *membership* only; it does not create the group
+  or its policies.
+
+The `lambda` backend additionally requires matching roles to exist in the Auth0
+tenant.
+
+**Note on naming:** the `user.yaml` group name must match `GROUP_NAME_TEMPLATE`
+(`program1_ausdiab_readonly`), **not** the Auth0 role name from
+`AUTH0_ROLE_TEMPLATE` (`acdc/program1_ausdiab_readonly`). The two are
+deliberately different — one names an Arborist group, the other an Auth0 role.
+
+---
+
+## Response and retry semantics
+
+The webhook returns `200` only when every entitlement action for every resource
+in the event succeeded. If any action reports `success: false`, it returns `500`
+so that REMS re-drives the event from its outbox.
+
+REMS retries failed event notifications with exponential backoff for up to
+12 hours, after which the notification is abandoned. Retries may arrive
+out of order (only initial notifications are ordered), and the `outbox`
+database table in REMS holds the retry state.
+
+Because of retries, both grant and revoke are idempotent — Arborist
+add/remove and Auth0 assign/remove are no-ops when the desired state already
+holds — so a retry that re-runs an already-successful half is harmless.
 
 ---
 
