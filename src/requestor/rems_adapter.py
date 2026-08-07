@@ -1,5 +1,9 @@
 from fastapi import HTTPException
-from starlette.status import HTTP_400_BAD_REQUEST, HTTP_502_BAD_GATEWAY
+from starlette.status import (
+    HTTP_400_BAD_REQUEST,
+    HTTP_404_NOT_FOUND,
+    HTTP_502_BAD_GATEWAY,
+)
 
 from . import logger
 from .config import config
@@ -15,14 +19,6 @@ def _first(value):
 def _get_rems_resid(data: dict) -> str | None:
     # Prefer the Gen3 auth/resource path because it is stable and maps back to Arborist.
     return _first(data.get("resource_paths")) or data.get("resource_path") or data.get("resource_id")
-
-
-def _get_title(data: dict, resid: str) -> str:
-    return data.get("resource_display_name") or data.get("title") or resid
-
-
-def _get_info_url(data: dict) -> str | None:
-    return data.get("study_url") or data.get("info_url") or data.get("infourl")
 
 
 def build_rems_redirect_url(rems_config: dict, *, catalogue_item_id: int, application_id: int | None = None) -> str:
@@ -41,6 +37,16 @@ def build_rems_redirect_url(rems_config: dict, *, catalogue_item_id: int, applic
 
 
 async def create_rems_request(api_request, data: dict, applicant_user_id: str) -> dict:
+    """
+    Route an access request to REMS.
+
+    This looks up the catalogue item already provisioned for the resource and,
+    if configured, creates an application against it on behalf of the applicant.
+    It does NOT create resources, catalogue items, or organizations — those must
+    be provisioned deliberately by an administrator. If the resource has no
+    active catalogue item, this fails with a clear error rather than fabricating
+    one.
+    """
     rems_config = config["REMS"]
     resid = _get_rems_resid(data)
     if not resid:
@@ -49,26 +55,21 @@ async def create_rems_request(api_request, data: dict, applicant_user_id: str) -
             "REMS request creation requires resource_path, resource_paths, or resource_id",
         )
 
-    title = _get_title(data, resid)
-    info_url = _get_info_url(data)
     client = RemsClient(api_request.app.async_client, rems_config)
 
-    resource = await client.ensure_resource(
-        resid=resid,
-        organization_id=rems_config["ORGANIZATION_ID"],
-        license_ids=rems_config.get("LICENSE_IDS", []),
-    )
+    catalogue_item = await client.get_active_catalogue_item_for_resource(resid)
+    if not catalogue_item:
+        logger.error(
+            f"No active REMS catalogue item is provisioned for resource '{resid}'"
+        )
+        raise HTTPException(
+            HTTP_404_NOT_FOUND,
+            f"Resource '{resid}' is not provisioned for access requests in REMS. "
+            "A catalogue item must be configured by an administrator before this "
+            "resource can be requested.",
+        )
 
-    catalogue_item = await client.ensure_catalogue_item(
-        resid=resid,
-        resource_id=resource["id"],
-        workflow_id=rems_config["WORKFLOW_ID"],
-        form_id=rems_config.get("FORM_ID"),
-        organization_id=rems_config["ORGANIZATION_ID"],
-        title=title,
-        info_url=info_url,
-        language=rems_config.get("LANGUAGE", "en"),
-    )
+    catalogue_item_id = catalogue_item["id"]
 
     application_id = None
     if rems_config.get("CREATE_APPLICATION", False):
@@ -77,7 +78,7 @@ async def create_rems_request(api_request, data: dict, applicant_user_id: str) -
         #   grant-role user-owner <USER_ID>
         #   api-key set-users <API_KEY>   (no users = all users allowed)
         application = await client.create_application(
-            catalogue_item_id=catalogue_item["id"],
+            catalogue_item_id=catalogue_item_id,
             applicant_user_id=applicant_user_id,
         )
         if not application.get("success"):
@@ -93,11 +94,11 @@ async def create_rems_request(api_request, data: dict, applicant_user_id: str) -
     return {
         "backend": "rems",
         "resource_id": resid,
-        "catalogue_item_id": catalogue_item["id"],
+        "catalogue_item_id": catalogue_item_id,
         "application_id": application_id,
         "redirect_url": build_rems_redirect_url(
             rems_config,
-            catalogue_item_id=catalogue_item["id"],
+            catalogue_item_id=catalogue_item_id,
             application_id=application_id,
         ),
     }

@@ -28,11 +28,6 @@ class RequestorConfig(Config):
                 "URL": "",
                 "API_KEY": "",
                 "USER_ID": "requestor",
-                "ORGANIZATION_ID": "gen3",
-                "WORKFLOW_ID": None,
-                "FORM_ID": None,
-                "LANGUAGE": "en",
-                "LICENSE_IDS": [],
                 "CREATE_APPLICATION": False,
                 "CATALOGUE_ITEM_URL_TEMPLATE": "",
                 "APPLICATION_URL_TEMPLATE": "",
@@ -102,10 +97,6 @@ class RequestorConfig(Config):
                 "URL",
                 "API_KEY",
                 "USER_ID",
-                "ORGANIZATION_ID",
-                "WORKFLOW_ID",
-                "LANGUAGE",
-                "LICENSE_IDS",
                 "CREATE_APPLICATION",
             ],
             "properties": {
@@ -113,12 +104,16 @@ class RequestorConfig(Config):
                 "URL": {"type": "string"},
                 "API_KEY": {"type": "string"},
                 "USER_ID": {"type": "string"},
+                "CREATE_APPLICATION": {"type": "boolean"},
+                # Deprecated: only used by the old REMS propagation path, which
+                # created resources/catalogue items. The Requestor no longer
+                # creates those, so these are ignored. Still accepted here so
+                # existing deployed configs continue to validate; safe to remove.
                 "ORGANIZATION_ID": {"type": "string"},
                 "WORKFLOW_ID": {"type": ["integer", "null"]},
                 "FORM_ID": {"type": ["integer", "null"]},
                 "LANGUAGE": NON_EMPTY_STRING_SCHEMA,
                 "LICENSE_IDS": {"type": "array", "items": {"type": "integer"}},
-                "CREATE_APPLICATION": {"type": "boolean"},
                 "CATALOGUE_ITEM_URL_TEMPLATE": {"type": "string"},
                 "APPLICATION_URL_TEMPLATE": {"type": "string"},
                 "DEFAULT_ACCESS_DURATION_DAYS": {"type": ["integer", "number"]},
@@ -134,8 +129,6 @@ class RequestorConfig(Config):
         if rems_backend_enabled:
             assert rems["URL"], "REMS.URL is required when REQUEST_BACKEND is rems or dual"
             assert rems["API_KEY"], "REMS.API_KEY is required when REQUEST_BACKEND is rems or dual"
-            assert rems["ORGANIZATION_ID"], "REMS.ORGANIZATION_ID is required when REQUEST_BACKEND is rems or dual"
-            assert rems["WORKFLOW_ID"] is not None, "REMS.WORKFLOW_ID is required when REQUEST_BACKEND is rems or dual"
 
     def validate_actions(self) -> None:
         """

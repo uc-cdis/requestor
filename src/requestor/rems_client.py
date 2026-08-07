@@ -11,14 +11,21 @@ class RemsClient:
     """
     Small async REMS API client used by the optional REMS request backend.
 
+    Scope: this client only *reads* REMS catalogue state and *creates
+    applications* on behalf of applicants. It deliberately does NOT create
+    organizations, resources, or catalogue items. Those are governance objects
+    (each catalogue item binds a workflow, form, and licenses chosen by a data
+    steward) and must be provisioned deliberately by an administrator, not
+    minted as a side effect of a user access request.
+
     REMS uses headers for API authentication and user impersonation. The API key
     identifies this service; x-rems-user-id identifies the REMS actor for the
-    current call. For admin catalogue/resource setup we use REMS.USER_ID. For
-    user-facing application creation, the API key must be configured to allow
-    all users (via `api-key set-users <key>` with no user list) and the service
-    account must have the `user-owner` role (via `grant-role user-owner <userid>`).
-    This allows the single API key to create applications on behalf of any user
-    by setting x-rems-user-id to the applicant's userid.
+    current call. For user-facing application creation, the API key must be
+    configured to allow all users (via `api-key set-users <key>` with no user
+    list) and the service account must have the `user-owner` role (via
+    `grant-role user-owner <userid>`). This allows the single API key to create
+    applications on behalf of any user by setting x-rems-user-id to the
+    applicant's userid.
     """
 
     def __init__(self, http_client: httpx.AsyncClient, rems_config: dict):
@@ -74,124 +81,27 @@ class RemsClient:
                 "Unable to reach REMS API",
             ) from exc
 
-    async def get_resource_by_resid(self, resid: str) -> dict | None:
-        resources = await self._request(
+    async def get_active_catalogue_item_for_resource(self, resid: str) -> dict | None:
+        """
+        Return the active (enabled, non-archived, non-expired) catalogue item
+        whose underlying resource matches `resid`, or None if the resource is
+        not provisioned for access requests in REMS.
+
+        This is a read-only lookup. If the resource has no catalogue item, the
+        caller is expected to fail loudly rather than create one.
+        """
+        items = await self._request(
             "GET",
-            f"/api/resources?disabled=true&archived=true&resid={quote(resid)}",
+            f"/api/catalogue-items?resource={quote(resid)}&archived=false",
         )
-        if not resources:
-            return None
-        return resources[0]
-
-    async def create_resource(
-        self,
-        *,
-        resid: str,
-        organization_id: str,
-        license_ids: list[int] | None = None,
-    ) -> dict:
-        return await self._request(
-            "POST",
-            "/api/resources/create",
-            json={
-                "resid": resid,
-                "organization": {"organization/id": organization_id},
-                "licenses": license_ids or [],
-            },
-        )
-
-    async def ensure_resource(
-        self,
-        *,
-        resid: str,
-        organization_id: str,
-        license_ids: list[int] | None = None,
-    ) -> dict:
-        existing = await self.get_resource_by_resid(resid)
-        if existing:
-            return existing
-
-        created = await self.create_resource(
-            resid=resid,
-            organization_id=organization_id,
-            license_ids=license_ids,
-        )
-        if not created.get("success"):
-            raise HTTPException(
-                HTTP_502_BAD_GATEWAY,
-                f"REMS resource creation failed: {created.get('errors')}",
-            )
-        return {"id": created["id"], "resid": resid}
-
-    async def get_catalogue_items_for_resource(self, resid: str) -> list[dict]:
-        return await self._request(
-            "GET",
-            f"/api/catalogue-items?disabled=true&archived=true&resource={quote(resid)}",
-        )
-
-    async def create_catalogue_item(
-        self,
-        *,
-        resource_id: int,
-        workflow_id: int,
-        form_id: int | None,
-        organization_id: str,
-        title: str,
-        info_url: str | None,
-        language: str = "en",
-    ) -> dict:
-        localization = {"title": title}
-        if info_url:
-            localization["infourl"] = info_url
-
-        payload = {
-            "resid": resource_id,
-            "wfid": workflow_id,
-            "organization": {"organization/id": organization_id},
-            "localizations": {language: localization},
-            "enabled": True,
-            "archived": False,
-        }
-        if form_id is not None:
-            payload["form"] = form_id
-
-        return await self._request(
-            "POST",
-            "/api/catalogue-items/create",
-            json=payload,
-        )
-
-    async def ensure_catalogue_item(
-        self,
-        *,
-        resid: str,
-        resource_id: int,
-        workflow_id: int,
-        form_id: int | None,
-        organization_id: str,
-        title: str,
-        info_url: str | None,
-        language: str = "en",
-    ) -> dict:
-        existing = await self.get_catalogue_items_for_resource(resid)
-        if existing:
-            return existing[0]
-
-        created = await self.create_catalogue_item(
-            resource_id=resource_id,
-            workflow_id=workflow_id,
-            form_id=form_id,
-            organization_id=organization_id,
-            title=title,
-            info_url=info_url,
-            language=language,
-        )
-        if not created.get("success"):
-            raise HTTPException(
-                HTTP_502_BAD_GATEWAY,
-                f"REMS catalogue item creation failed: {created.get('errors')}",
-            )
-        return {"id": created["id"]}
+        for item in items:
+            if (
+                item.get("enabled", True)
+                and not item.get("archived", False)
+                and not item.get("expired", False)
+            ):
+                return item
+        return None
 
     async def create_application(
         self, *, catalogue_item_id: int, applicant_user_id: str
