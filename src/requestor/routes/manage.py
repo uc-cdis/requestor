@@ -22,6 +22,7 @@ from ..auth import Auth
 from ..config import config
 from ..db import Request as RequestModel, get_db_session
 from ..request_utils import post_status_update
+from ..rems_adapter import create_rems_request
 
 
 router = APIRouter()
@@ -40,6 +41,22 @@ class CreateRequestInput(BaseModel):
     status: str = None
     policy_id: str = None
     role_ids: list[str] = None
+
+
+async def get_request_username(data: dict, auth) -> str:
+    if data.get("username"):
+        return data["username"]
+
+    logger.debug("No username provided in body, using token username")
+    token_claims = await auth.get_token_claims()
+    token_username = token_claims.get("context", {}).get("user", {}).get("name")
+    if not token_username:
+        raise HTTPException(
+            HTTP_400_BAD_REQUEST,
+            "Must provide a username in the request body or token",
+        )
+    logger.debug(f"Got username from token: {token_username}")
+    return token_username
 
 
 async def grant_or_revoke_arborist_policy(arborist_client, policy_id, username, revoke):
@@ -102,6 +119,18 @@ async def create_request(
     if data.get("resource_path") and not data.get("resource_paths"):
         data["resource_paths"] = [data["resource_path"]]
 
+    request_backend = config.get("REQUEST_BACKEND", "requestor")
+    if request_backend == "rems":
+        if "revoke" in api_request.query_params:
+            raise HTTPException(
+                HTTP_400_BAD_REQUEST,
+                "The REMS request backend does not support the 'revoke' parameter",
+            )
+        data["username"] = await get_request_username(data, auth)
+        if data.get("resource_paths"):
+            await auth.authorize("create", data["resource_paths"])
+        return await create_rems_request(api_request, data, data["username"])
+
     # error (if we have both policy_id and resource_paths)
     # OR (if we have neither)
     if bool(data.get("policy_id")) == bool(data.get("resource_paths")):
@@ -159,16 +188,9 @@ async def create_request(
         data["status"] = config["DEFAULT_INITIAL_STATUS"]
 
     if not data.get("username"):
-        logger.debug("No username provided in body, using token username")
-        token_claims = await auth.get_token_claims()
-        token_username = token_claims.get("context", {}).get("user", {}).get("name")
-        if not token_username:
-            raise HTTPException(
-                HTTP_400_BAD_REQUEST,
-                "Must provide a username in the request body or token",
-            )
-        logger.debug(f"Got username from token: {token_username}")
-        data["username"] = token_username
+        data["username"] = await get_request_username(data, auth)
+
+    rems_payload = dict(data)
 
     if "revoke" in api_request.query_params:
         if api_request.query_params["revoke"]:
@@ -316,7 +338,16 @@ async def create_request(
     if redirect_url:
         request.redirect_url = redirect_url
 
-    return request.to_dict()
+    result = request.to_dict()
+
+    if request_backend == "dual":
+        result["rems"] = await create_rems_request(
+            api_request,
+            rems_payload,
+            rems_payload["username"],
+        )
+
+    return result
 
 
 @router.put("/request/{request_id}", status_code=HTTP_200_OK)

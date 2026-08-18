@@ -20,6 +20,20 @@ class RequestorConfig(Config):
         super(RequestorConfig, self).__init__(*args, **kwargs)
 
     def post_process(self) -> None:
+        self.setdefault("REQUEST_BACKEND", "requestor")
+        self.setdefault(
+            "REMS",
+            {
+                "ENABLED": False,
+                "URL": "",
+                "API_KEY": "",
+                "USER_ID": "requestor",
+                "CREATE_APPLICATION": False,
+                "CATALOGUE_ITEM_URL_TEMPLATE": "",
+                "APPLICATION_URL_TEMPLATE": "",
+            },
+        )
+
         # generate DB_URL from DB configs or env vars
         self["DB_URL"] = URL.create(
             os.environ.get("DB_DRIVER", self["DB_DRIVER"]),
@@ -43,6 +57,8 @@ class RequestorConfig(Config):
         ]
 
         self.validate_statuses()
+        self.validate_request_backend()
+        self.validate_rems()
         self.validate_credentials()
         self.validate_actions()
 
@@ -61,6 +77,58 @@ class RequestorConfig(Config):
             self["FINAL_STATUSES"],
         ):
             assert status in allowed_statuses, msg.format(status, allowed_statuses)
+
+
+    def validate_request_backend(self) -> None:
+        logger.info("Validating configuration: request backend")
+        allowed_backends = ["requestor", "rems", "dual"]
+        assert (
+            self["REQUEST_BACKEND"] in allowed_backends
+        ), f"REQUEST_BACKEND must be one of {allowed_backends}"
+
+    def validate_rems(self) -> None:
+        logger.info("Validating configuration: REMS")
+        rems = self["REMS"]
+        schema = {
+            "type": "object",
+            "additionalProperties": False,
+            "required": [
+                "ENABLED",
+                "URL",
+                "API_KEY",
+                "USER_ID",
+                "CREATE_APPLICATION",
+            ],
+            "properties": {
+                "ENABLED": {"type": "boolean"},
+                "URL": {"type": "string"},
+                "API_KEY": {"type": "string"},
+                "USER_ID": {"type": "string"},
+                "CREATE_APPLICATION": {"type": "boolean"},
+                # Deprecated: only used by the old REMS propagation path, which
+                # created resources/catalogue items. The Requestor no longer
+                # creates those, so these are ignored. Still accepted here so
+                # existing deployed configs continue to validate; safe to remove.
+                "ORGANIZATION_ID": {"type": "string"},
+                "WORKFLOW_ID": {"type": ["integer", "null"]},
+                "FORM_ID": {"type": ["integer", "null"]},
+                "LANGUAGE": NON_EMPTY_STRING_SCHEMA,
+                "LICENSE_IDS": {"type": "array", "items": {"type": "integer"}},
+                "CATALOGUE_ITEM_URL_TEMPLATE": {"type": "string"},
+                "APPLICATION_URL_TEMPLATE": {"type": "string"},
+                "DEFAULT_ACCESS_DURATION_DAYS": {"type": ["integer", "number"]},
+                "ENTITLEMENT_BACKEND": {"type": "string", "enum": ["arborist", "lambda"]},
+                "ENTITLEMENT_LAMBDA_NAME": {"type": "string"},
+                "GROUP_NAME_TEMPLATE": {"type": "string"},
+                "AUTH0_ROLE_TEMPLATE": {"type": "string"},
+            },
+        }
+        validate(instance=rems, schema=schema)
+
+        rems_backend_enabled = self["REQUEST_BACKEND"] in ["rems", "dual"] or rems["ENABLED"]
+        if rems_backend_enabled:
+            assert rems["URL"], "REMS.URL is required when REQUEST_BACKEND is rems or dual"
+            assert rems["API_KEY"], "REMS.API_KEY is required when REQUEST_BACKEND is rems or dual"
 
     def validate_actions(self) -> None:
         """

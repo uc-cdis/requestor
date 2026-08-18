@@ -28,6 +28,46 @@ DB_SSL:
 # useful when migrating a local database or running unit tests
 LOCAL_MIGRATION: false
 
+
+####################
+# REQUEST BACKEND   #
+####################
+
+# requestor: existing behavior
+# rems: create/locate the matching REMS resource/catalogue item and return redirect_url
+# dual: run existing behavior and REMS adapter; useful for migration/testing
+REQUEST_BACKEND: requestor
+
+REMS:
+  ENABLED: true
+  URL: ""
+  API_KEY: ""
+  USER_ID: requestor
+  CREATE_APPLICATION: false
+  CATALOGUE_ITEM_URL_TEMPLATE: ""
+  APPLICATION_URL_TEMPLATE: ""
+  # Duration in days for Arborist group membership granted on REMS approval.
+  # After this period the delete_expired_access job removes the membership automatically.
+  # The REMS revoke/close/expired webhook event removes access immediately regardless.
+  DEFAULT_ACCESS_DURATION_DAYS: 365
+  # Backend for applying entitlements when REMS approves/revokes an application.
+  #   arborist (default): directly update Arborist group membership.
+  #                       authz_provider='requestor' gives full audit trail.
+  #   lambda:             invoke an AWS Lambda via IAM (boto3) with a generic
+  #                       entitlement payload. Lambda handles AAI-specific update.
+  #                       Requires ENTITLEMENT_LAMBDA_NAME and pod IAM permissions.
+  ENTITLEMENT_BACKEND: "arborist"
+  # Lambda function name or ARN. Required when ENTITLEMENT_BACKEND=lambda.
+  # The Requestor pod's IAM role must have lambda:InvokeFunction on this function.
+  ENTITLEMENT_LAMBDA_NAME: ""
+  # Template for deriving the entitlement name from a REMS resource path.
+  # <program> and <project> are substituted from /programs/<program>/projects/<project>.
+  # For backend=arborist: this must match a group name defined in user.yaml.
+  # For backend=lambda: this is passed as "entitlement" in the Lambda payload.
+  # Note: use <program>/<project> not {program}/{project} — gen3config intercepts {}.
+  GROUP_NAME_TEMPLATE: "<program>_<project>_readonly"
+  AUTH0_ROLE_TEMPLATE: "acdc/<program>_<project>_readonly"
+
 ####################
 # REQUEST STATUSES #
 ####################
@@ -109,3 +149,9 @@ CREDENTIALS: {}
   #     client_secret: ""
   #     url: "" # token endpoint
   #     scope: "space separated list of scopes"
+
+# Shared secret for authenticating incoming REMS webhook calls.
+# Must match the value in REMS config.edn event-notification-targets headers.
+# REQUIRED — the webhook endpoint bypasses CSRF protection so this secret is
+# the sole authentication mechanism. Requests will be rejected if not set.
+REMS_WEBHOOK_SECRET: ""
