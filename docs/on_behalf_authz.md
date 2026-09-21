@@ -1,20 +1,21 @@
 # Requesting access on behalf of other users
 
-**Status: design note, not implemented.** This describes how Requestor could restrict which
-users a caller may create access requests for. Nothing in the code implements it today.
+Requestor restricts which users a caller may create access requests for. Deployments that need
+callers to file requests naming somebody else must grant the policies below.
 
-## What it would add
+## What it adds
 
-`create` access on service `requestor` for a resource path allows creating access requests for
-*any* user: the `username` in the request body is used as provided, and only falls back to the
-token's user when it is absent. That is intended - `create` on a resource path is the
-administrative permission for that resource - but it means the permission cannot be split.
+`create` access on service `requestor` for a resource path allows creating access requests: the
+`username` in the request body is used as provided, and only falls back to the token's user when
+it is absent. `create` on a resource path is the administrative permission for that resource, so
+on its own that permission cannot be split.
 
 A deployment that wants self-service requests for everyone, as in the
 [example configuration](authorization.md#authorization-configuration-example) where
-`all_users_policies` grants `requestor_creator` on `/programs`, also grants every authenticated
-user the ability to file requests naming somebody else. There is no way to express "these users
-may file requests for others, everyone else may only file their own".
+`all_users_policies` grants `requestor_creator` on `/programs`, would otherwise also grant every
+authenticated user the ability to file requests naming somebody else. The separate
+`/requestor/on_behalf` resource path expresses "these users may file requests for others,
+everyone else may only file their own".
 
 ## The check
 
@@ -32,7 +33,7 @@ Two things about this check:
 - It must run before `arborist.create_arborist_policy`, since resources and policies created
   there are not undone when the request fails.
 
-Both hold if the check stays where the username is resolved, which is already before those two
+Both hold because the check stays where the username is resolved, which is before those two
 steps.
 
 Client tokens are covered by the same rule rather than exempted: a client token has no
@@ -69,30 +70,30 @@ authz:
         - requestor_on_behalf_johndoe
 ```
 
-## Potential issue: usernames containing a slash
+## Usernames containing a slash
 
 The username becomes a path segment, and a grant covers everything beneath a path, so a request
-naming `alice/bob` would be authorized by a policy granted for the user `alice`. Reject usernames
-containing `/` with a 400, or percent-encode the segment before building the path - but note that
-encoding it changes the path a `user.yaml` policy has to name.
+naming `alice/bob` would be authorized by a policy granted for the user `alice`. A username
+containing `/` is rejected with a 400. Percent-encoding the segment would also close this, but it
+changes the path a `user.yaml` policy has to name.
 
-## Why it is not enabled
+## Upgrading
 
 The policies are additive - no existing permission is revoked - but until a deployment grants
 them, callers can only file requests for themselves. That breaks any integration that files
 requests for other users, including the administrator revocation flow documented in
-[Removing access](authorization.md#removing-access). Enabling this therefore requires granting
-the policy before upgrading.
+[Removing access](authorization.md#removing-access). Grant the policy before upgrading.
 
 ## Testing notes
 
-`mock_arborist_requests` in `tests/conftest.py` keys its responses on URL, so the auth mock has
-to be taught to deny by resource path, matching Arborist's descendant semantics rather than exact
-equality - `is_path_prefix_of_path` in `src/requestor/arborist.py` already implements that
-comparison. With that in place the cases worth covering are: a caller with no on-behalf access,
+`mock_arborist_requests` in `tests/conftest.py` keys its responses on URL, so its
+`authorized_resource_paths` parameter denies by resource path instead, matching Arborist's
+descendant semantics rather than exact equality via `is_path_prefix_of_path` in
+`src/requestor/arborist.py`. `tests/test_on_behalf.py` covers a caller with no on-behalf access,
 a caller granted the whole subtree, a caller granted a single username (authorized for that
-username, denied for another), a client token, a username containing `/`, and a `revoke` request
-from an unauthorized caller asserting `arborist.user_has_policy` is never called.
+username, denied for another), a client token, a username containing `/`, a `revoke` request from
+an unauthorized caller asserting `arborist.user_has_policy` is never called, and a denied request
+asserting no policy is created.
 
 ## Alternatives considered
 

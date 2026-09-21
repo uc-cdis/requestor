@@ -28,6 +28,10 @@ from ..db import (
 from ..request_utils import post_status_update
 
 
+# Root of the resource paths that authorize creating requests for another user. A grant
+# on this path covers every user; a grant on "<root>/<username>" covers only that user.
+ON_BEHALF_RESOURCE_PREFIX = "/requestor/on_behalf"
+
 router = APIRouter()
 
 
@@ -467,6 +471,10 @@ async def get_request_username(auth: Auth, body_username: str | None) -> str:
     """
     Get the username an access request should be attributed to.
 
+    Naming a user other than the token's own requires "create" access on
+    "<ON_BEHALF_RESOURCE_PREFIX>/<username>". A client token has no username of its
+    own, so every username it provides goes through that check.
+
     Args:
         auth (Auth): the Auth instance for the current API request.
         body_username (str | None): the "username" from the request body, if any.
@@ -475,9 +483,23 @@ async def get_request_username(auth: Auth, body_username: str | None) -> str:
         str: the provided username, or the username of the user who provided the token.
 
     Raises:
-        HTTPException: 400 if neither the body nor the token provides a username.
+        HTTPException: 400 if neither the body nor the token provides a username, or if
+            the provided username contains a "/". 403 if the caller does not have
+            access to create requests for the provided username.
     """
     if body_username:
+        if body_username != await _get_token_username_or_none(auth):
+            # The username becomes a resource path segment and an Arborist grant covers
+            # everything below a path, so without this a request naming "alice/bob"
+            # would be authorized by a grant for the user "alice".
+            if "/" in body_username:
+                raise HTTPException(
+                    HTTP_400_BAD_REQUEST,
+                    "The username cannot contain '/'",
+                )
+            await auth.authorize(
+                "create", [f"{ON_BEHALF_RESOURCE_PREFIX}/{body_username}"]
+            )
         return body_username
 
     token_claims = await auth.get_token_claims()
@@ -529,3 +551,24 @@ def log_and_raise_400_error(logger, msg: str, body: CreateRequestInput):
 
 def init_app(app: FastAPI):
     app.include_router(router, tags=["Manage"])
+
+
+async def _get_token_username_or_none(auth: Auth) -> str | None:
+    """
+    Get the username from the token, or None if the token does not provide one.
+
+    Args:
+        auth (Auth): the Auth instance for the current API request.
+
+    Returns:
+        str | None: the token's username, or None if the token is missing, invalid or
+            carries no username, as a client token does.
+    """
+    try:
+        token_claims = await auth.get_token_claims()
+    except HTTPException:
+        # `Auth.get_token_claims` raises 401 for a missing or invalid token, but
+        # Requestor leaves that verdict to Arborist. This function's only job
+        # is to get the username if it exists.
+        return None
+    return token_claims.get("context", {}).get("user", {}).get("name")
