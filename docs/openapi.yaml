@@ -97,7 +97,7 @@ components:
       type: http
 info:
   title: Requestor
-  version: 2.0.0
+  version: 3.0.0
 openapi: 3.1.0
 paths:
   /_status:
@@ -186,10 +186,11 @@ paths:
         \ once, each (\"username\", \"policy_id\") combination must be\nunique unless\
         \ past requests' statuses are in FINAL_STATUSES.\n\nIf no \"username\" is\
         \ specified in the request body, will create an access\nrequest for the user\
-        \ who provided the token.\n\nThe request should include one of the following\
-        \ for which access is being granted:\n  * policy_id\n  * resource_path(s)\
-        \ + existing role_ids\n  * resource_path(s) without a role_id (a default reader\
-        \ role is assigned)"
+        \ who provided the token. Providing a \"username\" creates the\nrequest for\
+        \ that user.\n\nThe request should include one of the following for which\
+        \ access is being granted:\n  * policy_id\n  * resource_path(s) + existing\
+        \ role_ids\n  * resource_path(s) without a role_id (a default reader role\
+        \ is assigned)"
       operationId: create_request_request_post
       requestBody:
         content:
