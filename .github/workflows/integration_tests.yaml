@@ -9,6 +9,8 @@ jobs:
     with:
       # Tag used in tests that depend on this repo (https://github.com/uc-cdis/gen3-code-vigil/blob/master/gen3-integration-tests/pyproject.toml)
       SERVICE_TO_TEST: requestor
+      # TODO: remove before merging, or runs break once this gen3-code-vigil branch is deleted
+      TEST_REPO_BRANCH: feat/requestor
     secrets:
       CI_TEST_ORCID_USERID: ${{ secrets.CI_TEST_ORCID_USERID }}
       CI_TEST_ORCID_PASSWORD: ${{ secrets.CI_TEST_ORCID_PASSWORD }}
