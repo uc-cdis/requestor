@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime, timezone
 from fastapi import APIRouter, Body, Depends, FastAPI, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import delete, insert, select
+from sqlalchemy import delete, insert, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio.session import AsyncSession
 from starlette.requests import Request
@@ -20,9 +20,17 @@ import traceback
 from .. import logger, arborist
 from ..auth import Auth
 from ..config import config
-from ..db import Request as RequestModel, get_db_session
+from ..db import (
+    Request as RequestModel,
+    get_db_engine_and_sessionmaker,
+    get_db_session,
+)
 from ..request_utils import post_status_update
 
+
+# Root of the resource paths that authorize creating requests for another user. A grant
+# on this path covers every user; a grant on "<root>/<username>" covers only that user.
+ON_BEHALF_RESOURCE_PREFIX = "/requestor/on_behalf"
 
 router = APIRouter()
 
@@ -44,6 +52,15 @@ class CreateRequestInput(BaseModel):
 
 async def grant_or_revoke_arborist_policy(arborist_client, policy_id, username, revoke):
     if revoke:
+        # checked here rather than when the request is created: the answer is only
+        # actionable for a caller who has "update" access on the policy's resource
+        # paths, which both callers of this function check first
+        if not await arborist.user_has_policy(arborist_client, username, policy_id):
+            raise HTTPException(
+                HTTP_400_BAD_REQUEST,
+                f"Unable to revoke access: '{username}' does not have access to policy '{policy_id}'",
+            )
+
         success = await arborist.revoke_user_access_to_policy(
             arborist_client,
             username,
@@ -84,7 +101,8 @@ async def create_request(
     unique unless past requests' statuses are in FINAL_STATUSES.
 
     If no "username" is specified in the request body, will create an access
-    request for the user who provided the token.
+    request for the user who provided the token. Providing a "username" creates the
+    request for that user.
 
     The request should include one of the following for which access is being granted:
       * policy_id
@@ -146,6 +164,11 @@ async def create_request(
 
     await auth.authorize("create", resource_paths)
 
+    # both must run before any Arborist resource or policy is created below, since
+    # those are not undone when the request creation fails
+    data["username"] = await get_request_username(auth, data.get("username"))
+    data["status"] = get_request_status(data.get("status"))
+
     if not data["policy_id"]:
         # create the policy _after_ checking authz so we don't allow unauthorized users to
         # create resources and policies
@@ -154,21 +177,6 @@ async def create_request(
             resource_paths=data["resource_paths"],
             role_ids=data["role_ids"],
         )
-
-    if not data.get("status"):
-        data["status"] = config["DEFAULT_INITIAL_STATUS"]
-
-    if not data.get("username"):
-        logger.debug("No username provided in body, using token username")
-        token_claims = await auth.get_token_claims()
-        token_username = token_claims.get("context", {}).get("user", {}).get("name")
-        if not token_username:
-            raise HTTPException(
-                HTTP_400_BAD_REQUEST,
-                "Must provide a username in the request body or token",
-            )
-        logger.debug(f"Got username from token: {token_username}")
-        data["username"] = token_username
 
     if "revoke" in api_request.query_params:
         if api_request.query_params["revoke"]:
@@ -183,15 +191,6 @@ async def create_request(
                 f"The 'revoke' parameter is not compatible with the 'resource_path' body field",
             )
         data["revoke"] = True
-
-        # check if the user has the policy we want to revoke
-        if not await arborist.user_has_policy(
-            client, data["username"], data["policy_id"]
-        ):
-            raise HTTPException(
-                HTTP_400_BAD_REQUEST,
-                f"Unable to revoke access: '{data['username']}' does not have access to policy '{data['policy_id']}'",
-            )
 
     # get requests for this (username, policy_id) for which the status is
     # not in FINAL_STATUSES. users can only request access to a resource once.
@@ -387,7 +386,7 @@ async def update_request(
     request.status = status
     request.updated_time = datetime.now(timezone.utc)
     # commit the transaction, releasing the lock - `post_status_update` could take time
-    db_session.commit()
+    await db_session.commit()
 
     res = request.to_dict()
 
@@ -396,9 +395,16 @@ async def update_request(
     except Exception:  # if external calls or other actions fail: revert
         logger.error("Something went wrong during post-status-update actions")
         logger.warning(f"Reverting to the previous status: {old_status}")
-        request.status = old_status
-        request.updated_time = datetime.now(timezone.utc)
-        db_session.commit()
+        # `db_session` was committed above, and its transaction cannot be reused, so
+        # the revert needs a session of its own
+        _, session_maker_instance = get_db_engine_and_sessionmaker()
+        async with session_maker_instance() as revert_session:
+            async with revert_session.begin():
+                await revert_session.execute(
+                    update(RequestModel)
+                    .where(RequestModel.request_id == request_id)
+                    .values(status=old_status, updated_time=datetime.now(timezone.utc))
+                )
         if status in config["UPDATE_ACCESS_STATUSES"]:
             logger.warning(f"Reverting the previous access {action} action")
             await grant_or_revoke_arborist_policy(
@@ -461,6 +467,77 @@ async def delete_request(
     return {"request_id": request_id}
 
 
+async def get_request_username(auth: Auth, body_username: str | None) -> str:
+    """
+    Get the username an access request should be attributed to.
+
+    Naming a user other than the token's own requires "create" access on
+    "<ON_BEHALF_RESOURCE_PREFIX>/<username>". A client token has no username of its
+    own, so every username it provides goes through that check.
+
+    Args:
+        auth (Auth): the Auth instance for the current API request.
+        body_username (str | None): the "username" from the request body, if any.
+
+    Returns:
+        str: the provided username, or the username of the user who provided the token.
+
+    Raises:
+        HTTPException: 400 if neither the body nor the token provides a username, or if
+            the provided username contains a "/". 403 if the caller does not have
+            access to create requests for the provided username.
+    """
+    if body_username:
+        if body_username != await _get_token_username_or_none(auth):
+            # The username becomes a resource path segment and an Arborist grant covers
+            # everything below a path, so without this a request naming "alice/bob"
+            # would be authorized by a grant for the user "alice".
+            if "/" in body_username:
+                raise HTTPException(
+                    HTTP_400_BAD_REQUEST,
+                    "The username cannot contain '/'",
+                )
+            await auth.authorize(
+                "create", [f"{ON_BEHALF_RESOURCE_PREFIX}/{body_username}"]
+            )
+        return body_username
+
+    token_claims = await auth.get_token_claims()
+    token_username = token_claims.get("context", {}).get("user", {}).get("name")
+    if not token_username:
+        raise HTTPException(
+            HTTP_400_BAD_REQUEST,
+            "Must provide a username in the request body or token",
+        )
+
+    logger.debug(f"Using username from token: {token_username}")
+    return token_username
+
+
+def get_request_status(body_status: str | None) -> str:
+    """
+    Get the status an access request should be created with.
+
+    Args:
+        body_status (str | None): the "status" from the request body, if any.
+
+    Returns:
+        str: the provided status, or the configured DEFAULT_INITIAL_STATUS.
+
+    Raises:
+        HTTPException: 400 if the status is not in ALLOWED_REQUEST_STATUSES.
+    """
+    status = body_status or config["DEFAULT_INITIAL_STATUS"]
+    allowed_statuses = config["ALLOWED_REQUEST_STATUSES"]
+    if status not in allowed_statuses:
+        raise HTTPException(
+            HTTP_400_BAD_REQUEST,
+            f"Status '{status}' is not an allowed request status ({allowed_statuses})",
+        )
+
+    return status
+
+
 def log_and_raise_400_error(logger, msg: str, body: CreateRequestInput):
     logger.error(
         msg + f" body: {body}",
@@ -474,3 +551,24 @@ def log_and_raise_400_error(logger, msg: str, body: CreateRequestInput):
 
 def init_app(app: FastAPI):
     app.include_router(router, tags=["Manage"])
+
+
+async def _get_token_username_or_none(auth: Auth) -> str | None:
+    """
+    Get the username from the token, or None if the token does not provide one.
+
+    Args:
+        auth (Auth): the Auth instance for the current API request.
+
+    Returns:
+        str | None: the token's username, or None if the token is missing, invalid or
+            carries no username, as a client token does.
+    """
+    try:
+        token_claims = await auth.get_token_claims()
+    except HTTPException:
+        # `Auth.get_token_claims` raises 401 for a missing or invalid token, but
+        # Requestor leaves that verdict to Arborist. This function's only job
+        # is to get the username if it exists.
+        return None
+    return token_claims.get("context", {}).get("user", {}).get("name")

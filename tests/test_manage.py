@@ -43,6 +43,34 @@ def test_create_request_without_username(client, access_token_user_only_patcher)
     }
 
 
+def test_create_request_with_invalid_status(client):
+    """
+    A request with a status that is not in ALLOWED_REQUEST_STATUSES is rejected
+    before any policy is created in Arborist.
+    """
+    fake_jwt = "1.2.3"
+
+    mock_create_policy = MagicMock()
+    create_policy_patch = patch(
+        "requestor.routes.manage.arborist.create_arborist_policy", mock_create_policy
+    )
+    create_policy_patch.start()
+
+    res = client.post(
+        "/request",
+        json={
+            "username": "requestor_user",
+            "resource_path": "/my/resource",
+            "status": "NOT_AN_ALLOWED_STATUS",
+        },
+        headers={"Authorization": f"bearer {fake_jwt}"},
+    )
+
+    create_policy_patch.stop()
+    assert res.status_code == 400, res.text
+    assert not mock_create_policy.called, "Arborist policy created for a failed request"
+
+
 def test_create_duplicate_request(client):
     """
     Users can only request access to a resource once.
@@ -463,10 +491,41 @@ def test_revoke_request_failure(client):
     assert res.status_code == 400, res.text
     assert "should not be assigned a value" in res.json()["detail"]
 
-    # attempt to revoke access to a policy the user doesn't have
+    # a revoke request for a policy the user does not have is created...
     data["policy_id"] = "test-existing-policy"
     res = client.post(
         "/request?revoke", json=data, headers={"Authorization": f"bearer {fake_jwt}"}
     )
+    assert res.status_code == 201, res.text
+    request_id = res.json()["request_id"]
+
+    # ... and rejected when someone tries to approve it
+    res = client.put(
+        f"/request/{request_id}", json={"status": config["UPDATE_ACCESS_STATUSES"][0]}
+    )
     assert res.status_code == 400, res.text
     assert "does not have access to policy" in res.json()["detail"]
+
+
+def test_create_revoke_request_does_not_check_user_access(client):
+    """
+    Creating a revoke request does not look the user up in Arborist: their access to
+    the policy is only checked when the request is approved.
+    """
+    fake_jwt = "1.2.3"
+
+    mock_user_has_policy = MagicMock()
+    user_has_policy_patch = patch(
+        "requestor.routes.manage.arborist.user_has_policy", mock_user_has_policy
+    )
+    user_has_policy_patch.start()
+
+    res = client.post(
+        "/request?revoke",
+        json={"username": "other_user", "policy_id": "test-policy"},
+        headers={"Authorization": f"bearer {fake_jwt}"},
+    )
+
+    user_has_policy_patch.stop()
+    assert res.status_code == 201, res.text
+    assert not mock_user_has_policy.called, "Arborist was queried for the user's access"

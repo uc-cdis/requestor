@@ -1,7 +1,9 @@
 # Controlling authorization
 
 Requestor's endpoints are protected by Arborist policies:
+
 - To create an access request, users must have `create` access on service `requestor` for the relevant resource paths (either the resource paths provided in the request, or the resource paths for the policy provided in the request).
+- Providing a `username` in the request body creates the access request for that user. Naming a user other than the token's own additionally requires `create` access on `/requestor/on_behalf/<username>`; see [Requesting access on behalf of other users](on_behalf_authz.md), which deployments must grant before upgrading if any of their integrations file requests for other users. Filing requests for other users is intended functionality: granting `create` for the `requestor` service on a resource plus the on-behalf path explicitly grants that user the ability to file requests for other users to access that resource. Note that the actual review and decision of such access is out of band of this service.
 - To update an access request, users must have `update` access on service `requestor` for the relevant resource paths.
 - To delete an access request, users must have `delete` access on service `requestor` for the relevant resource paths.
 - Users can see their own access requests regardless of their access in Arborist by hitting the `GET  /request/user` endpoint.
@@ -12,7 +14,6 @@ Requestor's endpoints are protected by Arborist policies:
 User johndoe@example.com wants to request access to dataset D. The resource path for dataset D in the `user.yaml` file is `/programs/P/projects/D`.
 
 The authorization is flexible: we can allow specific users to request access to specific datasets, or allow all users to request access to all datasets (see the example configuration below), or something in-between.
-
 
 ```yaml
 authz:
@@ -113,7 +114,7 @@ The body of the request should have the `username` and `policy_id`, for example
 }
 ```
 
-Just like access requests, revocation requests must be approved before they take effect. The user's access will be revoked when the new request has been approved by an administrator.
+Just like access requests, revocation requests must be approved before they take effect. The user's access will be revoked when the new request has been approved by an administrator. Whether the user has access to the policy is verified when the revocation is approved, not when it is requested.
 
 **IMPORTANT NOTE:** Requestor can only revoke access that has been granted through Requestor.
 
