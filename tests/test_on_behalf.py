@@ -4,11 +4,12 @@ Tests the authorization check that governs creating requests for another user.
 import pytest
 from unittest.mock import MagicMock, patch
 
+from requestor.routes.manage import ON_BEHALF_RESOURCE_PREFIX
+
 
 # Resource path of "test-policy" in the `mock_arborist_requests` fixture. Every test
 # here grants it, so that the only denial under test is the on-behalf one.
 POLICY_RESOURCE_PATH = "/my/resource"
-ON_BEHALF_ANY_USER = "/requestor/on_behalf"
 
 FAKE_JWT = "1.2.3"
 
@@ -52,7 +53,7 @@ def test_create_request_for_other_user_with_access_to_whole_subtree(
 ):
     """A caller granted the whole on-behalf subtree may name any user."""
     mock_arborist_requests(
-        authorized_resource_paths=[POLICY_RESOURCE_PATH, ON_BEHALF_ANY_USER]
+        authorized_resource_paths=[POLICY_RESOURCE_PATH, ON_BEHALF_RESOURCE_PREFIX]
     )
 
     res = client.post(
@@ -76,7 +77,7 @@ def test_create_request_with_on_behalf_access_to_a_single_user(
     mock_arborist_requests(
         authorized_resource_paths=[
             POLICY_RESOURCE_PATH,
-            f"{ON_BEHALF_ANY_USER}/other_user",
+            f"{ON_BEHALF_RESOURCE_PREFIX}/other_user",
         ]
     )
 
@@ -99,7 +100,7 @@ def test_create_request_with_username_containing_a_slash_is_rejected(
     mock_arborist_requests(
         authorized_resource_paths=[
             POLICY_RESOURCE_PATH,
-            f"{ON_BEHALF_ANY_USER}/alice",
+            f"{ON_BEHALF_RESOURCE_PREFIX}/alice",
         ]
     )
 

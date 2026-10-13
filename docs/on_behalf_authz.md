@@ -77,12 +77,12 @@ naming `alice/bob` would be authorized by a policy granted for the user `alice`.
 containing `/` is rejected with a 400. Percent-encoding the segment would also close this, but it
 changes the path a `user.yaml` policy has to name.
 
-## Upgrading
+## Integrations that file requests for other users
 
-The policies are additive - no existing permission is revoked - but until a deployment grants
-them, callers can only file requests for themselves. That breaks any integration that files
-requests for other users, including the administrator revocation flow documented in
-[Removing access](authorization.md#removing-access). Grant the policy before upgrading.
+The policies are additive - they revoke no existing permission - and a caller without one can
+only file requests for themselves. This affects any integration that files requests for other
+users, including the administrator revocation flow documented in
+[Removing access](authorization.md#removing-access).
 
 ## Testing notes
 

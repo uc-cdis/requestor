@@ -487,8 +487,9 @@ async def get_request_username(auth: Auth, body_username: str | None) -> str:
             the provided username contains a "/". 403 if the caller does not have
             access to create requests for the provided username.
     """
+    token_username = await _get_token_username_or_none(auth)
     if body_username:
-        if body_username != await _get_token_username_or_none(auth):
+        if body_username != token_username:
             # The username becomes a resource path segment and an Arborist grant covers
             # everything below a path, so without this a request naming "alice/bob"
             # would be authorized by a grant for the user "alice".
@@ -502,8 +503,6 @@ async def get_request_username(auth: Auth, body_username: str | None) -> str:
             )
         return body_username
 
-    token_claims = await auth.get_token_claims()
-    token_username = token_claims.get("context", {}).get("user", {}).get("name")
     if not token_username:
         raise HTTPException(
             HTTP_400_BAD_REQUEST,
