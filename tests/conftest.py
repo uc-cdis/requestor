@@ -15,7 +15,7 @@ environ["REQUESTOR_CONFIG_PATH"] = os.path.join(
 )
 
 from requestor.app import app_init
-from requestor.arborist import get_auto_policy_id
+from requestor.arborist import get_auto_policy_id, is_path_prefix_of_path
 from requestor.config import config
 from requestor.db import Base, get_db_engine_and_sessionmaker, initialize_db
 
@@ -227,9 +227,12 @@ def mock_arborist_requests(request):
     arborist client's auth_request method.
     By default, it returns a 200 response. If parameter "authorized" is set
     to False, it raises a 401 error.
+    If parameter "authorized_resource_paths" is set to a list of resource paths,
+    authorization requests are only granted for those paths and the paths below
+    them, as Arborist would.
     """
 
-    def do_patch(authorized=True):
+    def do_patch(authorized=True, authorized_resource_paths=None):
         # URLs to reponses: { URL: { METHOD: ( content, code ) } }
         urls_to_responses = {
             "http://arborist-service/auth/request": {
@@ -340,9 +343,30 @@ def mock_arborist_requests(request):
             },
         }
 
+        def is_authorized_for_request_body(body):
+            """Grant only if every requested resource is at or below a granted path."""
+            return all(
+                any(
+                    is_path_prefix_of_path(granted_path, item["resource"])
+                    for granted_path in authorized_resource_paths
+                )
+                for item in body.get("requests", [])
+            )
+
         def make_mock_response(method, url, *args, **kwargs):
             method = method.upper()
             mocked_response = MagicMock(requests.Response)
+
+            if (
+                url == "http://arborist-service/auth/request"
+                and authorized_resource_paths is not None
+            ):
+                mocked_response.status_code = 200
+                mocked_response.json.return_value = {
+                    "auth": authorized
+                    and is_authorized_for_request_body(kwargs.get("json", {}))
+                }
+                return mocked_response
 
             if url not in urls_to_responses:
                 mocked_response.status_code = 404
