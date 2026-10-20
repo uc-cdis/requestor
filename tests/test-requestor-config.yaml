@@ -5,6 +5,9 @@
 DEBUG: true
 DOCS_URL_PREFIX: /
 
+ALLOWED_ISSUERS:
+  - https://test.planx-pla.net/user
+
 ####################
 # DATABASE         #
 ####################
