@@ -45,6 +45,16 @@ class RequestorConfig(Config):
         self.validate_statuses()
         self.validate_credentials()
         self.validate_actions()
+        self.validate_allowed_issuers()
+
+    def validate_allowed_issuers(self) -> None:
+        logger.info("Validating configuration: allowed issuers")
+        allowed_issuers = self["ALLOWED_ISSUERS"]
+        assert isinstance(allowed_issuers, list), "ALLOWED_ISSUERS should be a list"
+        if not allowed_issuers:
+            logger.warning(
+                "ALLOWED_ISSUERS is not configured: access tokens from any issuer will be accepted"
+            )
 
     def validate_statuses(self) -> None:
         logger.info("Validating configuration: statuses")

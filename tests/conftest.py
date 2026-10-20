@@ -1,5 +1,10 @@
 import asyncio
 import os
+import time
+
+from authutils.token.fastapi import access_token as authutils_access_token
+import httpx2
+from joserfc import jwk, jwt
 import pytest
 import pytest_asyncio
 import requests
@@ -221,6 +226,47 @@ def access_token_user_only_patcher():
 
 
 @pytest.fixture(scope="function")
+def generate_signed_token(access_token_patcher):
+    """
+    Undo the `access_token_patcher` mock so that tokens are actually validated by
+    authutils, and serve the public key of a newly generated key pair from the
+    `/jwt/keys` endpoint of any issuer.
+
+    Returns a function which generates an access token signed with the private key.
+    Claims can be overridden through its keyword arguments.
+    """
+    key = jwk.generate_key("RSA", 2048, parameters={"kid": "test-kid"}, private=True)
+
+    async def mock_get(self, url, *args, **kwargs):
+        if not url.endswith("/jwt/keys"):
+            # OIDC discovery is not available: authutils falls back on `/jwt/keys`
+            raise Exception(f"Unexpected URL in test: {url}")
+        mocked_response = MagicMock(httpx2.Response)
+        mocked_response.json.return_value = {"keys": [key.as_dict(private=False)]}
+        return mocked_response
+
+    def do_generate(**claim_overrides):
+        now = int(time.time())
+        claims = {
+            "sub": "1",
+            "iss": config["ALLOWED_ISSUERS"][0],
+            "aud": "gen3",
+            "iat": now,
+            "exp": now + 300,
+            "pur": "access",
+            "scope": ["openid", "user"],
+            "context": {"user": {"name": "requestor_user"}},
+        }
+        claims.update(claim_overrides)
+        return jwt.encode({"alg": "RS256", "typ": "JWT", "kid": key.kid}, claims, key)
+
+    with patch("requestor.auth.access_token", authutils_access_token), patch(
+        "httpx2.AsyncClient.get", mock_get
+    ), patch.dict("authutils.token.fastapi._jwt_public_keys", clear=True):
+        yield do_generate
+
+
+@pytest.fixture(scope="function")
 def mock_arborist_requests(request):
     """
     This fixture returns a function which you call to mock the call to
@@ -392,6 +438,8 @@ def mock_arborist_requests(request):
 
         patch_method.start()
         request.addfinalizer(patch_method.stop)
+
+        return mocked_method
 
     return do_patch
 

@@ -7,6 +7,7 @@ from starlette.status import HTTP_401_UNAUTHORIZED, HTTP_403_FORBIDDEN
 from gen3authz.client.arborist.errors import ArboristError
 
 from .. import logger
+from ..config import config
 
 
 # auto_error=False prevents FastAPI from raising a 403 when the request
@@ -23,8 +24,12 @@ class Auth:
     ):
         self.arborist_client = api_request.app.arborist_client
         self.bearer_token = bearer_token
+        self.token_claims = None
 
     async def get_token_claims(self) -> dict:
+        if self.token_claims is not None:
+            return self.token_claims
+
         if not self.bearer_token:
             err_msg = "Must provide an access token."
             logger.error(err_msg)
@@ -37,7 +42,11 @@ class Auth:
             # NOTE: token can be None if no Authorization header was provided, we
             # expect this to cause a downstream exception since it is invalid
             token_claims = await access_token(
-                "user", "openid", audience="gen3", purpose="access"
+                "user",
+                "openid",
+                audience="gen3",
+                allowed_issuers=config["ALLOWED_ISSUERS"] or None,
+                purpose="access",
             )(self.bearer_token)
         except Exception as e:
             logger.error(
@@ -49,6 +58,7 @@ class Auth:
                 "Could not verify, parse, and/or validate scope from provided access token.",
             )
 
+        self.token_claims = token_claims
         return token_claims
 
     async def authorize(
@@ -62,6 +72,11 @@ class Auth:
             if self.bearer_token and hasattr(self.bearer_token, "credentials")
             else None
         )
+
+        if token:
+            # validate the token before handing it off to Arborist. Raises a 401 error
+            # if the token is invalid
+            await self.get_token_claims()
 
         try:
             authorized = await self.arborist_client.auth_request(
